@@ -1,7 +1,7 @@
 """Manual moon register and transparent 30-day production projections."""
 from __future__ import annotations
 from collections import defaultdict
-from decimal import Decimal, ROUND_FLOOR
+from decimal import Decimal, ROUND_FLOOR, ROUND_HALF_UP
 import time
 import uuid
 
@@ -12,7 +12,7 @@ from .planner import PlanningError, integer, decimal_number
 CACHE_SECONDS=90*86400
 FUEL_BLOCKS=(4246,4247,4051,4312)
 MAGMATIC_GAS=81143
-DEFAULTS={'implant':4,'mining_recovery':100,'crystal_variant':'A II','fuel_block_id':4246,'fuel_block_price':None}
+DEFAULTS={'implant':4,'mining_recovery':100,'crystal_variant':'A II','fuel_block_id':4246,'fuel_block_price':None,'sales_tax':0,'broker_fee':0}
 SOURCES=[
     {'name':'CCP Static Data Export','url':'https://developers.eveonline.com/docs/services/static-data/'},
     {'name':'Moon mining','url':'https://support.eveonline.com/hc/en-us/articles/115005404229-Moon-Mining'},
@@ -34,6 +34,10 @@ def validate_preferences(data):
         if key=='implant':
             if isinstance(value,bool) or value not in [0,1,2,4]:raise PlanningError('Hibás finomítási implant.')
         elif key=='mining_recovery':value=float(decimal_number(value,'Begyűjtött arány',0,100))
+        elif key in ['sales_tax','broker_fee']:
+            amount=decimal_number(value,key,0,100)
+            if amount.as_tuple().exponent < -4:raise PlanningError('Az adó legfeljebb négy tizedesjegyet tartalmazhat.')
+            value=float(amount)
         elif key=='fuel_block_id':
             if isinstance(value,bool) or value not in FUEL_BLOCKS:raise PlanningError('Ismeretlen Fuel Block típus.')
         elif key=='fuel_block_price':
@@ -47,7 +51,7 @@ def validate_preferences(data):
 
 
 def validate_moon(data,catalog,existing):
-    if not isinstance(data,dict) or set(data)-{'id','system_id','moon_id','structure','ores','notes','enabled','online_starts'}:
+    if not isinstance(data,dict) or set(data)-{'id','system_id','moon_id','structure','ores','notes','enabled','online_starts','rent_isk','other_cost_isk'}:
         raise PlanningError('Ismeretlen holdmező.')
     mid=integer(data.get('moon_id'),'Hold',2**53-1,1)
     sid=integer(data.get('system_id'),'Rendszer',2**53-1,1)
@@ -74,7 +78,9 @@ def validate_moon(data,catalog,existing):
     if not isinstance(enabled,bool):raise PlanningError('Hibás üzemállapot.')
     identifier=data.get('id')
     if identifier is not None and identifier not in {r['id'] for r in existing}:raise PlanningError('A szerkesztett hold már nem található.')
-    return {'id':identifier or str(uuid.uuid4()),'system_id':sid,'moon_id':mid,'structure':structure,
+    previous=next((r for r in existing if r['id']==identifier),{})
+    costs={key:format(decimal_number(data.get(key,previous.get(key,'0')),'Bérlet' if key=='rent_isk' else 'Egyéb holdköltség',0,10**15).quantize(Decimal('.01'),rounding=ROUND_HALF_UP),'f') for key in ['rent_isk','other_cost_isk']}
+    return {**costs,'id':identifier or str(uuid.uuid4()),'system_id':sid,'moon_id':mid,'structure':structure,
             'ores':items,'notes':notes.strip(),'enabled':enabled,
             'online_starts':integer(data.get('online_starts',0),'Bekapcsolások',1000,0)}
 

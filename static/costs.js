@@ -26,6 +26,8 @@ const EveCosts=(()=>{
     });
     return {rows:values,cents,missing,stale};
   }
+  function money(value){const m=String(value??'').match(/^(\d+)(?:\.(\d+))?$/);if(!m)return null;const f=(m[2]||'').padEnd(3,'0');return BigInt(m[1])*100n+BigInt(f.slice(0,2))+(Number(f[2])>=5?1n:0n);}
+  function percent(cents,rate){const p=scaled(rate,true);return p===null||cents===null?null:(cents*p+500000n)/1000000n;}
   function materials(plan){
     // Each raw input or consumed existing intermediate is valued once. Do not
     // add manufactured intermediates again on top of their production inputs.
@@ -34,15 +36,16 @@ const EveCosts=(()=>{
   }
   function format(cents){
     if(cents===null||cents===undefined)return '–';
+    const negative=cents<0n;cents=negative?-cents:cents;
     const s=cents.toString().padStart(3,'0'),whole=s.slice(0,-2).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
-    return whole+','+s.slice(-2)+' ISK';
+    return (negative?'-':'')+whole+','+s.slice(-2)+' ISK';
   }
   function formatUnit(price){
     if(price===null||price===undefined)return '–';
     const s=price.toString().padStart(5,'0');
     return s.slice(0,-4).replace(/\B(?=(\d{3})+(?!\d))/g,' ')+','+s.slice(-4).replace(/0{1,2}$/,'')+' ISK';
   }
-  return {scaled,unit,value,materials,format,formatUnit};
+  return {scaled,unit,value,money,percent,materials,format,formatUnit};
 })();
 globalThis.EveCosts=EveCosts;
 if(typeof module!=='undefined'&&module.exports)module.exports=EveCosts;

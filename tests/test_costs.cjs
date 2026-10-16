@@ -57,3 +57,9 @@ test('fuel aggregates sum rounded per-moon costs without losing cents',()=>{
  const result=C.value(rows,{},'split');
  assert.equal(result.cents,80n);assert.equal(result.rows[0].cents,40n);
 });
+test('profit formatting preserves losses and exact percentage fees',()=>{
+ assert.equal(C.format(-5n),'-0,05 ISK');assert.equal(C.format(-123456789n),'-1 234 567,89 ISK');
+ assert.equal(C.money('123456789012345.6789012345'),12345678901234568n);
+ assert.equal(C.percent(123456789n,'2.5'),3086420n);
+ assert.equal(C.percent(0n,0),0n);
+});

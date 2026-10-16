@@ -23,6 +23,7 @@ import webbrowser
 from . import __version__
 from . import moons
 from .market import Market,validate_ids as market_ids
+from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
 from .esi import EveConnection, EsiError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES
 from .corporations import dashboard as corporation_dashboard
@@ -43,6 +44,7 @@ class App:
         self.planner = Planner(self.catalog)
         self.eve = EveConnection(self.store)
         self.market = Market(self.store)
+        self.industry = IndustryCosts(self.store)
         self.port = port
         self.origin = f'http://127.0.0.1:{port}'
         self.cookie = secrets.token_urlsafe(32)
@@ -410,6 +412,7 @@ class App:
         return {'version': __version__, 'csrf': self.csrf, 'settings': settings,
                 'corporation_id':corporation_id,'scope_label':self.scope_label(corporation_id),
                 'corporations':corporation_dashboard(self.store)['corporations'],'corporation_scopes':CORPORATION_SCOPES,
+                'industry_facilities':{a:{'system_id':settings[a].get('system_id'),'system_name':self.catalog.moon_systems.get(settings[a].get('system_id'),{}).get('name')} for a in ['manufacturing','reaction']},
                 'production_characters':[{k:p[k] for k in ['id','name','available','as_of']} for p in production_profiles(self.store,settings,corporation_id)],
                 'characters': chars, 'plans': plans, 'reservation_error': reservation_error,'delivery_wait':delivery_wait,
                 'inventory': self.store.mapping('inventory',corporation_id), 'parameters': self.store.mapping('parameters',corporation_id),
@@ -450,8 +453,11 @@ def validated_settings(data, current):
                 raise PlanningError('Ismeretlen struktúrabeállítás.')
             group = result[key].copy()
             for field, n in value.items():
+                if field=='system_id':
+                    group[field]=None if n is None else integer(n,'Rendszer',2**31-1,1)
+                    continue
                 group[field] = float(decimal_number(n, field, .01 if field == 'skill_time' else 0,
-                                                    1 if field == 'skill_time' else 99))
+                                                    1 if field == 'skill_time' else 10 if field=='facility_tax' else 99))
             value = group
         else:
             raise PlanningError('Ismeretlen beállítás.')
@@ -511,7 +517,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/icon.svg']:
+            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if not self.authorized():
@@ -529,6 +535,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/skills':
                 with self.app.catalog.lock:
                     return self.send(200, skill_dashboard(self.app.store,self.app.catalog))
+            if path == '/api/industry':return self.send(200,self.app.industry.status())
+            if path == '/api/industry/system':return self.send(200,self.app.industry.system(int(query.get('id',['0'])[0]),self.app.catalog))
             if path == '/api/prices':
                 ids=market_ids([int(v) for v in query.get('ids',[''])[0].split(',') if v],self.app.catalog)
                 return self.send(200,self.app.market.snapshot(ids))
@@ -578,7 +586,11 @@ class Handler(BaseHTTPRequestHandler):
             path = urllib.parse.urlsplit(self.path).path
             query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             corporation_id=self.app.scope_id(query.get('corporation_id',[None])[0])
-            if path == '/api/prices/refresh':
+            if path == '/api/industry/refresh':
+                self.app.industry.start();return self.send(200,self.app.industry.status())
+            elif path == '/api/industry/estimate':
+                with self.app.catalog.lock:return self.send(200,self.app.industry.estimate(data.get('rows'),self.app.store.settings(),self.app.catalog))
+            elif path == '/api/prices/refresh':
                 ids=market_ids(data.get('ids'),self.app.catalog)
                 self.app.market.start(ids)
                 return self.send(200,self.app.market.snapshot(ids))
@@ -601,7 +613,12 @@ class Handler(BaseHTTPRequestHandler):
                     updated=validated_settings(data,self.app.scope_settings(corporation_id))
                     current=self.app.store.settings();current.setdefault('corporation_locations',{})[str(corporation_id)]=updated['location_ids']
                     self.app.store.save_settings(current)
-                else:self.app.store.save_settings(validated_settings(data, self.app.store.settings()))
+                else:
+                    updated=validated_settings(data, self.app.store.settings())
+                    for activity in ['manufacturing','reaction']:
+                        sid=updated[activity].get('system_id')
+                        if sid is not None and sid not in self.app.catalog.moon_systems:raise PlanningError('Ismeretlen rendszer.')
+                    self.app.store.save_settings(updated)
             elif path in ['/api/inventory', '/api/parameters']:
                 table = 'inventory' if path.endswith('inventory') else 'parameters'
                 existing = self.app.store.mapping(table,corporation_id)

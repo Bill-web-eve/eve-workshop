@@ -136,7 +136,7 @@ A bónuszok szorzódnak. A skill időszorzó alapból 1,00; állítsd át, ha a 
 
 - Bármely recepttel rendelkező köztes termék **Vételre** állítható a Blueprintok oldalon. Ekkor annak saját alapanyagai eltűnnek, és maga a köztes termék kerül a beszerzési listára.
 - Fuel block bemenetet alapból vásároltnak tekint, ahogy a korábbi táblázatok. Külön célterméknek kiválasztva gyártható, vagy a tervben Gyártásra állítható.
-- A PI-termékek beszerzendő levelek. A PI-kolóniák külön menüben követhetők; invention, BPC-másolás, ISK-költségek, adók és slotok naptári ütemezése nem része a tervezőnek. Az összes munkaóra a jobidők összege, nem a párhuzamos gyártás átfutási ideje.
+- A PI-termékek beszerzendő levelek. A PI-kolóniák külön menüben követhetők; invention, BPC-másolás és slotok naptári ütemezése nem része a tervezőnek. Az ISK-költségek és a jobdíjak külön becslésként jelennek meg. Az összes munkaóra a jobidők összege, nem a párhuzamos gyártás átfutási ideje.
 - A **Terv mentése és foglalás** a célterméket és darabszámot tárolja, valamint aktív készletfoglalást indít. A készlet és a blueprintparaméterek közösek. A foglalások kezelését az alábbi rész írja le.
 - A gyártási és beszerzési lista CSV-be menthető; a beszerzési lista vágólapra is másolható.
 - A **Receptadatok frissítése** a CCP hivatalos SDE-jét tölti le. A mellékelt adatbázis: **3607705**, 2026. október 12.; **4172 választható, publikált gyártható termék**. Frissítés nélkül az előre csomagolt receptek internet nélkül is használhatók.
@@ -246,8 +246,20 @@ Az **Ellenorzes.cmd** külön ideiglenes tesztprofillal ellenőrzi a Windows-tit
 
 A holdtermelés, a gyártási terv és az alapanyaghiány oldalán az **Árazás** mezőben választható a Jita sell, buy vagy split érték. A split a vételi és eladási ár átlaga. A választás minden költségnézetre érvényes és megmarad a böngészőben.
 
-A gyártási anyagköltség a felhasználásra kerülő meglévő anyagok értékét is tartalmazza. A hiánylista összege csak a beszerzendő mennyiségeket mutatja. Az ár nélküli tételek kimaradnak a részösszegből, és külön figyelmeztetést kapsz. A BPC-runokhoz nem használunk BPO-árat. A gyártási díjak és adók még nincsenek hozzáadva.
+A gyártási anyagköltség a felhasználásra kerülő meglévő anyagok értékét is tartalmazza. A hiánylista összege csak a beszerzendő mennyiségeket mutatja. Az ár nélküli tételek kimaradnak a részösszegből, és külön figyelmeztetést kapsz. A BPC-runokhoz nem használunk BPO-árat. A gyártási díjakat, a system indexet és a facility tax értékét a külön job cost számítás tartalmazza.
 
 Az árak Jita 4-4 nyilvános piaci ajánlataiból származnak, háttérben töltődnek be. A frissítés gomb az EVE ötperces gyorsítótárát betartja. A régi árak dátuma és az árazatlan tételek száma látható. A Production by moon és Ore volume and processing táblák holdszűrőiben a felsorolt holdakból választhatsz.
 
 A **Holdak és kitermelés → Fogyasztás** oldalon a **Fuel Block típusa** legördülőben válassz a négy blokk közül. A választás minden holdfúró költségére érvényes. A **Kézi Fuel Block egységár (ISK)** mezővel felülírhatod a blokk piaci árát; üresen visszaáll a kiválasztott Jita-árazás. Az **Üzemanyagár alkalmazása** menti a beállításokat. A Magmatic Gas továbbra is a Jita buy/sell/split választással számít. A 30 napos összeg holdanként, struktúratípusonként és összesen is látható, és a megadott bekapcsolásokat is tartalmazza.
+
+### Job cost és késztermék-eladási érték
+
+A **Struktúrák és bónuszok** alatt válassz gyártási rendszert a kereső találatai közül, külön a manufacturing és a reakció mezőben. Az indexet az ESI tölti be. Add meg a **Facility tax** értékét; a struktúra job cost kedvezménye, SCC és az esetleges Alpha-pótdíj is ugyanitt állítható. A **Bónuszok mentése** után a terv anyagköltségénél látható a job cost, a teljes hátralévő gyártási költség és a részletes díjbontás. Az indexek és a díjalaphoz használt adjusted price háttérben frissül, a CCP gyorsítótárát betartva.
+
+A terv késztermékének **Jita buy** és **Jita sell** eladási értéke egyszerre látható, a teljes célmennyiségre, bruttó összegként. A megadott termékre hiányzó Jita-ajánlat `–` értéket ad. A már meglévő késztermékek miatt a hátralévő gyártás költsége és a célmennyiség teljes eladási értéke eltérő mennyiségi alapot is jelenthet.
+
+### A holdtermelés profitja
+
+A **Termelés Jita-értéke** panel tartalmazza az üzemanyagot és Magmatic Gas-t, a megadott bérletet és egyéb költséget, az eladási díjakat, a teljes költséget és a **Profit / 30 nap** sort. Holdanként a **Szerkesztés** alatt add meg a havi bérletet és a további költségeket; ide írható például a külön Tatara üzemanyaga, a finomítás, bányászat és szállítás költsége. Ezek nem kerülnek automatikusan becslésre.
+
+Az eladási adót és a broker fee-t a holdak **Számítási beállítások** lapján adhatod meg. Kezdetben mindkettő 0%. Buy áron történő eladásnál nincs új eladási megbízás broker fee-je; sell és split esetén a megadott broker fee is számít. A struktúraszűrő a költséget és a profitot is szűri. A kézi Fuel Block ár mező az ezreseket automatikusan tagolja, a tizedesrészt megtartja.

@@ -101,6 +101,19 @@ class MoonTests(unittest.TestCase):
                       {'fuel_block_price':1000000000001}]:
             with self.subTest(value=value),self.assertRaises(PlanningError):validate_preferences(value)
 
+    def test_monthly_costs_survive_legacy_edits_and_validate_taxes(self):
+        m=self.save(rent_isk='12345.675',other_cost_isk='0.01')
+        self.assertEqual(m['rent_isk'],'12345.68')
+        request={k:v for k,v in m.items() if k not in ['rent_isk','other_cost_isk']}
+        self.s.save_moon(validate_moon(request,self.c,self.s.moon_records()))
+        self.assertEqual(self.report()['moons'][0]['rent_isk'],'12345.68')
+        self.s.save_moon_preferences(validate_preferences({'sales_tax':3.6,'broker_fee':1.2345}))
+        self.assertEqual(self.report()['settings']['broker_fee'],1.2345)
+        for value in [{'sales_tax':101},{'sales_tax':True},{'broker_fee':.00001}]:
+            with self.assertRaises(PlanningError):validate_preferences(value)
+        for patch in [{'rent_isk':-1},{'other_cost_isk':'nan'}]:
+            with self.assertRaises(PlanningError):validate_moon({**m,**patch},self.c,self.s.moon_records())
+
     def test_esi_cache_overrides_sde_and_304(self):
         http=Mock();http.request.side_effect=[({'name':'RP2-OQ','constellation_id':123,'security_status':-.5},{'ETag':'sys'}),({'name':'ESI constellation'},{'ETag':'const'})]
         info=system_info(self.s,self.c,http,self.sid);self.assertEqual(info['source'],'esi');self.assertEqual(info['system']['constellation'],'ESI constellation')

@@ -58,3 +58,4 @@ html[data-theme=dark] .skill-tabs [aria-pressed=true],html[data-theme=dark] .sho
 @media(max-width:760px){.moon-form-grid,.moon-ore-grid,.moon-settings{grid-template-columns:1fr}.moon-toolbar{align-items:flex-start}.moon-toolbar p{max-width:100%}}
 
 .cost-summary{margin-bottom:22px}.jita-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}.jita-controls label{display:flex;align-items:center;gap:10px}.jita-controls select{min-width:130px}.jita-controls small{color:var(--muted)}.cost-grand{font-size:26px;letter-spacing:-.5px;display:block}.cost-summary details{margin-top:14px}.cost-summary summary{cursor:pointer;padding:10px 0}.cost-summary p:empty{display:none}
+.facility-index{flex-wrap:wrap;gap:8px}.facility-index small{flex-basis:100%;color:var(--muted);font-size:11px}.economic-table [data-economic-value=total],.economic-table [data-economic-value=profit]{font-weight:750}.economic-table [data-economic-value=profit]{font-size:15px}

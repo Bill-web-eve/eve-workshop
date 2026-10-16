@@ -26,9 +26,11 @@ DEFAULT_SETTINGS = {
     'character_ids': [], 'location_ids': [], 'client_id': '',
     'corporation_locations': {},
     'manufacturing': {'material_role': 1, 'material_rig': 4.2,
-                      'time_role': 30, 'time_rig': 42, 'skill_time': 1},
+                      'time_role': 30, 'time_rig': 42, 'skill_time': 1, 'system_id':None,
+                      'facility_tax':2.5,'job_cost_role':5,'scc_surcharge':4,'alpha_surcharge':0},
     'reaction': {'material_role': 0, 'material_rig': 2.6,
-                 'time_role': 25, 'time_rig': 26.4, 'skill_time': 1},
+                 'time_role': 25, 'time_rig': 26.4, 'skill_time': 1,'system_id':None,
+                 'facility_tax':2.5,'job_cost_role':0,'scc_surcharge':4,'alpha_surcharge':0},
 }
 
 
@@ -106,7 +108,8 @@ class Store:
         result.update(bundled_defaults())
         with self.db() as db:
             for r in db.execute('SELECT * FROM settings'):
-                result[r['key']] = json.loads(r['value'])
+                value=json.loads(r['value'])
+                result[r['key']] = {**result[r['key']],**value} if r['key'] in ['manufacturing','reaction'] and isinstance(value,dict) else value
         return result
 
     def save_settings(self, settings):
