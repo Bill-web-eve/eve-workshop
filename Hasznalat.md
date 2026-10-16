@@ -238,3 +238,12 @@ A Windows ZIP-et az **Az összes kibontása** paranccsal csomagold ki, majd a ki
 A kiadásban nincs karakter, mentett terv, saját készlet vagy belépés. Csak a nyilvános Client ID van előre megadva; mindenki a saját EVE-karaktereit engedélyezi. A saját adatok Windows alatt a **%LOCALAPPDATA%\EVE Muhely** mappába kerülnek. A tokenek titkosítási kulcsát a Windows az adott felhasználói fiókhoz védi; másik gépen vagy Windows-fiókkal új EVE-belépés kell. Frissítés előtt a bal oldali **Alkalmazás leállítása** gombot használd, utána cseréld az alkalmazás mappáját. A külön tárolt saját adatok megmaradnak.
 
 Az **Ellenorzes.cmd** külön ideiglenes tesztprofillal ellenőrzi a Windows-titkosítást, a helyi API-t, a tervmentést és az EVE HTTPS-kapcsolatot. Saját karaktert nem ad hozzá és saját tervet nem módosít. Az összeállítás ezen a Macen történt; natív Windows 11 futtatási próba itt nem volt elérhető. A Windows-csomag nincs kiadói tanúsítvánnyal aláírva. A vírusvédelmet és a SmartScreent nem kell kikapcsolni.
+
+
+### Jita-árak és anyagköltség (helyi tesztváltozat)
+
+A holdtermelés, a gyártási terv és az alapanyaghiány oldalán az **Árazás** mezőben választható a Jita sell, buy vagy split érték. A split a vételi és eladási ár átlaga. A választás minden költségnézetre érvényes és megmarad a böngészőben.
+
+A gyártási anyagköltség a felhasználásra kerülő meglévő anyagok értékét is tartalmazza. A hiánylista összege csak a beszerzendő mennyiségeket mutatja. Az ár nélküli tételek kimaradnak a részösszegből, és külön figyelmeztetést kapsz. A BPC-runokhoz nem használunk BPO-árat. A gyártási díjak és adók még nincsenek hozzáadva.
+
+Az árak Jita 4-4 nyilvános piaci ajánlataiból származnak, háttérben töltődnek be. A frissítés gomb az EVE ötperces gyorsítótárát betartja. A régi árak dátuma és az árazatlan tételek száma látható. A Production by moon és Ore volume and processing táblák holdszűrőiben a felsorolt holdakból választhatsz.

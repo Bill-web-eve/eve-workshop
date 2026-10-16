@@ -67,3 +67,25 @@ test('blueprint wire values and canonical metadata are not translated',async()=>
   assert.equal(select.value,'manual');assert.equal(select.selectedOptions[0].textContent,'Manual');assert.equal(select.dataset.key,'source');assert.equal(d.querySelector('input').value,'3');assert.equal(d.querySelector('span').textContent,'Készlet');
   w.EveI18n.setLanguage('hu');await tick();assert.equal(select.value,'manual');assert.equal(select.selectedOptions[0].textContent,'Kézi');w.close();
 });
+test('stale-stock and edited-plan banners translate with names preserved',async()=>{
+ const dom=await page(),i=dom.window.EveI18n;i.setLanguage('en');
+ assert.equal(i.t('Korábbi EVE-adatokból számolunk: Alpha Test, Készlet. Frissítsd az EVE-adatokat; a legutóbbi sikeres pillanatkép addig megmarad.'),'Using an earlier EVE snapshot: Alpha Test, Készlet. Refresh the EVE data; the last successful snapshot remains available until then.');
+ assert.equal(i.t('Módosított mennyiség vagy gyártó karakter előnézete. A Terv és foglalás frissítése gombbal érvényesítheted. A későbbi tervek kiosztása is változhat.'),'Preview of a changed quantity or manufacturing character. Apply it using Update plan and reservations. Allocations for later plans may also change.');
+ dom.window.close();
+});
+test('moon dropdown filters select exact column values and preserve names across languages',async()=>{
+ const dom=await page(),w=dom.window,d=w.document;vm.runInContext(fs.readFileSync(path.join(root,'tables.js'),'utf8'),dom.getInternalVMContext());
+ d.body.insertAdjacentHTML('beforeend',w.EveTables.markup(['Hold','Anyag'],['<tr><td><span data-i18n-skip>Moon 1</span></td><td>One</td></tr>','<tr><td><span data-i18n-skip>Moon 10</span></td><td>Two</td></tr>','<tr><td><span data-i18n-skip>Moon 1</span></td><td>Three</td></tr>'],'','moon-select',{selectColumns:[0]}));await tick();
+ const select=d.querySelector('[data-table-filter="0"]');assert.equal(select.tagName,'SELECT');assert.equal(select.options.length,3);assert.equal(d.querySelector('.table-filters').hidden,true);
+ select.value='Moon 1';select.dispatchEvent(new w.Event('change'));await tick();
+ assert.deepEqual([...d.querySelectorAll('tbody tr:not(.table-empty-row)')].map(r=>r.hidden),[false,true,false]);
+ w.EveI18n.setLanguage('en');await tick();assert.equal(select.value,'Moon 1');assert.equal(select.options[0].textContent,'All moons');dom.window.close();
+});
+
+test('moon filter removes selections that disappeared from refreshed rows',async()=>{
+ const dom=await page(),w=dom.window,d=w.document;vm.runInContext(fs.readFileSync(path.join(root,'tables.js'),'utf8'),dom.getInternalVMContext());
+ const host=d.createElement('div');d.body.append(host);
+ const markup=name=>w.EveTables.markup(['Hold'],['<tr><td><span data-i18n-skip>'+name+'</span></td></tr>'],'','refreshed-moons',{selectColumns:[0]});
+ host.innerHTML=markup('Moon 1');await tick();let select=host.querySelector('select');select.value='Moon 1';select.dispatchEvent(new w.Event('change'));
+ host.innerHTML=markup('Moon 2');await tick();select=host.querySelector('select');assert.equal(select.value,'');assert.deepEqual([...select.options].map(o=>o.value),['','Moon 2']);dom.window.close();
+});

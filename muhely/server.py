@@ -22,6 +22,7 @@ import webbrowser
 
 from . import __version__
 from . import moons
+from .market import Market,validate_ids as market_ids
 from .catalog import Catalog, import_sde
 from .esi import EveConnection, EsiError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES
 from .corporations import dashboard as corporation_dashboard
@@ -41,6 +42,7 @@ class App:
         self.catalog = Catalog(catalog_path,pi_fallback=ROOT/'data/catalog.sqlite3')
         self.planner = Planner(self.catalog)
         self.eve = EveConnection(self.store)
+        self.market = Market(self.store)
         self.port = port
         self.origin = f'http://127.0.0.1:{port}'
         self.cookie = secrets.token_urlsafe(32)
@@ -509,7 +511,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/icon.svg']:
+            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if not self.authorized():
@@ -527,6 +529,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/skills':
                 with self.app.catalog.lock:
                     return self.send(200, skill_dashboard(self.app.store,self.app.catalog))
+            if path == '/api/prices':
+                ids=market_ids([int(v) for v in query.get('ids',[''])[0].split(',') if v],self.app.catalog)
+                return self.send(200,self.app.market.snapshot(ids))
             if path == '/api/moons':
                 with self.app.catalog.lock:return self.send(200,moons.dashboard(self.app.store,self.app.catalog))
             if path == '/api/moons/systems':
@@ -573,7 +578,11 @@ class Handler(BaseHTTPRequestHandler):
             path = urllib.parse.urlsplit(self.path).path
             query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             corporation_id=self.app.scope_id(query.get('corporation_id',[None])[0])
-            if path == '/api/moons/save':
+            if path == '/api/prices/refresh':
+                ids=market_ids(data.get('ids'),self.app.catalog)
+                self.app.market.start(ids)
+                return self.send(200,self.app.market.snapshot(ids))
+            elif path == '/api/moons/save':
                 with self.app.catalog.lock:
                     value=moons.validate_moon(data,self.app.catalog,self.app.store.moon_records())
                     self.app.store.save_moon(value)

@@ -49,6 +49,7 @@ class Store:
         self.path = self.folder / 'muhely.sqlite3'
         with self.db() as db:
             db.executescript('''
+                CREATE TABLE IF NOT EXISTS market_quotes(type_id INTEGER PRIMARY KEY,data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS moons(id TEXT PRIMARY KEY,moon_id INTEGER UNIQUE NOT NULL,data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS moon_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS universe_cache(kind TEXT,id INTEGER,data TEXT NOT NULL,
@@ -311,3 +312,11 @@ class Store:
     def save_universe_cache(self, kind, item_id, data, fetched, etag=None):
         with self.db() as db:db.execute('INSERT OR REPLACE INTO universe_cache VALUES (?,?,?,?,?)',
                                        (kind,item_id,json.dumps(data),fetched,etag))
+
+    def market_quote(self, tid):
+        with self.db() as db:
+            row=db.execute('SELECT data FROM market_quotes WHERE type_id=?',(tid,)).fetchone()
+            return json.loads(row['data']) if row else None
+
+    def save_market_quote(self, tid, data):
+        with self.db() as db:db.execute('INSERT OR REPLACE INTO market_quotes VALUES (?,?)',(tid,json.dumps(data)))

@@ -11,7 +11,7 @@ async function refreshMoons(){
   catch(e){if(view==='moons')error(e.message);}
   finally{moonRequest=null;}
 }
-function moonTable(headers,rows,key){return EveTables.markup(headers,rows,'moon-table','moons:'+key);}
+function moonTable(headers,rows,key){return EveTables.markup(headers,rows,'moon-table','moons:'+key,{selectColumns:/^(production-moons|ore-volumes)-/.test(key)?[0]:[]});}
 function renderMoons(content){
   setHead('HOLDGAZDÁLKODÁS','Holdak és kitermelés','Kézi holdnyilvántartás, 30 napos termelés, üzemanyag és bányászkristály-arányok.');
   $('#plan-status').hidden=true;
@@ -44,12 +44,15 @@ function renderMoonBody(){
   target.innerHTML=(invalid.length?`<div class="banner warn"><strong>Javításig kimaradnak a termelésből:</strong> ${invalid.map(m=>verbatim(m.name)).join(', ')}. <span>A megadott ércarányok összege meghaladja a 100%-ot.</span></div>`:'')+(partial.length?'<div class="banner">A részleges összetételű holdaknál csak a megadott ércekkel számolunk. Az arányokat nem növeljük fel 100%-ra.</div>':'');
   if(moonTab==='production'){
     target.innerHTML+=`<div class="banner">Az Athanor becslése a beállított begyűjtési aránnyal és a Tatara finomításával számol. A Metenox a saját, skillektől és implanttól független 40%-os kihozatalát használja. Folyamatos működést feltételezünk; ez előrejelzés, nem ESI-ben látott készlet.</div>`;
-    const ids=[...new Set(['Athanor','Metenox'].flatMap(k=>d.totals[k].map(r=>r.id)))].sort((a,b)=>d.totals.all.find(r=>r.id===a).name.localeCompare(d.totals.all.find(r=>r.id===b).name));
+    const ids=d.totals[moonFilter==='all'?'all':moonFilter].filter(r=>r.quantity>0).map(r=>r.id).sort((a,b)=>d.totals.all.find(r=>r.id===a).name.localeCompare(d.totals.all.find(r=>r.id===b).name));
     const amount=(k,id)=>d.totals[k].find(r=>r.id===id)?.quantity||0;
-    const rows=ids.map(id=>`<tr><td>${itemName(d.totals.all.find(r=>r.id===id).name)}</td>${(moonFilter==='all'?['Athanor','Metenox','all']:[moonFilter]).map(k=>`<td class="num">${fmt(amount(k,id))}</td>`).join('')}</tr>`);
-    target.innerHTML+=panel('Összesített anyagtermelés','30 nap · csak a beszámítható holdak',moonTable(moonFilter==='all'?['Anyag','Athanor (db)','Metenox (db)','Összesen (db)']:['Anyag','Mennyiség (db)'],rows,'production-'+moonFilter));
+    const costRows=ids.map(id=>({id,name:d.totals.all.find(r=>r.id===id).name,quantity:amount(moonFilter==='all'?'all':moonFilter,id),unit:'db'}));
+    target.innerHTML+=costSummary('moon-production',costRows,'Termelés Jita-értéke','A beszámított, 30 nap alatt várható anyagmennyiség piaci értéke.');
+    const rows=ids.map(id=>`<tr><td>${itemName(d.totals.all.find(r=>r.id===id).name)}</td>${(moonFilter==='all'?['Athanor','Metenox','all']:[moonFilter]).map(k=>`<td class="num">${fmt(amount(k,id))}</td>`).join('')}${costCell(id,amount(moonFilter==='all'?'all':moonFilter,id))}</tr>`);
+    target.innerHTML+=panel('Összesített anyagtermelés','30 nap · csak a beszámítható holdak',moonTable(moonFilter==='all'?['Anyag','Athanor (db)','Metenox (db)','Összesen (db)','Jita-egységár','Anyagérték']:['Anyag','Mennyiség (db)','Jita-egységár','Anyagérték'],rows,'production-'+moonFilter));
     target.innerHTML+=panel('Termelés holdanként','30 nap',moonTable(['Hold','Struktúra','Anyag','Mennyiség (db)','Állapot'],moons.flatMap(m=>m.outputs.length?m.outputs.map(r=>`<tr><td>${verbatim(m.name)}</td><td>${m.structure}</td><td>${itemName(r.name)}</td><td class="num" data-sort-value="${m.included?r.quantity:''}">${m.included?fmt(r.quantity):'–'}</td><td>${moonStatus(m)}</td></tr>`):[]),'production-moons-'+moonFilter));
     target.innerHTML+=panel('Érctérfogat és feldolgozás','Athanor: teljes 100 darabos adagok finomítása; Metenox: órás ciklusok',moonTable(['Hold','Érc','Arány','Érctérfogat (m³)','Nyers érc (db)'],moons.flatMap(m=>m.ores.map(o=>`<tr><td>${verbatim(m.name)}</td><td>${itemName(o.name)}</td><td class="num">${moonPercent(o.percent)}</td><td class="num" data-sort-value="${o.volume??''}">${o.volume===null?'–':fmt(o.volume)}</td><td class="num" data-sort-value="${o.units??''}">${o.units===null?'–':fmt(o.units)}</td></tr>`)),'ore-volumes-'+moonFilter));
+    bindJita(costRows.map(r=>r.id));
   }else if(moonTab==='consumption'){
     target.innerHTML+='<div class="banner">Csak a holdfúró fogyasztása szerepel itt. Más szolgáltatásmodulok, a külön Tatara üzemanyaga és a bérleti díj nincsenek benne. A hibás ércösszetételű, működő holdak üzemanyagát is számoljuk. A bekapcsolási költséget külön kell megadni.</div>';
     const keys=moonFilter==='all'?['Athanor','Metenox','all']:[moonFilter];

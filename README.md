@@ -111,3 +111,18 @@ Források: [CCP SDE](https://developers.eveonline.com/docs/services/static-data/
 ### Release upload recovery
 
 The publication workflow verifies and reconciles every reviewed `release-assets/v*/manifest.json` in numeric version order. It repairs missing installers on older mutable releases as well as publishing the latest version. Creation uses the REST response's numeric release ID directly; uploads and final publication checks also use IDs, so a freshly created draft need not appear in the release listing or tag index. Existing assets are SHA-256 checked and never overwritten. A draft is published only after every required asset has uploaded and verified successfully. An interrupted run resumes on the next push or manual workflow run.
+
+
+## Helyi tesztváltozat – 0.11.0 (még nincs release)
+
+Jita-árazás a holdtermelés, a gyártási terv és az egyedi/összesített beszerzési lista mellé. A táblázaton kívül választható **Jita sell**, **Jita buy**, **Jita split**; a választást a böngésző megjegyzi. Forrás: a CCP nyilvános ESI API-ja, The Forge régió (10000002), kizárólag a Jita IV - Moon 4 - Caldari Navy Assembly Plant állomás (60003760). Buy = legmagasabb vételi ajánlat, sell = legalacsonyabb eladási ajánlat, split = ezek számtani átlaga. A lekérés nem igényel karakterengedélyt és nem ad fel megbízást.
+
+A termékenkénti, összes oldalt feldolgozó árlekérés háttérben fut. A helyi cache és az ETag megmarad újraindítás után; az ötperces lekérési korlátot a frissítés gomb is betartja. Oldalhiba esetén a korábbi teljes ár marad meg, régi árként megjelölve. Hiányzó vételi/eladási oldal nem kap nulla értéket, a splithez mindkét ár kell. A részösszeg mellett megjelenik az árazatlan tételek száma. A BPC-runokat nem árazzuk BPO-piaci árral.
+
+Az anyagköltség a hátralévő gyártás felhasználandó bemeneteinek értéke, beleértve a készleten lévő és folyamatban lévő komponenseket. A legyártandó köztes termékek értékét nem adjuk hozzá még egyszer a bemeneteik értékéhez; a már elkészült komponensek alapanyagai nem kerülnek vissza a számításba. A beszerzési érték csak a hiányzó mennyiségekkel számol. A holdtermelés értéke a kiválasztott struktúraszűrővel, 30 napra számolt termékek értéke. Az egységárak tájékoztató jellegűek: mennyiségi árkönyvmélység, díjak, structure tax és system cost index még nincs a modellben.
+
+A pénzszámítás négy tizedes egységárból, egész aritmetikával készül; a sorösszeg cent pontosságra kerekített, az összesítés a látható sorösszegek összege. Az ár nélküli sorok `–` értékkel jelennek meg. A hiánylisták CSV-exportja tartalmazza az árazási módot, egységárat és értéket is.
+
+A **Production by moon** és **Ore volume and processing** holdoszlopai pontos választólistás szűrést kaptak, a szűrősor továbbra is csukva indul. Az angol figyelmeztetések javítva; a karakter-, hold- és terméknevek változatlanok.
+
+Tesztváltozat: nincs új kiadási csomag, tag vagy GitHub Release. A korábbi telepítők változatlanok.

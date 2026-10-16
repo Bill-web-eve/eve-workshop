@@ -21,9 +21,9 @@ const EveTables=(()=>{
   }
   const states=new Map(),instances=new WeakMap();
   let filterRowId=0;
-  function markup(headers,rows,cls,key){
+  function markup(headers,rows,cls,key,options={}){
     const heading=headers.map((h,i)=>`<th scope="col" aria-sort="none" data-column="${i}" data-label="${escape(h)}"><button type="button" class="table-sort" data-table-sort="${i}" aria-label="Rendezés: ${escape(h)}" title="Növekvő, csökkenő, majd eredeti sorrend">${escape(h)}<span class="table-sort-icon" aria-hidden="true">↕</span></button></th>`).join('');
-    const filters=headers.map((h,i)=>`<td>${/^karakter(?: neve|név)?$/i.test(h)?`<select data-table-filter="${i}" aria-label="${escape(h)} – oszlopszűrő"><option value="">Minden karakter</option></select>`:`<input type="search" data-table-filter="${i}" aria-label="${escape(h)} – oszlopszűrő" placeholder="Szűrés…" autocomplete="off">`}</td>`).join('');
+    const filters=headers.map((h,i)=>`<td>${/^karakter(?: neve|név)?$/i.test(h)||options.selectColumns?.includes(i)?`<select data-table-filter="${i}" aria-label="${escape(h)} – oszlopszűrő"><option value="">${/^karakter(?: neve|név)?$/i.test(h)?'Minden karakter':'Minden hold'}</option></select>`:`<input type="search" data-table-filter="${i}" aria-label="${escape(h)} – oszlopszűrő" placeholder="Szűrés…" autocomplete="off">`}</td>`).join('');
     return `<div class="table-block"><div class="table-tools"><span data-table-count role="status"></span><div class="table-tool-actions"><button type="button" class="text-button" data-table-toggle-filters aria-expanded="false">Szűrők megnyitása</button><button type="button" class="text-button" data-table-reset>Rendezés és oszlopszűrők törlése</button></div></div><div class="table-scroll"><table class="data-table ${escape(cls)}" data-table-key="${escape(key)}"><thead><tr>${heading}</tr><tr class="table-filters" hidden>${filters}</tr></thead><tbody>${rows.join('')}</tbody></table></div></div>`;
   }
   function cellValue(cell){
@@ -93,7 +93,7 @@ const EveTables=(()=>{
       if(control.tagName==='SELECT'){
         characterColumns.add(index);
         const names=new Set(rows.map(r=>cellValue(r.cells[index]).text).filter(Boolean));
-        if(setting.filters[index])names.add(setting.filters[index]);
+        if(setting.filters[index]&&!names.has(setting.filters[index]))setting.filters[index]='';
         for(const name of [...names].sort(collator.compare)){const option=document.createElement('option');option.value=name;option.textContent=name;control.append(option);}
       }
       control.value=setting.filters[index]||'';
