@@ -7,7 +7,7 @@ const moonNumber=value=>Number(String(value).replace(/\s/g,'').replace(',','.'))
 async function refreshMoons(){
   if(moonRequest)return moonRequest;
   moonRequest=api('/api/moons');
-  try{moonData=await moonRequest;if(view==='moons'&&!moonEditing&&!dirty.moon_settings)render();}
+  try{moonData=await moonRequest;if(view==='moons'&&!moonEditing&&!dirty.moon_settings&&!dirty.moon_fuel)render();}
   catch(e){if(view==='moons')error(e.message);}
   finally{moonRequest=null;}
 }
@@ -16,7 +16,7 @@ function renderMoons(content){
   setHead('HOLDGAZDÁLKODÁS','Holdak és kitermelés','Kézi holdnyilvántartás, 30 napos termelés, üzemanyag és bányászkristály-arányok.');
   $('#plan-status').hidden=true;
   actions('<button id="moon-refresh" class="button compact">↻ Rendszeradatok ellenőrzése</button>');
-  $('#moon-refresh').disabled=state.task.running||moonEditing||!!dirty.moon_settings;
+  $('#moon-refresh').disabled=state.task.running||moonEditing||!!dirty.moon_settings||!!dirty.moon_fuel;
   $('#moon-refresh').onclick=()=>startTask('/api/moons/sync');
   if(!moonData){content.innerHTML=empty('Holdadatok betöltése');void refreshMoons();return;}
   const d=moonData,s=d.summary;
@@ -24,7 +24,7 @@ function renderMoons(content){
     <div class="metrics"><div class="metric"><div class="metric-label">Nyilvántartott holdak</div><strong>${fmt(s.count)}</strong><small>hold</small></div><div class="metric"><div class="metric-label">Termelésbe beszámítva</div><strong>${fmt(s.included)}</strong><small>hold</small></div><div class="metric"><div class="metric-label">Javítandó összetétel</div><strong>${fmt(s.invalid)}</strong><small>100% feletti arány</small></div><div class="metric"><div class="metric-label">Tatara kihozatal</div><strong>${moonPercent(d.refining_yield*100)}</strong><small>Nullsec · T2 rig · minden skill V · ${d.settings.implant}% implant</small></div></div>
     <div class="moon-toolbar"><label>Struktúraszűrő <select id="moon-filter"><option value="all">Összes struktúra</option><option value="Athanor">Athanor</option><option value="Metenox">Metenox</option></select></label><span>Időszak: 30 nap · 720 óra</span></div><div id="moon-body"></div>`;
   $('#moon-filter').value=moonFilter;
-  $('#moon-filter').onchange=e=>{moonFilter=e.target.value;renderMoonBody();};
+  $('#moon-filter').onchange=e=>{if((dirty.moon_fuel||dirty.moon_settings)&&!confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?')){e.target.value=moonFilter;return;}dirty={};moonFilter=e.target.value;renderMoonBody();};
   $$('[data-moon-tab]').forEach(b=>b.onclick=()=>{if(Object.keys(dirty).length&&!confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?'))return;dirty={};moonEditing=false;moonSystemGeneration++;moonSearchGeneration++;moonTab=b.dataset.moonTab;render();});
   renderMoonBody();
 }
@@ -55,9 +55,20 @@ function renderMoonBody(){
     bindJita(costRows.map(r=>r.id));
   }else if(moonTab==='consumption'){
     target.innerHTML+='<div class="banner">Csak a holdfúró fogyasztása szerepel itt. Más szolgáltatásmodulok, a külön Tatara üzemanyaga és a bérleti díj nincsenek benne. A hibás ércösszetételű, működő holdak üzemanyagát is számoljuk. A bekapcsolási költséget külön kell megadni.</div>';
+    const fuel=d.settings.fuel_block_id,manual=d.settings.fuel_block_price,gas=d.magmatic_gas.id;
+    const fuelName=d.fuel_blocks.find(f=>f.id===fuel).name;
+    const costRows=(fuelQty,gasQty)=>[{id:fuel,name:fuelName,quantity:fuelQty,unit:'db',manual_price:manual},{id:gas,name:d.magmatic_gas.name,quantity:gasQty,unit:'db'}].filter(r=>r.quantity>0);
+    const composite=(key,rows)=>{jitaGroups.set(key,rows);return `<td class="num" data-cost-lines="${esc(key)}" data-sort-value="">–</td>`;};
+    target.innerHTML+=`<form id="moon-fuel-settings" class="panel panel-body moon-toolbar"><label>Fuel Block típusa<select name="fuel_block_id">${d.fuel_blocks.map(f=>`<option data-i18n-skip value="${f.id}" ${f.id===fuel?'selected':''}>${esc(f.name)}</option>`).join('')}</select></label><label>Kézi Fuel Block egységár (ISK)<input name="fuel_block_price" type="text" inputmode="decimal" placeholder="Üresen: Jita-ár" value="${manual===null?'':esc(String(manual).replace('.',','))}"></label><button class="button primary compact">Üzemanyagár alkalmazása</button><p class="footnote">A kiválasztott blokktípussal számolunk minden holdfúrónál. A kézi ár felülírja a Fuel Block Jita-árát; a Magmatic Gas továbbra is a választott Jita-árral számít. Az üres mező visszaállítja a piaci árazást.</p></form>`;
     const keys=moonFilter==='all'?['Athanor','Metenox','all']:[moonFilter];
-    target.innerHTML+=panel('Összesített fogyasztás','30 nap',moonTable(['Struktúra','Működő holdak','Fuel Block / nap','Fuel Block / 30 nap','Magmatic Gas / nap','Magmatic Gas / 30 nap','Bekapcsolási Fuel Block','Teljes Fuel Block'],keys.map(k=>{const c=d.consumption[k];return `<tr><td>${k==='all'?'Összesen':k}</td><td class="num">${fmt(c.count)}</td><td class="num">${fmt(c.fuel/30)}</td><td class="num">${fmt(c.fuel)}</td><td class="num">${fmt(c.gas/30)}</td><td class="num">${fmt(c.gas)}</td><td class="num">${fmt(c.online_fuel)}</td><td class="num">${fmt(c.fuel+c.online_fuel)}</td></tr>`;}),'consumption-'+moonFilter));
-    target.innerHTML+=panel('Fogyasztás holdanként','A hold szerkesztésénél állítható az üzem és a bekapcsolások száma',moonTable(['Hold','Struktúra','Fuel Block / nap','Fuel Block / 30 nap','Magmatic Gas / nap','Magmatic Gas / 30 nap','Bekapcsolások','Bekapcsolási Fuel Block'],moons.map(m=>`<tr><td>${verbatim(m.name)}</td><td>${m.structure}</td><td class="num">${fmt(m.fuel/30)}</td><td class="num">${fmt(m.fuel)}</td><td class="num">${fmt(m.gas/30)}</td><td class="num">${fmt(m.gas)}</td><td class="num">${fmt(m.online_starts)}</td><td class="num">${fmt(m.online_fuel)}</td></tr>`),'consumption-moons-'+moonFilter));
+    const combined=moons.flatMap(m=>costRows(m.fuel+m.online_fuel,m.gas).map(r=>({...r,context:m.name})));
+    target.innerHTML+=costSummary('moon-fuel',combined,'30 napos üzemanyagköltség','A működés és a megadott bekapcsolások üzemanyaga, Magmatic Gas fogyasztással együtt.',true);
+    if(manual!==null)target.innerHTML+='<div class="banner">Kézi Fuel Block ár aktív. A Jita-mód váltása csak a Magmatic Gas árazását módosítja.</div>';
+    target.innerHTML+=panel('Összesített fogyasztás','30 nap',moonTable(['Struktúra','Működő holdak','Fuel Block / nap','Fuel Block / 30 nap','Magmatic Gas / nap','Magmatic Gas / 30 nap','Bekapcsolási Fuel Block','Teljes Fuel Block','Üzemanyagköltség'],keys.map(k=>{const c=d.consumption[k];return `<tr><td>${k==='all'?'Összesen':k}</td><td class="num">${fmt(c.count)}</td><td class="num">${fmt(c.fuel/30)}</td><td class="num">${fmt(c.fuel)}</td><td class="num">${fmt(c.gas/30)}</td><td class="num">${fmt(c.gas)}</td><td class="num">${fmt(c.online_fuel)}</td><td class="num">${fmt(c.fuel+c.online_fuel)}</td>${composite('moon-fuel-total-'+k,moons.filter(m=>k==='all'||m.structure===k).flatMap(m=>costRows(m.fuel+m.online_fuel,m.gas)))}</tr>`;}),'consumption-'+moonFilter));
+    target.innerHTML+=panel('Fogyasztás holdanként','A hold szerkesztésénél állítható az üzem és a bekapcsolások száma',moonTable(['Hold','Struktúra','Fuel Block / nap','Fuel Block / 30 nap','Magmatic Gas / nap','Magmatic Gas / 30 nap','Bekapcsolások','Bekapcsolási Fuel Block','Üzemanyagköltség'],moons.map(m=>`<tr><td>${verbatim(m.name)}</td><td>${m.structure}</td><td class="num">${fmt(m.fuel/30)}</td><td class="num">${fmt(m.fuel)}</td><td class="num">${fmt(m.gas/30)}</td><td class="num">${fmt(m.gas)}</td><td class="num">${fmt(m.online_starts)}</td><td class="num">${fmt(m.online_fuel)}</td>${composite('moon-fuel-'+m.id,costRows(m.fuel+m.online_fuel,m.gas))}</tr>`),'consumption-moons-'+moonFilter));
+    const form=$('#moon-fuel-settings');form.oninput=()=>{dirty.moon_fuel=true;};
+    form.onsubmit=async e=>{e.preventDefault();try{const f=new FormData(form),price=String(f.get('fuel_block_price')).replace(/\s/g,'').replace(',','.');await api('/api/moons/settings',{fuel_block_id:Number(f.get('fuel_block_id')),fuel_block_price:price||null});dirty={};await refreshMoons();toast('Üzemanyagár mentve.');}catch(e){error(e.message);}};
+    bindJita(combined.filter(r=>r.manual_price==null).map(r=>r.id));
   }else{
     target.innerHTML+='<div class="banner">A kristályarány az Athanorok megadott, bányászandó érctérfogatának megoszlása. Nem kristálydarabszám vagy kopási becslés. A Metenox automatikusan dolgozik, bányászkristályt nem igényel.</div>';
     if(moonFilter!=='Metenox')target.innerHTML+=panel('Kristálytípusok összesítve','Csak a működő, beszámítható Athanorok',moonTable(['Kristály','Érckategória','Érctérfogat (m³)','Arány'],d.crystals.map(c=>`<tr><td>${itemName(c.name)}</td><td>R${c.rarity}</td><td class="num">${fmt(c.volume)}</td><td class="num">${moonPercent(c.share)}</td></tr>`),'crystals-total'));

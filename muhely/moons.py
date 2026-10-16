@@ -10,7 +10,9 @@ from .esi import ESI, EsiError
 from .planner import PlanningError, integer, decimal_number
 
 CACHE_SECONDS=90*86400
-DEFAULTS={'implant':4,'mining_recovery':100,'crystal_variant':'A II'}
+FUEL_BLOCKS=(4246,4247,4051,4312)
+MAGMATIC_GAS=81143
+DEFAULTS={'implant':4,'mining_recovery':100,'crystal_variant':'A II','fuel_block_id':4246,'fuel_block_price':None}
 SOURCES=[
     {'name':'CCP Static Data Export','url':'https://developers.eveonline.com/docs/services/static-data/'},
     {'name':'Moon mining','url':'https://support.eveonline.com/hc/en-us/articles/115005404229-Moon-Mining'},
@@ -32,6 +34,13 @@ def validate_preferences(data):
         if key=='implant':
             if isinstance(value,bool) or value not in [0,1,2,4]:raise PlanningError('Hibás finomítási implant.')
         elif key=='mining_recovery':value=float(decimal_number(value,'Begyűjtött arány',0,100))
+        elif key=='fuel_block_id':
+            if isinstance(value,bool) or value not in FUEL_BLOCKS:raise PlanningError('Ismeretlen Fuel Block típus.')
+        elif key=='fuel_block_price':
+            if value is not None:
+                price=decimal_number(value,'Fuel Block egységár',0,10**12)
+                if price.as_tuple().exponent < -4:raise PlanningError('Az egységár legfeljebb négy tizedesjegyet tartalmazhat.')
+                value=format(price,'f')
         elif value not in ['A I','A II','B I','B II','C I','C II']:raise PlanningError('Ismeretlen kristályváltozat.')
         result[key]=value
     return result
@@ -204,6 +213,8 @@ def dashboard(store,catalog):
     for c in crystal_totals.values():c['share']=c['volume']/total_volume*100 if total_volume else 0
     return {'moons':moons,'settings':prefs,'rules':rules,'refining_yield':float(refining),
             'ores':sorted(catalog.moon_ores.values(),key=lambda o:(o['rarity'],o['name'])),
+            'fuel_blocks':[{'id':tid,'name':catalog.name(tid)} for tid in FUEL_BLOCKS],
+            'magmatic_gas':{'id':MAGMATIC_GAS,'name':catalog.name(MAGMATIC_GAS)},
             'crystal_variants':['A I','A II','B I','B II','C I','C II'],
             'totals':{k:[{'id':tid,'name':catalog.name(tid),'quantity':v} for tid,v in sorted(totals[k].items(),key=lambda r:catalog.name(r[0]))] for k in ['Athanor','Metenox','all']},
             'consumption':fuel_totals,'crystals':sorted(crystal_totals.values(),key=lambda c:c['rarity']),

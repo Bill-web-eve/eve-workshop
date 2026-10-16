@@ -84,6 +84,23 @@ class MoonTests(unittest.TestCase):
     def test_preferences(self):
         for value in [{'implant':5},{'implant':True},{'mining_recovery':101},{'crystal_variant':'D II'},{'client_secret':'x'}]:
             with self.subTest(value=value),self.assertRaises(PlanningError):validate_preferences(value)
+    def test_fuel_selection_and_manual_price_persist_without_affecting_quantities(self):
+        self.save(structure='Metenox',online_starts=1)
+        self.s.save_moon_preferences(validate_preferences({'fuel_block_id':4312,'fuel_block_price':'12345.6789'}))
+        r=dashboard(Store(self.tmp.name),self.c)
+        self.assertEqual(r['settings']['fuel_block_id'],4312)
+        self.assertEqual(r['settings']['fuel_block_price'],'12345.6789')
+        self.assertEqual(len(r['fuel_blocks']),4);self.assertEqual(r['magmatic_gas']['id'],81143)
+        self.assertEqual(r['consumption']['all']['fuel'],3600)
+        self.assertEqual(r['consumption']['all']['online_fuel'],1000)
+        self.s.save_moon_preferences(validate_preferences({'fuel_block_price':None}))
+        self.assertIsNone(self.report()['settings']['fuel_block_price'])
+        self.assertEqual(validate_preferences({'fuel_block_price':'0'})['fuel_block_price'],'0')
+        for value in [{'fuel_block_id':True},{'fuel_block_id':35},{'fuel_block_price':'nan'},
+                      {'fuel_block_price':True},{'fuel_block_price':-1},{'fuel_block_price':'1.00001'},
+                      {'fuel_block_price':1000000000001}]:
+            with self.subTest(value=value),self.assertRaises(PlanningError):validate_preferences(value)
+
     def test_esi_cache_overrides_sde_and_304(self):
         http=Mock();http.request.side_effect=[({'name':'RP2-OQ','constellation_id':123,'security_status':-.5},{'ETag':'sys'}),({'name':'ESI constellation'},{'ETag':'const'})]
         info=system_info(self.s,self.c,http,self.sid);self.assertEqual(info['source'],'esi');self.assertEqual(info['system']['constellation'],'ESI constellation')

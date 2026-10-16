@@ -239,7 +239,7 @@ function navigate(next) {
 }
 function render() {
   if(!state) return;
-  if(view==='moons'&&(moonEditing&&$('#moon-form')||dirty.moon_settings&&$('#moon-settings')))return;
+  if(view==='moons'&&(moonEditing&&$('#moon-form')||dirty.moon_settings&&$('#moon-settings')||dirty.moon_fuel&&$('#moon-fuel-settings')))return;
   const content=$('#view-content'); actions();
   $('.plan-selector').hidden=['skills','pi','corporations','moons'].includes(view);
   $('#plan-status').hidden=!plan?.stale_characters.length;

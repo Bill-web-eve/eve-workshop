@@ -43,3 +43,17 @@ test('an entirely unpriced summary shows a dash, not a zero-cost production',()=
  vm.runInContext("jitaData.quotes={1:{sell:'2.01',checked:1}};applyJita();",ctx);
  assert.equal(dom.window.document.querySelector('[data-cost-grand]').textContent,'20,10 ISK');dom.window.close();
 });
+test('manual fuel prices override all Jita modes, preserve zero and ignore quote staleness',()=>{
+  const rows=[{id:4246,quantity:3600,manual_price:'10.1234'},{id:81143,quantity:144000}],quotes={4246:{buy:'99',sell:'101',stale:true},81143:{buy:'1',sell:'3'}};
+  assert.equal(C.value(rows,quotes,'sell').cents,46844424n);
+  assert.equal(C.value(rows,quotes,'buy').cents,18044424n);
+  assert.equal(C.value(rows,quotes,'split').cents,32444424n);
+  assert.equal(C.value(rows,quotes,'sell').stale,0);
+  assert.equal(C.value([{id:4246,quantity:3600,manual_price:'0'}],{},'sell').cents,0n);
+  assert.equal(C.value([{id:4246,quantity:3600,manual_price:'bad'}],quotes,'sell').missing,1);
+});
+test('fuel aggregates sum rounded per-moon costs without losing cents',()=>{
+ const rows=[{id:4246,quantity:3960,manual_price:'0.0001'},{id:4246,quantity:3960,manual_price:'0.0001'}];
+ const result=C.value(rows,{},'split');
+ assert.equal(result.cents,80n);assert.equal(result.rows[0].cents,40n);
+});

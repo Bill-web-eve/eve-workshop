@@ -9,6 +9,7 @@ import math
 import time
 
 from .esi import EsiError
+from .pi_forecast import forecast
 
 STORAGE_GROUPS={1027,1029,1030}
 
@@ -96,7 +97,7 @@ def valid_routes(layout):
     return good,bad
 
 
-def maxflow(supply,demand,capacities):
+def maxflow(supply,demand,capacities,allocations=None):
     """Integer bipartite flow. Reassignment avoids greedy shared-stock errors."""
     source=('root',);sink=('sink',);edges=defaultdict(dict)
     def add(a,b,capacity):
@@ -134,6 +135,8 @@ def maxflow(supply,demand,capacities):
             node=pending.pop()
             for nxt in neighbors[node]-seen:seen.add(nxt);pending.append(nxt)
         affected.update(node[1] for node in seen if node[0]=='factory')
+    if allocations is not None:
+        allocations.update({(a,b):edges.get(('factory',b),{}).get(('stock',a),0) for a,b in capacities})
     return total,affected
 
 
@@ -223,7 +226,9 @@ def colony_view(record,catalog,now,hours):
             label='Program aktív' if program and routed else 'Kimeneti útvonal hiányzik' if program else \
                   'A program lejárt' if end is not None and end<=now else 'Nincs aktív kitermelőprogram'
             extractors.append({**base,'product_id':product,'product':catalog.name(product) if product else '–',
-                'heads':heads,'cycle_time':cycle,'program_start':start,'program_end':end,
+                'heads':heads,'cycle_time':cycle,'qty_per_cycle':detail.get('qty_per_cycle'),'program_start':start,'program_end':end,
+                'program_duration':end-start if start is not None and end is not None and end>=start else None,
+                'cycles_remaining':max(0,math.floor((end-start)/cycle)-math.floor(max(0,now-start)/cycle)) if start is not None and end is not None and cycle and end>=start else None,
                 'seconds_left':max(0,end-now) if end is not None else None,
                 'active':program and routed,'program_active':program,'output_routed':routed,'label':label})
         if group in STORAGE_GROUPS:
@@ -237,7 +242,15 @@ def colony_view(record,catalog,now,hours):
                 'contents':[{'id':r['type_id'],'name':catalog.name(r['type_id']),'amount':r['amount']} for r in pin.get('contents',[])]})
     supply=Supply(pins,factories,routes,catalog);next_cycle=supply.check(1);period=supply.check(hours*3600)
     coverage=supply.coverage()
+    valid=not unknown_recipes and planet['num_pins']==len(pins) and not bad_routes
+    stored_projection=forecast(pins,factories,routes,catalog,updated,now,hours,valid=valid)
+    projection=forecast(pins,factories,routes,catalog,updated,now,hours,valid=valid,extractors=extractors) if extractors else stored_projection
+    projection['stock_only_first_stop']=stored_projection['first_stop']
+    projection['stock_only_seconds_left']=stored_projection['seconds_left']
+    for f in projection['factories']:
+        f['stock_stop']=next((r['expected_stop'] for r in stored_projection['factories'] if r['id']==f['id']),None)
     factory_by_id={f['id']:f for f in factories};factory_outputs={f['id']:set(f['recipe']['outputs']) for f in factories}
+    factory_inputs={f['id']:set(f['recipe']['inputs']) for f in factories}
     extractor_by_id={e['id']:e for e in extractors}
     def providers(tid,target):
         result=[];seen={target};pending=[target]
@@ -264,6 +277,20 @@ def colony_view(record,catalog,now,hours):
                            'buffer':supply.contents[factory['id']].get(tid,0),
                            'suppliers':providers(tid,factory['id'])} for tid,quantity in factory['recipe']['inputs'].items()]
         factory['outputs']=[{'id':tid,'name':catalog.name(tid),'per_cycle':quantity} for tid,quantity in factory['recipe']['outputs'].items()]
+        # Trace extractor dependencies through storage and intermediate factories.
+        seen=set();pending=[(factory['id'],tid) for tid in factory_inputs[factory['id']]];extractor_sources=set()
+        while pending:
+            dest,tid=pending.pop()
+            if (dest,tid) in seen:continue
+            seen.add((dest,tid))
+            for r in routes:
+                if r['destination_pin_id']!=dest or r['content_type_id']!=tid:continue
+                source=r['source_pin_id']
+                if source in extractor_by_id and extractor_by_id[source]['product_id']==tid:extractor_sources.add(source)
+                elif source in supply.storage:pending.append((source,tid))
+                elif source in factory_by_id and tid in factory_outputs[source]:pending.extend((source,material) for material in factory_inputs[source])
+        factory['extractor_sources']=sorted(extractor_sources)
+        factory['projection']=next((f for f in projection['factories'] if f['id']==factory['id']),None)
         factory.pop('recipe')
     active=sum(e['active'] for e in extractors)+sum(f['running_evidence'] and f['output_routed'] for f in factories)
     stopped_extractors=sum(not e['active'] for e in extractors)
@@ -293,7 +320,7 @@ def colony_view(record,catalog,now,hours):
             'unassigned':unassigned,'unknown_recipes':unknown_recipes,'storages':storages,
             'active_signals':active,'next_enough':next_cycle['enough'] if not unknown_recipes else None,
             'next_materials':next_cycle['materials'],'horizon_hours':hours,'period_enough':period['enough'] if not unknown_recipes else None,
-            'period_materials':period['materials'],'stock_coverage_seconds':coverage,'bad_routes':len(bad_routes)}
+            'period_materials':period['materials'],'stock_coverage_seconds':coverage,'bad_routes':len(bad_routes),'projection':projection}
 
 
 def dashboard(store,catalog,hours=24,now=None):
