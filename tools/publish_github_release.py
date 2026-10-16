@@ -48,12 +48,14 @@ def gh(*args):
 
 
 def release_info(repo, tag):
-    try:
-        return json.loads(gh('api', 'repos/' + repo + '/releases/tags/' + quote(tag, safe='')))
-    except RuntimeError as exc:
-        if 'HTTP 404' in str(exc):
-            return None
-        raise
+    # The by-tag endpoint returns published releases only. Authenticated release
+    # listings include drafts, including a draft just created by this workflow.
+    pages = json.loads(gh('api', '--paginate', '--slurp',
+                         'repos/' + repo + '/releases?per_page=100'))
+    matches = [item for page in pages for item in page if item['tag_name'] == tag]
+    if len(matches) > 1:
+        raise RuntimeError('More than one release has tag ' + tag)
+    return matches[0] if matches else None
 
 
 def verify_remote(repo, tag, path, expected, asset):
@@ -89,8 +91,8 @@ def publish(repo, target, data, files):
             verify_remote(repo, tag, path, expected, assets[path.name])
         else:
             missing.append(path)
-    if missing and not release['draft']:
-        raise RuntimeError('Published release is incomplete. Use a new release tag; existing files were not changed.')
+    if missing and release.get('immutable', False):
+        raise RuntimeError('Immutable release is incomplete. Use a new release tag; existing files were not changed.')
     if missing:
         gh('release', 'upload', tag, '--repo', repo, *map(str, missing))
         release = release_info(repo, tag)
@@ -99,8 +101,21 @@ def publish(repo, target, data, files):
             if path.name not in assets:
                 raise RuntimeError('Upload missing: ' + path.name)
             verify_remote(repo, tag, path, expected, assets[path.name])
+    # Repair an already-published empty release by attaching only missing files.
+    # Keep custom release text, including any changelog the owner has added.
+    original_body = release.get('body', data['body'])
+    linked_body = original_body
+    for path, _ in files:
+        if path.suffix.lower() in {'.zip', '.dmg'}:
+            url = 'https://github.com/' + repo + '/releases/download/' + quote(tag, safe='') + '/' + quote(path.name)
+            linked_body = linked_body.replace('`' + path.name + '`', '[' + path.name + '](' + url + ')')
+    edit = []
     if release['draft']:
-        gh('release', 'edit', tag, '--repo', repo, '--draft=false', '--latest')
+        edit += ['--draft=false', '--latest']
+    if linked_body != original_body:
+        edit += ['--notes', linked_body]
+    if edit:
+        gh('release', 'edit', tag, '--repo', repo, *edit)
     published = release_info(repo, tag)
     if not published or published['draft']:
         raise RuntimeError('Release has not been published')

@@ -32,11 +32,21 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'filename'):
             release.checked_bundle(manifest)
 
-    def test_only_http_404_is_treated_as_missing(self):
-        with patch.object(release, 'gh', side_effect=RuntimeError('HTTP 403 Forbidden')):
-            with self.assertRaisesRegex(RuntimeError, '403'):
-                release.release_info('owner/repo', 'v1')
-        with patch.object(release, 'gh', side_effect=RuntimeError('HTTP 404 Not Found')):
+    def test_release_lookup_includes_drafts_on_later_pages(self):
+        draft = {'tag_name': 'v1', 'draft': True, 'assets': []}
+        pages = [[{'tag_name': 'v2', 'draft': False}], [draft]]
+        with patch.object(release, 'gh', return_value=json.dumps(pages)) as gh:
+            self.assertEqual(release.release_info('owner/repo', 'v1'), draft)
+            self.assertIn('--paginate', gh.call_args.args)
+            self.assertIn('--slurp', gh.call_args.args)
+            self.assertNotIn('/tags/', gh.call_args.args[-1])
+
+    def test_api_errors_are_not_treated_as_missing_releases(self):
+        for status in [401, 403, 404, 500]:
+            with patch.object(release, 'gh', side_effect=RuntimeError('HTTP ' + str(status))):
+                with self.assertRaisesRegex(RuntimeError, str(status)):
+                    release.release_info('owner/repo', 'v1')
+        with patch.object(release, 'gh', return_value='[[]]'):
             self.assertIsNone(release.release_info('owner/repo', 'v1'))
 
     def test_corrupt_remote_file_is_never_overwritten(self):
@@ -46,9 +56,9 @@ class ReleaseTests(unittest.TestCase):
                 release.publish('owner/repo', 'main', self.data, self.files)
             gh.assert_not_called()
 
-    def test_published_incomplete_release_is_not_modified(self):
-        with patch.object(release, 'release_info', return_value={'draft': False, 'assets': []}), patch.object(release, 'gh') as gh:
-            with self.assertRaisesRegex(RuntimeError, 'Published release is incomplete'):
+    def test_immutable_incomplete_release_is_not_modified(self):
+        with patch.object(release, 'release_info', return_value={'draft': False, 'immutable': True, 'assets': []}), patch.object(release, 'gh') as gh:
+            with self.assertRaisesRegex(RuntimeError, 'Immutable release is incomplete'):
                 release.publish('owner/repo', 'main', self.data, self.files)
             gh.assert_not_called()
 
@@ -81,6 +91,47 @@ class ReleaseTests(unittest.TestCase):
                 release.publish('owner/repo', 'main', self.data, self.files)
             self.assertEqual(gh.call_count, 1)
             self.assertEqual(gh.call_args.args[1], 'upload')
+
+    def test_published_empty_release_is_repaired_without_recreating_it(self):
+        before = {'draft': False, 'immutable': False, 'assets': []}
+        after = {'draft': False, 'immutable': False, 'assets': [self.asset]}
+        with patch.object(release, 'release_info', side_effect=[before, after, after]), patch.object(release, 'gh') as gh:
+            release.publish('owner/repo', 'main', self.data, self.files)
+            self.assertEqual([c.args[1] for c in gh.call_args_list], ['upload'])
+            self.assertNotIn('--clobber', gh.call_args.args)
+
+    def test_download_links_preserve_owners_custom_notes(self):
+        body = 'Download `installer.zip`\n\nCustom changelog: retained'
+        info = {'draft': False, 'assets': [self.asset], 'body': body}
+        with patch.object(release, 'release_info', return_value=info), patch.object(release, 'gh') as gh:
+            release.publish('owner/repo', 'main', self.data, self.files)
+            args = gh.call_args.args
+            self.assertEqual(args[1], 'edit')
+            new_body = args[args.index('--notes') + 1]
+            self.assertIn('Custom changelog: retained', new_body)
+            self.assertIn('[installer.zip](https://github.com/owner/repo/releases/download/v1.0.0/installer.zip)', new_body)
+
+    def test_real_lookup_and_publishing_support_a_draft_with_no_public_tag(self):
+        # Model GitHub's documented API semantics rather than mocking release_info:
+        # a new draft appears in authenticated listings before publication.
+        remote = []
+        operations = []
+        def fake_gh(*args):
+            if args[0] == 'api':
+                self.assertNotIn('/tags/', args[-1])
+                return json.dumps([remote])
+            operations.append(args[1])
+            if args[1] == 'create':
+                remote.append({'tag_name': self.data['tag'], 'draft': True, 'assets': []})
+            elif args[1] == 'upload':
+                remote[0]['assets'] = [self.asset]
+            elif args[1] == 'edit':
+                remote[0]['draft'] = False
+            return ''
+        with patch.object(release, 'gh', side_effect=fake_gh):
+            release.publish('owner/repo', 'main', self.data, self.files)
+        self.assertEqual(operations, ['create', 'upload', 'edit'])
+        self.assertFalse(remote[0]['draft'])
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 ## Letölthető alkalmazások
 
-- **Mac Apple Silicon: 0.8.0** — `EVE_Muhely-0.8.0-macOS-AppleSilicon.dmg`
-- **Windows 11 x64: 0.8.1** — `EVE_Muhely-0.8.1-Windows11-x64.zip`
+- [**Mac Apple Silicon: 0.8.0** — DMG letöltése](https://github.com/Bill-web-eve/eve-workshop/releases/download/v0.8.1/EVE_Muhely-0.8.0-macOS-AppleSilicon.dmg)
+- [**Windows 11 x64: 0.8.1** — ZIP letöltése](https://github.com/Bill-web-eve/eve-workshop/releases/download/v0.8.1/EVE_Muhely-0.8.1-Windows11-x64.zip)
 
 A két csomag verziója eltér: a 0.8.1-es módosítások a Windows-futtatást érintik. A kiadás a korábban elkészült csomagokat teszi letölthetővé, új fordítás nélkül.
 
