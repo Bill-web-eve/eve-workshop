@@ -4,7 +4,9 @@ const $$ = selector => [...document.querySelectorAll(selector)];
 const fmt = n => new Intl.NumberFormat('hu-HU', {maximumFractionDigits: 0}).format(n || 0);
 const hours = n => new Intl.NumberFormat('hu-HU', {maximumFractionDigits: 1}).format((n || 0) / 3600);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const date = n => n ? new Date(n * 1000).toLocaleString('hu-HU', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Még nem frissült';
+const verbatim=value=>`<span data-i18n-skip>${esc(value)}</span>`;
+const confirmUI=message=>confirm(EveI18n.t(message));
+const date = n => n ? EveI18n.date(n * 1000, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Még nem frissült';
 let state, plan, productId = null, productName = '', view = 'queue', dirty = {}, searchTimer, taskTimer, lastTaskFinished;
 let planGeneration = 0;
 let blueprintDetailId = null;
@@ -46,7 +48,7 @@ function error(message) { const el=$('#global-error'); el.textContent=message; e
 function toast(message) { const el=$('#toast'); el.textContent=message; el.hidden=false; setTimeout(()=>el.hidden=true,3500); }
 function empty(title, description='') { return `<div class="empty"><div class="empty-icon">◈</div><h2>${esc(title)}</h2><p>${esc(description)}</p></div>`; }
 function table(headers, rows, cls='') { return EveTables.markup(headers,rows,cls,JSON.stringify([view,corporationId,view==='shopping'?shoppingMode:'',cls,headers])); }
-function panel(title, note, body, copyValue=null) { const heading=copyValue&&title.startsWith(copyValue)?itemName(copyValue)+esc(title.slice(copyValue.length)):esc(title);return `<div class="panel"><div class="panel-head"><h2>${heading}</h2><small>${esc(note)}</small></div>${body}</div>`; }
+function panel(title, note, body, copyValue=null) { const heading=typeof title==='object'?verbatim(title.name)+esc(title.suffix):copyValue&&title.startsWith(copyValue)?itemName(copyValue)+esc(title.slice(copyValue.length)):esc(title);return `<div class="panel"><div class="panel-head"><h2>${heading}</h2><small>${esc(note)}</small></div>${body}</div>`; }
 function itemName(name){
   if(name==null||name==='–')return esc(name);
   return `<button type="button" class="copy-item-name" data-copy-item="${esc(name)}" aria-label="${esc(name)} – Név másolása" title="Név másolása: ${esc(name)}">${esc(name)}</button>`;
@@ -82,7 +84,7 @@ document.addEventListener('keydown',event=>{
   const target=event.target.closest?.('.graph-node[data-copy-item]');
   if(target&&!event.repeat&&['Enter',' '].includes(event.key))void copyItemName(target.dataset.copyItem);
 },true);
-function planLabel(saved){const product=saved.product_name||state?.plans.find(p=>p.id===saved.id)?.product_name;return saved.name===product?itemName(product):esc(saved.name);}
+function planLabel(saved){const product=saved.product_name||state?.plans.find(p=>p.id===saved.id)?.product_name;return saved.name===product?itemName(product):verbatim(saved.name);}
 function scopedPlans(){return state.plans.filter(p=>(p.corporation_id??null)===corporationId);}
 function badge(row) { return `<span class="badge ${row.activity==='reaction'?'reaction':'manufacturing'}">${row.activity==='reaction'?'Reakció':'Gyártás'}</span>`; }
 function batchText(row) { return row.batches.map(g=>`${fmt(g.count)} × ${fmt(g.runs)} run`).join(' + '); }
@@ -128,7 +130,7 @@ function scheduleDeliveryCheck(){
     scheduleDeliveryCheck();
   },delay);
 }
-function deliveryTimestamp(value){return value?new Date(value*1000).toLocaleString('hu-HU',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'–';}
+function deliveryTimestamp(value){return value?EveI18n.date(value*1000,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'–';}
 function deliveryWaitMarkup(wait){
   const retry=wait.retry_at;
   return `<div class="banner delivery-wait"><strong>Készletfrissítésre várunk${wait.plan_name?' · '+esc(wait.plan_name):''}</strong><p>A jobok már át vannak véve, de az EVE még az átvétel előtti készletet adja vissza. Az ismételt frissítés a gyorsítótár lejártáig ezt nem változtatja meg.</p><p><strong>Új adat legkorábban: ${esc(date(retry))}</strong>. Ha ez az ablak előtérben marad, a lejárat után automatikusan újra próbáljuk.</p>${table(['Anyag','Karakter','Készletpillanatkép','Job átvétele'],wait.items.map(i=>`<tr><td>${itemName(i.name)}</td><td>${esc(i.character_name||i.character_id||'–')}</td><td data-sort-value="${i.assets_as_of??''}">${esc(deliveryTimestamp(i.assets_as_of))}</td><td data-sort-value="${i.completed_at??''}">${esc(deliveryTimestamp(i.completed_at))}</td></tr>`))}<p>A mentett tervek és foglalások megmaradnak. Az átvett kimenetet nem adjuk hozzá még egyszer a készlethez. Az időpont a CCP által jelzett lejárat; nem garantálja, hogy rögtön új adat érkezik.</p></div>`;
@@ -143,7 +145,7 @@ function renderDeliveryWait(content){
 }
 function renderPlanShortcuts(){
   const target=$('#saved-plan-shortcuts'),plans=scopedPlans();
-  target.innerHTML='<span>Mentett tervek</span>'+plans.map(p=>`<button data-saved-shortcut="${esc(p.id)}" class="${p.id===activePlanId?'selected':''}" aria-pressed="${p.id===activePlanId}" title="${esc(p.product_name)} · ${fmt(p.quantity)} db">${esc(p.name)} · ${fmt(p.quantity)} db</button>`).join('')+(plans.length?'':'<span>Ebben a gyártási körben még nincs mentett terv</span>');
+  target.innerHTML='<span>Mentett tervek</span>'+plans.map(p=>`<button data-saved-shortcut="${esc(p.id)}" class="${p.id===activePlanId?'selected':''}" aria-pressed="${p.id===activePlanId}" title="${esc(p.product_name)} · ${fmt(p.quantity)} db">${verbatim(p.name)} · ${fmt(p.quantity)} db</button>`).join('')+(plans.length?'':'<span>Ebben a gyártási körben még nincs mentett terv</span>');
   $$('[data-saved-shortcut]').forEach(el=>el.onclick=()=>openSavedPlan(el.dataset.savedShortcut));
 }
 async function openSavedPlan(id){
@@ -159,7 +161,7 @@ function updatePlanControls() {
   if(state){
     $('#production-scope').innerHTML='<option value="">Személyes gyártás</option>'+state.corporations.map(c=>`<option value="${c.id}">Corp gyártás · ${esc(c.name)}${c.ready?'':' · frissítés szükséges'}</option>`).join('');
     $('#production-scope').value=corporationId||'';
-    $('#manufacturer').innerHTML='<option value="manual">Válassz karaktert · addig kézi időbecslés</option>'+state.production_characters.map(c=>`<option value="${c.id}">${esc(c.name)}${c.available?'':' · nincs skilladat'}</option>`).join('');
+    $('#manufacturer').innerHTML='<option value="manual">Válassz karaktert · addig kézi időbecslés</option>'+state.production_characters.map(c=>`<option data-i18n-name="${esc(c.name)}" value="${c.id}">${esc(c.name)}${c.available?'':' · nincs skilladat'}</option>`).join('');
     if(manufacturerId&&!state.production_characters.some(c=>c.id===manufacturerId))$('#manufacturer').insertAdjacentHTML('beforeend',`<option value="${manufacturerId}">Nem elérhető karakter · ${manufacturerId}</option>`);
     $('#manufacturer').value=manufacturerValue();
     $('#target-quantity').dataset.numberMax=productActivity==='manufacturing'?'1000000':'100000000';EveNumbers.validate($('#target-quantity'));
@@ -189,7 +191,7 @@ function scheduleTaskPoll() {
   },1200);
 }
 async function calculate(refreshState=true) {
-  if(Object.keys(dirty).length && !confirm('Az új számítás eldobja a még nem alkalmazott módosításokat. Folytatod?')) return;
+  if(Object.keys(dirty).length && !confirmUI('Az új számítás eldobja a még nem alkalmazott módosításokat. Folytatod?')) return;
   const generation=++planGeneration;
   const targetId=productId, targetName=productName, quantity=targetQuantity();
   $('#calculate').disabled=true;
@@ -224,7 +226,7 @@ async function calculate(refreshState=true) {
   } finally { if(generation===planGeneration) $('#calculate').disabled=false; }
 }
 function navigate(next) {
-  if(Object.keys(dirty).length && !confirm('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?')) return false;
+  if(Object.keys(dirty).length && !confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?')) return false;
   view=next; dirty={};
   clearTimeout(skillTimer);
   clearTimeout(piTimer);
@@ -287,7 +289,7 @@ function renderReservationContext(content) {
 function productionTime(row){
   const p=row.producer;if(!p)return '–';
   const details=[...p.bonuses.map(b=>`${b.name} ${b.level}: ${b.percent_per_level*b.level}%`),...p.missing_skills.map(m=>`${m.name}: ${m.active}/${m.required}`),p.warning].filter(Boolean).join(' · ');
-  return `<span class="badge ${p.status==='verified'?'good':'warn'}" title="${esc(details)}">${esc(p.name||'Kézi becslés')}</span>`;
+  return `<span class="badge ${p.status==='verified'?'good':'warn'}" title="${esc(details)}">${p.name?verbatim(p.name):esc('Kézi becslés')}</span>`;
 }
 function blueprintSupply(row){return row.unit==='run'?`${fmt(Math.ceil(row.buy/(row.copy_runs||1)))} db, ${fmt(row.copy_runs||1)} run/BPC mellett`:row.category==='Reakcióformula'?'Beszerzendő, nem másolható':'–';}
 function renderQueue(content) {
@@ -320,10 +322,10 @@ function renderGraph(content) {
   const cards=graph.nodes.map(n=>{
     const lines=EvePlanGraph.wrap(n.name), detail=n.runs?`${fmt(n.runs)} run`:n.buy?`${fmt(n.buy)} db hiány`:'Készlet / folyamatban';
     const output=n.runs?`Gyártandó: ${fmt(n.manufactured)} db · Hiány: ${fmt(n.missing)} db`:`Szükséglet: ${fmt(n.required)} db`;
-    return `<g class="graph-node ${n.kind}${n.id===plan.product_id?' graph-target':''}" data-graph-id="${n.id}" data-copy-item="${esc(n.name)}" transform="translate(${n.x} ${n.y})" role="button" tabindex="0" aria-pressed="false" aria-label="${esc(n.name+' – '+labels[n.kind]+', '+detail)}"><title>${esc(n.name+'\n'+output+'\nElérhető: '+fmt(n.available)+' db; folyamatban: '+fmt(n.wip)+' db'+(n.warning.length?'\n'+n.warning.join(' '):''))}</title><rect class="graph-card" width="${n.width}" height="${n.height}" rx="10"/><rect class="graph-stripe" width="5" height="${n.height-20}" x="0" y="10" rx="2"/><text class="graph-kind" x="16" y="23">${n.id===plan.product_id?'CÉLTERMÉK · ':''}${labels[n.kind].toLocaleUpperCase('hu')}</text>${n.warning.length?'<text class="graph-warning" x="240" y="23">!</text>':''}${lines.map((line,i)=>`<text class="graph-name" x="16" y="${48+i*18}">${esc(line)}</text>`).join('')}<text class="graph-amount" x="16" y="94">${esc(detail)}</text><text class="graph-note" x="16" y="117">${esc(output)}</text><text class="graph-note" x="16" y="136">Készlet: ${fmt(n.available)} · Folyamatban: ${fmt(n.wip)}</text></g>`;
+    return `<g class="graph-node ${n.kind}${n.id===plan.product_id?' graph-target':''}" data-graph-id="${n.id}" data-copy-item="${esc(n.name)}" transform="translate(${n.x} ${n.y})" role="button" tabindex="0" aria-pressed="false" aria-label="${esc(n.name+' – '+labels[n.kind]+', '+detail)}"><title>${esc(n.name+'\n'+output+'\nElérhető: '+fmt(n.available)+' db; folyamatban: '+fmt(n.wip)+' db'+(n.warning.length?'\n'+n.warning.join(' '):''))}</title><rect class="graph-card" width="${n.width}" height="${n.height}" rx="10"/><rect class="graph-stripe" width="5" height="${n.height-20}" x="0" y="10" rx="2"/><text class="graph-kind" x="16" y="23">${n.id===plan.product_id?'CÉLTERMÉK · ':''}${labels[n.kind].toLocaleUpperCase('hu')}</text>${n.warning.length?'<text class="graph-warning" x="240" y="23">!</text>':''}${lines.map((line,i)=>`<text data-i18n-skip class="graph-name" x="16" y="${48+i*18}">${esc(line)}</text>`).join('')}<text class="graph-amount" x="16" y="94">${esc(detail)}</text><text class="graph-note" x="16" y="117">${esc(output)}</text><text class="graph-note" x="16" y="136">Készlet: ${fmt(n.available)} · Folyamatban: ${fmt(n.wip)}</text></g>`;
   }).join('');
   const edges=graph.edges.map(e=>`<path class="graph-edge" data-from="${e.from}" data-to="${e.to}" d="${EvePlanGraph.path(graph,e)}" marker-end="url(#graph-arrow)"><title>${esc(plan.rows.find(r=>r.id===e.from).name)} → ${esc(plan.rows.find(r=>r.id===e.to).name)}: ${fmt(e.quantity)} db bemenet</title></path>`).join('');
-  const toolbar=`<div class="graph-toolbar"><div class="graph-options"><label><input id="graph-purchases" type="checkbox" ${graphOptions.purchases?'checked':''}> Beszerzendő anyagok</label><label><input id="graph-covered" type="checkbox" ${graphOptions.covered?'checked':''}> Fedezett elemek</label></div><div class="graph-navigation"><button class="button compact" id="graph-minus" aria-label="Gráf kicsinyítése">−</button><output id="graph-scale" aria-label="Gráf nagyítása"></output><button class="button compact" id="graph-plus" aria-label="Gráf nagyítása">＋</button><button class="button compact" id="graph-fit">Teljes gráf</button><button class="button compact" id="graph-actual">100%</button></div></div><div class="graph-toolbar graph-secondary"><select id="graph-jump" aria-label="Ugrás egy gráfelemhez"><option value="">Ugrás egy tételhez…</option>${[...graph.nodes].sort((a,b)=>a.name.localeCompare(b.name,'hu')).map(n=>`<option value="${n.id}">${esc(n.name)}</option>`).join('')}</select><button class="text-button" id="graph-clear">Kijelölés törlése</button><span class="muted">${fmt(graph.nodes.length)} elem · ${fmt(graph.edges.length)} kapcsolat</span></div>`;
+  const toolbar=`<div class="graph-toolbar"><div class="graph-options"><label><input id="graph-purchases" type="checkbox" ${graphOptions.purchases?'checked':''}> Beszerzendő anyagok</label><label><input id="graph-covered" type="checkbox" ${graphOptions.covered?'checked':''}> Fedezett elemek</label></div><div class="graph-navigation"><button class="button compact" id="graph-minus" aria-label="Gráf kicsinyítése">−</button><output id="graph-scale" aria-label="Gráf nagyítása"></output><button class="button compact" id="graph-plus" aria-label="Gráf nagyítása">＋</button><button class="button compact" id="graph-fit">Teljes gráf</button><button class="button compact" id="graph-actual">100%</button></div></div><div class="graph-toolbar graph-secondary"><select id="graph-jump" aria-label="Ugrás egy gráfelemhez"><option value="">Ugrás egy tételhez…</option>${[...graph.nodes].sort((a,b)=>a.name.localeCompare(b.name,'hu')).map(n=>`<option data-i18n-skip value="${n.id}">${esc(n.name)}</option>`).join('')}</select><button class="text-button" id="graph-clear">Kijelölés törlése</button><span class="muted">${fmt(graph.nodes.length)} elem · ${fmt(graph.edges.length)} kapcsolat</span></div>`;
   const picture=graph.nodes.length?`<div class="graph-viewport" id="graph-viewport" role="region" tabindex="0" aria-label="Gyártási kapcsolatok; görgethető és húzással mozgatható gráf"><svg id="plan-graph" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${graph.width} ${graph.height}" aria-label="${esc(plan.name)} gyártási gráfja"><defs><marker id="graph-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M 0 0 L 9 4.5 L 0 9 z"/></marker></defs>${graph.layers.map(l=>`<text class="graph-layer" x="${l.x}" y="30">${l.stage?l.stage+'. SZINT':'BESZERZÉS'} · ${l.count} ELEM</text>`).join('')}<g class="graph-edges">${edges}</g><g class="graph-cards">${cards}</g></svg></div>`:empty('Nincs megjeleníthető gyártandó tétel',plan.queue.length?'Kapcsold be a beszerzendő vagy fedezett elemeket.':'A gyártási lista is üres. A Beszerzendő anyagok és Fedezett elemek kapcsolóval a további tételeket is láthatod.');
   content.innerHTML=`<div id="graph-shell" class="graph-shell${graphExpanded?' graph-expanded':''}">`+panel(`${plan.name} · ${fmt(plan.quantity)} db`,'Az aktuális gyártási terv alapján',toolbar+picture,plan.name)+`<div class="graph-legend"><span class="reaction">● Reakció</span><span class="manufacturing">● Gyártás</span><span class="buy">● Beszerzés</span><span class="covered">● Fedezett</span><span>→ Bemenetből készülő termék</span></div><p class="footnote">Kattints egy elemre: a neve a vágólapra kerül, és a kapcsolódó gyártási ág kiemelést kap. Az ismétlődő anyagok egyszer szerepelnek, a teljes tervre összesített mennyiséggel. Nagyítás: a + / − gombokkal vagy Ctrl/⌘ + görgetéssel; mozgatás: görgetéssel vagy az üres terület húzásával. A nyíl fölött látható a felhasznált bemenet mennyisége.</p><div id="graph-details"></div></div>`;
   $('.graph-navigation').insertAdjacentHTML('beforeend',`<button class="button compact" id="graph-expand" aria-expanded="${graphExpanded}">${graphExpanded?'Normál nézet':'Nagy nézet'}</button>`);
@@ -439,7 +441,7 @@ function renderAllShopping(content){
   if(data.stale_characters.length)content.innerHTML+=`<div class="banner warn">Korábbi EVE-pillanatképből számolunk: ${esc(data.stale_characters.join(', '))}. Frissítsd az EVE-adatokat.</div>`;
   const rows=data.rows.map(r=>`<tr><td>${item(r)}</td><td><span class="badge">${esc(r.category)}</span></td><td class="num"><strong>${fmt(r.buy)}</strong></td><td>${r.unit||'db'}</td><td>${esc(blueprintSupply(r))}</td><td>${r.plans.map(p=>`${planLabel(p)}${p.corporation_id?' · '+esc(p.scope_label):' · Személyes'} (${fmt(p.quantity)} db cél): <strong>${fmt(p.buy)} ${r.unit||'db'}</strong>`).join('<br>')}</td></tr>`);
   content.innerHTML+=panel('Összesített alapanyaghiány',`${rows.length} beszerzendő termék`,rows.length?table(['Termék','Típus','Összesen beszerzendő','Egység','Blueprint beszerzés','Hiány tervenként'],rows):empty(data.plans.length?'Nincs alapanyaghiány':'Még nincs mentett terv',data.plans.length?'A közös készlet és jobkimenetek minden mentett tervhez elegendők.':'Ments el egy gyártási tervet az összesítéshez.'));
-  content.innerHTML+=`<details class="panel shopping-included"><summary>Beszámított tervek · ${data.plans.length}</summary>${table(['Elsőbbség','Terv','Gyártási kör','Célmennyiség','Foglalás'],data.plans.map(p=>`<tr><td>${p.priority}</td><td>${planLabel(p)}</td><td>${esc(p.scope_label||'Személyes gyártás')}</td><td>${fmt(p.quantity)} db</td><td>${p.reserve_active?'Aktív':'Nincs aktív foglalás; beleszámít'}</td></tr>`))}</details><p class="footnote">A kész komponensek és hajók alapanyagai nem kerülnek vissza a hiányba. A közösen használható reakcióformula készlettulajdonosonként egyszer szerepel. Azonos anyag egy sorban szerepel; a tervenkénti bontás a még hiányzó mennyiségeket mutatja. A termékmezőben végzett, még nem mentett módosításokat ez az összesítés nem tartalmazza. Számítás: ${esc(date(data.calculated_at))}.</p>`;
+  content.innerHTML+=`<details class="panel shopping-included"><summary>Beszámított tervek · ${data.plans.length}</summary>${table(['Elsőbbség','Terv','Gyártási kör','Célmennyiség','Foglalás'],data.plans.map(p=>`<tr><td>${p.priority}</td><td>${planLabel(p)}</td><td>${p.corporation_id?verbatim(p.scope_label):esc(p.scope_label||'Személyes gyártás')}</td><td>${fmt(p.quantity)} db</td><td>${p.reserve_active?'Aktív':'Nincs aktív foglalás; beleszámít'}</td></tr>`))}</details><p class="footnote">A kész komponensek és hajók alapanyagai nem kerülnek vissza a hiányba. A közösen használható reakcióformula készlettulajdonosonként egyszer szerepel. Azonos anyag egy sorban szerepel; a tervenkénti bontás a még hiányzó mennyiségeket mutatja. A termékmezőben végzett, még nem mentett módosításokat ez az összesítés nem tartalmazza. Számítás: ${esc(date(data.calculated_at))}.</p>`;
   bindShoppingTabs();
   $('#copy-all-shopping').onclick=async()=>{try{await navigator.clipboard.writeText(data.rows.map(r=>`${r.name}\t${r.buy}\t${r.unit||'db'}`).join('\n'));toast('Az összesített beszerzési lista a vágólapon.');}catch{error('A másolás nem sikerült. Használd a CSV-mentést.');}};
   $('#export-csv').onclick=()=>csv(data.rows.map(r=>[r.name,r.buy,r.unit||'db',r.plans.map(p=>`${p.name} (${p.quantity} db cél): ${p.buy}`).join(' | ')]),['Termék','Összesen beszerzendő','Egység','Hiány tervenként'],'osszes-terv-alapanyaghiany');
@@ -522,7 +524,7 @@ async function applyMapping(kind) {
 function renderJobs(content) {
   setHead('IPARI JOBOK','Ami már folyamatban van',corporationId?'A kiválasztott corporation saját ipari jobjai.':'Személyes gyártási, reakciós és egyéb aktív jobok a legutóbbi EVE-frissítésből.');
   const labels={active:'Fut',paused:'Szünetel',ready:'Átvehető'};
-  const rows=state.jobs.map(j=>`<tr><td>${item({name:j.name,id:j.product_type_id||0})}</td><td><span class="badge ${j.status==='ready'?'good':'reaction'}">${esc(labels[j.status]||j.status)}</span></td><td class="num">${fmt(j.runs)}</td><td class="num"><strong>${fmt(j.expected_output)}</strong></td>${characterCell(j.character_id)}<td class="num">${j.output_location_id||'–'}</td><td data-sort-value="${j.end_date?Date.parse(j.end_date):''}">${j.end_date?esc(new Date(j.end_date).toLocaleString('hu-HU')):'–'}</td></tr>`);
+  const rows=state.jobs.map(j=>`<tr><td>${item({name:j.name,id:j.product_type_id||0})}</td><td><span class="badge ${j.status==='ready'?'good':'reaction'}">${esc(labels[j.status]||j.status)}</span></td><td class="num">${fmt(j.runs)}</td><td class="num"><strong>${fmt(j.expected_output)}</strong></td>${characterCell(j.character_id)}<td class="num">${j.output_location_id||'–'}</td><td data-sort-value="${j.end_date?Date.parse(j.end_date):''}">${j.end_date?esc(EveI18n.date(new Date(j.end_date))):'–'}</td></tr>`);
   content.innerHTML=panel('Aktív és át nem vett jobok',`${fmt(rows.length)} job`,rows.length?table(['Termék','Állapot','Run','Beszámítható kimenet','Karakter','Kimeneti Hely-ID','Befejezés'],rows):empty('Nincs betöltött aktív job','Adj hozzá karaktert az EVE-kapcsolat oldalon, majd indíts EVE-frissítést.'));
   content.innerHTML+='<p class="footnote">A kimenet csak gyártási és reakciós jobnál, a kiválasztott helyszíneken számít. A delivered, cancelled és reverted jobokat nem adja a folyamatban készlethez. Kutatás, invention és másolás kimenete itt 0. Kézi készletmódban a terv a Készlet oldalon megadott kézi folyamatban mennyiségekkel számol.</p>';
 }
@@ -549,7 +551,7 @@ function renderConnection(content) {
   content.innerHTML+=state.settings.client_id?`<details class="panel skill-permissions"><summary>Másik Client ID beállítása – választható</summary>${setupHelp}</details>`:setupHelp;
   $('#save-client').onclick=async()=>{try{await api('/api/settings',{client_id:$('#client-id').value.trim()});await reloadState();toast('Client ID mentve.');render();}catch(e){error(e.message);}};
   $('#add-character').onclick=async()=>{try{error('');const result=await api('/api/auth/start',{});window.location.assign(result.url);}catch(e){error(e.message);}};
-  $$('[data-remove-character]').forEach(el=>el.onclick=async()=>{if(!confirm('Eltávolítod ezt a karaktert és a helyben mentett adatait?'))return;try{await api('/api/characters/remove',{id:Number(el.dataset.removeCharacter)});await reloadState();render();}catch(e){error(e.message);}});
+  $$('[data-remove-character]').forEach(el=>el.onclick=async()=>{if(!confirmUI('Eltávolítod ezt a karaktert és a helyben mentett adatait?'))return;try{await api('/api/characters/remove',{id:Number(el.dataset.removeCharacter)});await reloadState();render();}catch(e){error(e.message);}});
   if($('#save-characters')) $('#save-characters').onclick=async()=>{try{const checked=$$('[data-char]:checked').map(el=>Number(el.dataset.char));if(!checked.length)throw new Error('Válassz legalább egy karaktert.');await api('/api/settings',{character_ids:checked.length===state.characters.length?[]:checked});await calculate();toast('Karakterválasztás mentve.');}catch(e){error(e.message);}};
 }
 function renderSaved(content) {
@@ -558,7 +560,7 @@ function renderSaved(content) {
   setHead('MENTETT TERVEK','Tervek és készletfoglalások','Csak a kiválasztott kategória tervei láthatók. A mentés és a készletfoglalás is ehhez a gyártási körhöz tartozik.');
   content.innerHTML=`<div class="saved-categories" role="group" aria-label="Mentett tervek kategóriái">${scopes.map(s=>`<button type="button" class="button compact${s.id===corporationId?' selected':''}" data-saved-scope="${s.id??''}" aria-pressed="${s.id===corporationId}">${esc(s.name)} <span class="badge">${state.plans.filter(p=>(p.corporation_id??null)===s.id).length}</span></button>`).join('')}</div><p class="saved-category-note">Mentés helye: <strong>${esc(category)}</strong> · ${plans.length} mentett terv</p>`;
   content.innerHTML+=state.delivery_wait?deliveryWaitMarkup(state.delivery_wait):state.reservation_error?`<div class="banner error">${esc(state.reservation_error)}</div>`:'';
-  content.innerHTML+=plans.length?`<div class="saved-list">${plans.map(p=>`<div class="saved-plan-card"><div class="saved-plan"><div><strong>${planLabel(p)}</strong><div class="reservation-badges"><span class="badge">${p.corporation_id?'Corp: '+esc(p.scope_label):'Személyes gyártás'}</span></div>${p.allocation_error?`<div class="warning-text">${esc(p.allocation_error)}</div>`:''}<small>${itemName(p.product_name)} · ${fmt(p.quantity)} db · ${date(p.created)}</small><div class="saved-producer">Gyártó: ${esc(p.manufacturer_id?(state.characters.find(c=>c.id===p.manufacturer_id)?.name||String(p.manufacturer_id)):'még nincs kiválasztva')}</div><div class="reservation-badges"><span class="badge ${p.reserve_active?'good':''}">${p.reserve_active?'Foglalás aktív':'Nincs aktív foglalás'}</span>${p.allocation?`<span class="badge">${p.allocation.priority}. elsőbbség</span><span class="badge">${fmt(p.allocation.reserved_types)} terméktípus foglalva</span>`:''}</div>${p.allocation?`<small>Hátralévő gyártás: ${fmt(p.allocation.summary.items)} tétel · Beszerzési hiány: ${fmt(p.allocation.summary.shopping_items)} tétel</small>`:''}</div><div class="saved-actions"><button class="button compact" data-load-plan="${esc(p.id)}" aria-label="${esc(p.name)} – Terv megnyitása">Terv megnyitása</button><button class="button compact" data-toggle-reservation="${esc(p.id)}" aria-label="${esc(p.name)} – ${p.reserve_active?'Foglalás feloldása':'Foglalás bekapcsolása'}">${p.reserve_active?'Foglalás feloldása':'Foglalás bekapcsolása'}</button>${p.reserve_active?`<button class="text-button" data-reservation-detail="${esc(p.id)}" aria-label="${esc(p.name)} – Lefoglalt tételek">Lefoglalt tételek</button>`:''}<button class="text-button danger" data-remove-plan="${esc(p.id)}" aria-label="${esc(p.name)} – Terv törlése">Törlés</button></div></div></div>`).join('')}</div>`:empty('Ebben a kategóriában még nincs mentett terv','Válassz terméket, majd kattints a Terv mentése és foglalás gombra. A terv ide kerül: '+category+'.');
+  content.innerHTML+=plans.length?`<div class="saved-list">${plans.map(p=>`<div class="saved-plan-card"><div class="saved-plan"><div><strong>${planLabel(p)}</strong><div class="reservation-badges"><span class="badge">${p.corporation_id?'Corp: '+esc(p.scope_label):'Személyes gyártás'}</span></div>${p.allocation_error?`<div class="warning-text">${esc(p.allocation_error)}</div>`:''}<small>${itemName(p.product_name)} · ${fmt(p.quantity)} db · ${date(p.created)}</small><div class="saved-producer">Gyártó: ${p.manufacturer_id?verbatim(state.characters.find(c=>c.id===p.manufacturer_id)?.name||String(p.manufacturer_id)):esc('még nincs kiválasztva')}</div><div class="reservation-badges"><span class="badge ${p.reserve_active?'good':''}">${p.reserve_active?'Foglalás aktív':'Nincs aktív foglalás'}</span>${p.allocation?`<span class="badge">${p.allocation.priority}. elsőbbség</span><span class="badge">${fmt(p.allocation.reserved_types)} terméktípus foglalva</span>`:''}</div>${p.allocation?`<small>Hátralévő gyártás: ${fmt(p.allocation.summary.items)} tétel · Beszerzési hiány: ${fmt(p.allocation.summary.shopping_items)} tétel</small>`:''}</div><div class="saved-actions"><button class="button compact" data-load-plan="${esc(p.id)}" aria-label="${esc(p.name)} – Terv megnyitása">Terv megnyitása</button><button class="button compact" data-toggle-reservation="${esc(p.id)}" aria-label="${esc(p.name)} – ${p.reserve_active?'Foglalás feloldása':'Foglalás bekapcsolása'}">${p.reserve_active?'Foglalás feloldása':'Foglalás bekapcsolása'}</button>${p.reserve_active?`<button class="text-button" data-reservation-detail="${esc(p.id)}" aria-label="${esc(p.name)} – Lefoglalt tételek">Lefoglalt tételek</button>`:''}<button class="text-button danger" data-remove-plan="${esc(p.id)}" aria-label="${esc(p.name)} – Terv törlése">Törlés</button></div></div></div>`).join('')}</div>`:empty('Ebben a kategóriában még nincs mentett terv','Válassz terméket, majd kattints a Terv mentése és foglalás gombra. A terv ide kerül: '+category+'.');
   content.innerHTML+='<p class="footnote">A terv a hozzá felhasznált meglévő készletet és várható jobkimenetet foglalja le; a még hiányzó anyag beszerzendő marad. A kész komponens alapanyagait nem foglalja külön. Beérkező anyagokból és a közös beállítások változásakor újraszámolódik a kiosztás. Feloldás vagy tervtörlés után a mennyiségek más tervekhez felhasználhatók. A korábbi verzióban mentett tervekhez a Foglalás bekapcsolása gombbal indítható a foglalás.</p><div id="reservation-detail"></div>';
   $$('[data-saved-scope]').forEach(el=>el.onclick=()=>setProductionScope(Number(el.dataset.savedScope)||null));
   $$('[data-load-plan]').forEach(el=>el.onclick=()=>openSavedPlan(el.dataset.loadPlan));
@@ -575,7 +577,7 @@ function renderSaved(content) {
     $('#reservation-detail').scrollIntoView({block:'nearest',behavior:'smooth'});
   });
   $$('[data-remove-plan]').forEach(el=>el.onclick=async()=>{
-    if(!confirm('Törlöd ezt a mentett tervet? A foglalása is felszabadul.'))return;
+    if(!confirmUI('Törlöd ezt a mentett tervet? A foglalása is felszabadul.'))return;
     try{await api('/api/plans/remove',{id:el.dataset.removePlan});if(activePlanId===el.dataset.removePlan)activePlanId=null;await calculate();toast('A terv törölve, a foglalása felszabadult.');}catch(e){error(e.message);}
   });
   renderReservationDetails();
@@ -585,7 +587,7 @@ function renderReservationDetails() {
   if(!target)return;
   if(!saved?.reserve_active||(saved.corporation_id??null)!==corporationId){target.innerHTML='';return;}
   const a=saved.allocation;
-  target.innerHTML=panel(saved.name+' – lefoglalt tételek',`${fmt(saved.quantity)} db céltermék`,a?
+  target.innerHTML=panel({name:saved.name,suffix:' – lefoglalt tételek'},`${fmt(saved.quantity)} db céltermék`,a?
     a.items.length?table(['Termék','Készletből (db)','Folyamatban lévő kimenetből (db)'],a.items.map(r=>`<tr><td>${item(r)}</td><td class="num">${fmt(r.stock)}</td><td class="num">${fmt(r.wip)}</td></tr>`)):
     empty('Jelenleg nincs lefoglalható készlet','A foglalás aktív. Beérkező anyagokból a terv elsőbbsége szerint részesül.'):
     empty('A foglalás most nem számolható','Ellenőrizd a fenti üzenetet és az EVE-adatokat.'));
@@ -610,6 +612,7 @@ async function startTask(path) {
 }
 function csv(rows, headers, name) {
   const quote=value=>{let s=String(value??'');if(/^[=+@-]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';};
+  headers=headers.map(EveI18n.t);
   const blob=new Blob(['\ufeff'+[headers,...rows].map(row=>row.map(quote).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob), a=document.createElement('a');a.href=url;a.download='eve-'+name+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
@@ -636,7 +639,7 @@ $('#new-plan').onclick=async()=>{
   if(Object.keys(dirty).length)return error('Az új terv előtt alkalmazd a beírt módosításokat.');
   activePlanId=null;updatePlanControls();await calculate();
 };
-$('#shutdown').onclick=async()=>{if(!confirm('Leállítod a helyi alkalmazást? A mentett adatok megmaradnak.'))return;try{await api('/api/shutdown',{});document.body.innerHTML='<main><section class="content"><h1>A műhely leállt.</h1><p>Az indítóikonnal újra megnyithatod. Ezt a böngészőlapot bezárhatod.</p></section></main>';}catch(e){error(e.message);}};
+$('#shutdown').onclick=async()=>{if(!confirmUI('Leállítod a helyi alkalmazást? A mentett adatok megmaradnak.'))return;try{await api('/api/shutdown',{});document.body.innerHTML='<main><section class="content"><h1>A műhely leállt.</h1><p>Az indítóikonnal újra megnyithatod. Ezt a böngészőlapot bezárhatod.</p></section></main>';}catch(e){error(e.message);}};
 $('#product-search').oninput=()=>{
   productId=null;activePlanId=null;updatePlanControls();clearTimeout(searchTimer);
   const q=$('#product-search').value;

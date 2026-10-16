@@ -1,7 +1,7 @@
 'use strict';
 let skillData=null,skillRequest=null,skillTimer=null,skillSelectedId=null,skillTab='queue',skillFilter='',skillShowCompleted=false;
 const skillLevel=n=>n==null?'–':['0','I','II','III','IV','V'][n]||String(n);
-const skillDate=n=>n==null?'–':new Date(n*1000).toLocaleString('hu-HU',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+const skillDate=n=>n==null?'–':EveI18n.date(n*1000,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
 function skillDuration(seconds){
   if(seconds==null)return '–';
   const minutes=Math.max(0,Math.ceil(seconds/60)),days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60);
@@ -70,7 +70,7 @@ function renderSkillDetail(){
       empty('Még nincs betöltött skilllista','Engedélyezd a skilladatokat, és indíts frissítést.');
     body+='<p class="footnote">A már befejezett, de az EVE skilllistájában még át nem vezetett szinteket a tanulási sor alapján hozzáadjuk a tanult szinthez és az ismert skillpontokhoz. Az aktív szintet külön, az EVE adata alapján mutatjuk; az Alpha/Omega állapotát nem találgatjuk.</p>';
   }
-  target.innerHTML=panel(c.name+' – skillek és sor',`Skilladat: ${skillDate(c.skills_as_of)} · Sor: ${skillDate(c.queue_as_of)}`,`<div class="skill-detail-body">${body}</div>`);
+  target.innerHTML=panel({name:c.name,suffix:' – skillek és sor'},`Skilladat: ${skillDate(c.skills_as_of)} · Sor: ${skillDate(c.queue_as_of)}`,`<div class="skill-detail-body">${body}</div>`);
   $('#skill-queue-tab').onclick=()=>{skillTab='queue';renderSkillDetail();};
   $('#skill-trained-tab').onclick=()=>{skillTab='trained';renderSkillDetail();};
   if($('#skill-completed'))$('#skill-completed').onchange=e=>{skillShowCompleted=e.target.checked;renderSkillDetail();};

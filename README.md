@@ -4,7 +4,7 @@ Helyben futó, magyar nyelvű EVE Online gyártástervező macOS Apple Silicon �
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 0.8.0**, **Windows 11 x64 0.8.1**. A két platform verziója eltér; a kiadási leírás ezt jelzi.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 0.9.0**, **Windows 11 x64 0.9.0**, magyar és angol felülettel.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -20,6 +20,8 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 
 ## Használat
 
+Az oldalsávban, a sötét mód kapcsolója alatt a **Magyar / English** gombokkal válthatsz nyelvet. A választást a böngésző megjegyzi; a nyelv a megnyitott nézetben is azonnal változik. A beírt értékek, szűrők és még nem mentett módosítások megmaradnak. A karakterek, corporationök, mentett tervek és EVE-tárgyak neve nem változik.
+
 A kész alkalmazás futtatásához nem kell Excel, Codex vagy külön Python. Windowson a teljes ZIP kibontása után indítsd az `EVE_Muhely.exe` fájlt; Macen másold a DMG-ben található alkalmazást az Alkalmazások mappába. A kiadások aláírás és hitelesítés nélkül készülnek. A Windows-csomag tényleges Windows 11 alatti futtatása ezen a fejlesztői gépen még nem volt ellenőrizhető; a mellékelt `Ellenorzes.cmd` külön, ideiglenes profillal ellenőrzi a működést.
 
 A saját karaktereidet az **EVE-kapcsolat** menüben adhatod hozzá. A kiadások nem tartalmaznak karaktert, mentett tervet, készletet vagy belépési tokent; csak a nyilvános EVE Client ID lehet előre beállítva. Forrásból indításkor saját Client ID is megadható. Részletes útmutató: [Hasznalat.md](Hasznalat.md).
@@ -33,7 +35,7 @@ Local Hungarian EVE Online industry planner. Developer and build notes follow be
 - Python 3.9+; runtime dependency: `cryptography` (SSO token signatures and encryption).
 - Run: `python3 run.py --no-browser` then open `http://127.0.0.1:8765`.
 - Test: `python3 -m unittest discover -s tests -v` (binds loopback ports).
-- Graph layout tests: `node --test tests/test_graph.cjs` (Node is only needed for these developer tests, not to run the app).
+- UI tests: `npm ci --ignore-scripts` then `npm test`. Node and jsdom are developer-only dependencies; neither is needed to run the app.
 - `EVE_MUHELY_DATA` overrides the user-data directory; keep test data separate from personal data.
 - The bundled SQLite catalogue is generated from CCP's official JSONL SDE. Rebuild with `python3 tools/build_catalog.py --help`, or update through the UI.
 - Plain browser JavaScript/CSS; no frontend build and no remote scripts.
@@ -79,3 +81,9 @@ Build with `python tools/build_windows_release.py --client-id-file PUBLIC_CLIENT
 Windows stores profiles under `%LOCALAPPDATA%\EVE Muhely`. `muhely/windows_security.py` protects the Fernet vault key with current-user Windows DPAPI and fixed application entropy. It does not use machine-wide protection or a plaintext-key fallback. Existing legacy plaintext keys are verified against the encrypted token file before migrating. Failure to decrypt never replaces the vault. macOS continues to use Keychain; POSIX fallback behaviour is unchanged.
 
 `windows_desktop.py` writes startup diagnostics and calls the common desktop entry point. Windows backend processes run without a console and with isolated Python paths; source/catalogue SQLite connections close before replacement so SDE updates work with Windows file locking. `windows_smoke_test.py` plus `Ellenorzes.cmd` run a recipient-side smoke test against a temporary blank profile: actual DPAPI, HTTP/CSRF, large reaction planning, plan persistence and optional public EVE HTTPS. It never logs in a real character or changes the user's plans. Windows runtime execution has not been verified on this build host; `release-manifest.json` records that limitation explicitly.
+
+## Interface languages (0.9.0)
+
+Hungarian is the default. The sidebar language buttons persist `eve-muhely-language` locally, independently of the theme. `static/i18n.js` projects canonical Hungarian presentation messages using the English catalogue in `static/i18n-en.js`. It updates existing text and accessibility attributes in place, including asynchronous content, without rerendering forms, making requests or changing API values. Known messages can contain numbered placeholders; captured names are preserved, and `:t` explicitly opts a captured UI fragment into recursive translation. Unknown messages are kept intact. Date presentation follows the selected language; quantities retain their requested three-digit space grouping.
+
+Names and other user-controlled labels must use `verbatim`, `data-i18n-skip` or the dedicated name renderers. Input values, select values, data attributes, credentials, EVE names and clipboard contents remain canonical. `EveI18n.t` also localizes confirmation messages, validation and CSV headings. No translation service or external script is used. Tests cover preference persistence, live changes, DOM updates, names, escaping, dates, table filters, input identity and 100-million-unit validation.

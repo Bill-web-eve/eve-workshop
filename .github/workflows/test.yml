@@ -1,0 +1,19 @@
+name: Application tests
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - name: Python application tests
+        run: |
+          python3 -m venv /tmp/eve-tests
+          /tmp/eve-tests/bin/pip install -r requirements.txt
+          /tmp/eve-tests/bin/python -m unittest discover -s tests -v

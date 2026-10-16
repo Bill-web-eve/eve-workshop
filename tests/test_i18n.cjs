@@ -1,0 +1,69 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const {JSDOM}=require('jsdom');
+const root=path.join(__dirname,'../static');
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+async function page(html='',saved=null){
+  const dom=new JSDOM(`<html lang="hu"><body><div class="language-control" data-i18n-skip><button data-ui-language="hu">Magyar</button><button data-ui-language="en">English</button></div>${html}</body></html>`,{url:'http://127.0.0.1:8765',runScripts:'outside-only'});
+  if(saved)dom.window.localStorage.setItem('eve-muhely-language',saved);
+  for(const name of ['i18n-en.js','i18n.js'])vm.runInContext(fs.readFileSync(path.join(root,name),'utf8'),dom.getInternalVMContext());
+  await tick();return dom;
+}
+test('English translates messages and parameters while preserving names and escaping',async()=>{
+  const dom=await page();const i=dom.window.EveI18n;i.setLanguage('en');
+  assert.equal(i.t('Gyártási terv'),'Production plan');
+  assert.equal(i.t('Salvation – Név másolása'),'Salvation – Copy name');
+  assert.equal(i.t('Az EVE szerver HTTP 400 hibát jelzett. A korábbi adatok megmaradtak.'),'The EVE server returned HTTP 400. Previous data has been preserved.');
+  const p=dom.window.document.createElement('p');p.textContent='Másolva: <script>arbitrary name</script>';dom.window.document.body.append(p);await tick();
+  assert.equal(p.textContent,'Copied: <script>arbitrary name</script>');assert.equal(p.querySelector('script'),null);
+  dom.window.close();
+});
+test('language buttons persist selection and do not change unsaved fields, item names or theme',async()=>{
+  const dom=await page('<h1>Gyártási terv</h1><input value="15 000 000"><span data-i18n-skip>Gyártási terv</span><button class="copy-item-name" data-copy-item="Reakció">Reakció</button>');
+  const w=dom.window,d=w.document;w.localStorage.setItem('eve-muhely-theme','light');
+  const input=d.querySelector('input');input.value='73 123';input.focus();input.setSelectionRange(2,5);
+  d.querySelector('[data-ui-language=en]').click();await tick();
+  assert.equal(d.documentElement.lang,'en');assert.equal(d.querySelector('h1').textContent,'Production plan');
+  assert.equal(input.value,'73 123');assert.equal(input.selectionStart,2);assert.equal(d.activeElement,input);
+  assert.equal(d.querySelector('.copy-item-name').textContent,'Reakció');assert.equal(d.querySelector('.copy-item-name').dataset.copyItem,'Reakció');
+  assert.equal(d.querySelector('span').textContent,'Gyártási terv');assert.equal(w.localStorage.getItem('eve-muhely-language'),'en');assert.equal(w.localStorage.getItem('eve-muhely-theme'),'light');
+  d.querySelector('[data-ui-language=hu]').click();await tick();assert.equal(d.querySelector('h1').textContent,'Gyártási terv');assert.equal(input.value,'73 123');
+  w.close();
+});
+test('saved language, malformed preferences and blocked storage are safe',async()=>{
+  for(const [saved,expected] of [['en','Production plan'],['unexpected','Gyártási terv']]){
+    const dom=await page('<p>Gyártási terv</p>',saved);assert.equal(dom.window.document.querySelector('p').textContent,expected);dom.window.close();
+  }
+  const dom=await page('<p>Gyártási terv</p>');Object.defineProperty(dom.window,'localStorage',{get(){throw new Error('blocked');}});
+  dom.window.EveI18n.setLanguage('en');assert.equal(dom.window.document.querySelector('p').textContent,'Production plan');dom.window.close();
+});
+test('new content, attributes and dates translate and restore without replacing controls',async()=>{
+  const dom=await page(),w=dom.window,d=w.document;w.EveI18n.setLanguage('en');
+  const div=d.createElement('div'),stamp=w.EveI18n.date(1760000000000,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  div.innerHTML=`<label title="Rendezés: Termék">Gyártási terv</label><input placeholder="Szűrés…"><small>${stamp}</small>`;d.body.append(div);await tick();
+  assert.equal(div.querySelector('label').textContent,'Production plan');assert.equal(div.querySelector('label').title,'Sort: Product');assert.equal(div.querySelector('input').placeholder,'Filter…');
+  assert.notEqual(div.querySelector('small').textContent,stamp);
+  const input=div.querySelector('input');w.EveI18n.setLanguage('hu');await tick();assert.equal(input,div.querySelector('input'));assert.equal(input.placeholder,'Szűrés…');assert.equal(div.querySelector('small').textContent,stamp);
+  div.querySelector('label').textContent='Készlet';await tick();w.EveI18n.setLanguage('en');await tick();assert.equal(div.querySelector('label').textContent,'Inventory');w.close();
+});
+test('table filters, character dropdowns and row controls survive language changes',async()=>{
+  const dom=await page(),w=dom.window,d=w.document;vm.runInContext(fs.readFileSync(path.join(root,'tables.js'),'utf8'),dom.getInternalVMContext());
+  d.body.insertAdjacentHTML('beforeend',w.EveTables.markup(['Karakter','Tevékenység'],['<tr><td data-filter-value="Reakció">Reakció</td><td>Gyártás<input value="22"></td></tr>','<tr><td data-filter-value="Other">Other</td><td>Reakció<input value="33"></td></tr>'],'','stable-key'));
+  await tick();w.EveI18n.setLanguage('en');await tick();
+  assert.equal(d.querySelector('[data-table-filter="0"] option[value="Reakció"]').textContent,'Reakció');
+  const filter=d.querySelector('[data-table-filter="1"]'),row=d.querySelector('tbody tr'),input=row.querySelector('input');
+  filter.value='Manufacturing';filter.dispatchEvent(new w.Event('input'));await tick();assert.equal(row.hidden,false);assert.equal(row.nextElementSibling.hidden,true);
+  input.value='777';w.EveI18n.setLanguage('hu');await tick();assert.equal(row.querySelector('input'),input);assert.equal(input.value,'777');assert.equal(filter.value,'Manufacturing');assert.equal(d.querySelector('.table-filters').hidden,true);assert.equal(d.querySelector('.table-empty-row td').textContent,'Nincs a szűrésnek megfelelő sor.');w.close();
+});
+test('number validation switches language and preserves 100-million-unit quantities',async()=>{
+  const dom=await page('<input data-grouped-number data-number-min="1" data-number-max="100000000" value="100000001">'),w=dom.window,d=w.document;
+  vm.runInContext(fs.readFileSync(path.join(root,'numbers.js'),'utf8'),dom.getInternalVMContext());await tick();const input=d.querySelector('input');
+  assert.match(input.validationMessage,/Egész számot/);w.EveI18n.setLanguage('en');await tick();assert.equal(input.value,'100 000 001');assert.equal(input.validationMessage,'Enter a whole number between 1 and 100 000 000.');
+  input.value='100 000 000';input.dispatchEvent(new w.Event('input'));assert.equal(input.validationMessage,'');w.close();
+});
+test('blueprint wire values and canonical metadata are not translated',async()=>{
+  const dom=await page('<select data-id="92822" data-key="source"><option value="auto">Automatikus</option><option value="manual" selected>Kézi</option></select><input data-id="92822" data-key="me" value="3"><span data-i18n-skip>Készlet</span>');
+  const w=dom.window,d=w.document,select=d.querySelector('select');w.EveI18n.setLanguage('en');await tick();
+  assert.equal(select.value,'manual');assert.equal(select.selectedOptions[0].textContent,'Manual');assert.equal(select.dataset.key,'source');assert.equal(d.querySelector('input').value,'3');assert.equal(d.querySelector('span').textContent,'Készlet');
+  w.EveI18n.setLanguage('hu');await tick();assert.equal(select.value,'manual');assert.equal(select.selectedOptions[0].textContent,'Kézi');w.close();
+});

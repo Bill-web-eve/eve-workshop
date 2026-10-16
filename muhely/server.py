@@ -505,7 +505,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/app.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/icon.svg']:
+            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if not self.authorized():
@@ -538,7 +538,7 @@ class Handler(BaseHTTPRequestHandler):
             message = str(error) if isinstance(error, (PlanningError, EsiError)) else 'Hibás kérés.'
             if urllib.parse.urlsplit(self.path).path == '/callback':
                 import html
-                return self.send(400, '<!doctype html><html lang="hu"><meta charset="utf-8"><title>EVE-belépés</title><h1>A belépés nem fejeződött be</h1><p>'+html.escape(message)+'</p><a href="/">Vissza az alkalmazáshoz</a></html>', 'text/html; charset=utf-8')
+                return self.send(400, '<!doctype html><html lang="hu"><head><meta charset="utf-8"><title>EVE-belépés</title><script src="/i18n-en.js"></script><script src="/i18n.js"></script></head><body><h1>A belépés nem fejeződött be</h1><p>'+html.escape(message)+'</p><a href="/">Vissza az alkalmazáshoz</a></body></html>', 'text/html; charset=utf-8')
             return self.send(400, {'error': message,**({'delivery_wait':error.info} if isinstance(error,AssetSnapshotPending) else {})})
         except (BrokenPipeError, ConnectionResetError):
             pass

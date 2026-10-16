@@ -1,0 +1,6 @@
+{
+  "name": "eve-workshop-ui-tests",
+  "private": true,
+  "scripts": {"test": "node --test tests/*.cjs"},
+  "devDependencies": {"jsdom": "26.1.0"}
+}

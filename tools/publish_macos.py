@@ -16,7 +16,7 @@ def build_app(application):
     (bundle/'MacOS').mkdir(parents=True, exist_ok=True)
     (bundle/'Resources').mkdir(exist_ok=True)
     shutil.copytree(SOURCE, bundle/'Resources/eve_muhely', dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store', '.venv', 'test-results', '*.building.sqlite3'))
+                    ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store', '.venv', '.git', 'node_modules', 'release-assets', 'test-results', '*.building.sqlite3'))
     info = {'CFBundleName': 'EVE Muhely', 'CFBundleDisplayName': 'EVE Műhely',
             'CFBundleIdentifier': 'hu.eve.muhely.local', 'CFBundleExecutable': 'EVE Muhely',
             'CFBundlePackageType': 'APPL',
@@ -39,11 +39,11 @@ def publish(destination):
     target = destination/'workdir/eve_muhely'
     if target == SOURCE:
         raise SystemExit('Choose a destination outside this source folder.')
-    ignored = shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store', '.venv', 'test-results', '*.building.sqlite3')
+    ignored = shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store', '.venv', '.git', 'node_modules', 'release-assets', 'test-results', '*.building.sqlite3')
     shutil.copytree(SOURCE, target, dirs_exist_ok=True, ignore=ignored)
     verified = 0
     for path in SOURCE.rglob('*'):
-        if not path.is_file() or any(part in ['__pycache__', '.venv', 'test-results'] for part in path.parts) or path.name in ['.DS_Store'] or path.suffix == '.pyc':
+        if not path.is_file() or any(part in ['__pycache__', '.venv', '.git', 'node_modules', 'release-assets', 'test-results'] for part in path.parts) or path.name in ['.DS_Store'] or path.suffix == '.pyc':
             continue
         relative = path.relative_to(SOURCE)
         copied = target/relative

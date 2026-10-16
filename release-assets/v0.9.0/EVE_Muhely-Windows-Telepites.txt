@@ -1,0 +1,36 @@
+﻿EVE MŰHELY 0.9.0 – WINDOWS 11 64 BIT
+
+1. A ZIP-en jobb kattintás → Az összes kibontása.
+2. Nyisd meg a kibontott EVE Muhely mappát.
+3. Indítsd el az EVE_Muhely.exe fájlt. A teljes mappát tartsd együtt.
+4. A műhely a saját böngésződben nyílik meg: http://127.0.0.1:8765
+
+Külön Python, Excel és Codex telepítése nem szükséges. Rendszergazdai
+telepítés nem kell. Internet az EVE-belépéshez és frissítéshez szükséges.
+Az Inditas.cmd ugyanazt az alkalmazást indítja tartalék indítóként.
+Parancsikont az EVE_Muhely.exe fájlhoz készíthetsz az Asztalon.
+
+Ez a kiadás üres: nincs benne karakter, mentett terv, személyes készlet,
+belépési token vagy Client Secret. Csak a nyilvános EVE Client ID van
+előre megadva. Az EVE-kapcsolat menüben a saját karaktereidet engedélyezd.
+
+SAJÁT ADATOK ÉS LEÁLLÍTÁS
+Adatok: %LOCALAPPDATA%\EVE Muhely
+Frissítés előtt használd az Alkalmazás leállítása gombot, utána cseréld
+az alkalmazás mappáját. A saját adatok megmaradnak. Az EVE-tokenek
+titkosítva tárolódnak, a kulcsot a Windows DPAPI az adott Windows-fiókhoz
+védi. Másik gépen vagy másik Windows-fiókkal új EVE-belépés szükséges.
+Leállítás: a bal oldali Alkalmazás leállítása gombbal.
+
+ELLENŐRZÉS ÉS NAPLÓK
+Az Ellenorzes.cmd ideiglenes, üres tesztprofillal ellenőrzi a futtatást,
+a Windows titkosítását, a helyi API-t, a tervmentést és az EVE HTTPS-t.
+A saját karaktereidet és mentett terveidet nem módosítja.
+Hiba esetén: %LOCALAPPDATA%\EVE Muhely\launcher.log és server.log.
+
+A program nincs kiadói tanúsítvánnyal aláírva. Ha a Windows figyelmeztet,
+csak megbízható forrásból származó csomagnál engedélyezd a futtatást.
+Sem a SmartScreent, sem a vírusvédelmet nem kell kikapcsolni.
+
+Ellenőrzés állapota: a Windows x64 binárisok és a csomag szerkezete
+ellenőrizve; ezen a Macen natív Windows 11 futtatási próba nem történt.

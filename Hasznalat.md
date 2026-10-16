@@ -1,5 +1,12 @@
 # EVE Műhely – használati útmutató
 
+## Felület nyelve / Interface language
+
+Az oldalsávban a sötét mód kapcsolója alatt válassz a **Magyar** és **English** gombokkal. A váltás azonnali, és a böngésző megjegyzi. A beírt mezők, szűrők és még nem mentett módosítások megmaradnak. A nevek és EVE-adatok változatlanok.
+
+Use **Magyar / English** in the sidebar, below the dark-mode switch. Your browser remembers the language. Switching keeps your current view, inputs and filters. Character, corporation, saved-plan and EVE item names remain unchanged.
+
+
 Helyben futó, magyar nyelvű gyártástervező macOS-re. Excel és OpenAI API-előfizetés nem szükséges hozzá. A böngészős felület kizárólag a saját gépeden futó alkalmazáshoz kapcsolódik.
 
 ## Indítás

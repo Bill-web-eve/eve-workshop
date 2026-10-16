@@ -1,0 +1,30 @@
+{
+  "tag": "v0.9.0",
+  "title": "EVE Workshop 0.9.0 – Magyar / English – Mac & Windows",
+  "assets": [
+    {
+      "name": "EVE_Muhely-0.9.0-macOS-AppleSilicon.dmg",
+      "sha256": "c9798120553f68317cc813fa0e4a97f8488fe7cf4e057732395e69dbcdf104fa"
+    },
+    {
+      "name": "EVE_Muhely-0.9.0-macOS-AppleSilicon.sha256",
+      "sha256": "19b1c5349aa026b99832de43e5c6d6979a08b69993da0d748ae004aa7ad8fa5a"
+    },
+    {
+      "name": "EVE_Muhely-0.9.0-Windows11-x64.zip",
+      "sha256": "ce6efd60d49cbae3b39c0fd6bb5bbf01bdd339ab68dd238e0cb9bffee5d3545e"
+    },
+    {
+      "name": "EVE_Muhely-0.9.0-Windows11-x64.sha256",
+      "sha256": "1c5061ca88db0ab6d66f07f6eb6d0d696ae849e26f76ec54b4bf49ce3ee6d503"
+    },
+    {
+      "name": "EVE_Muhely-Telepites.txt",
+      "sha256": "93ed176eb45b854ba8748c91b2e150d210962a5944133f511ccab49761cfebb1"
+    },
+    {
+      "name": "EVE_Muhely-Windows-Telepites.txt",
+      "sha256": "776ff46371aa16c7fb300fb0a3e76a94b1a3ef80afb78827a868aba2c3f46a29"
+    }
+  ]
+}

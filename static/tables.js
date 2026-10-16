@@ -1,12 +1,13 @@
 'use strict';
 const EveTables=(()=>{
+  const t=value=>typeof EveI18n==='undefined'?value:EveI18n.t(value);
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('hu-HU').replace(/\s+/g,' ').trim();
   const collator=new Intl.Collator('hu',{numeric:true,sensitivity:'base'});
   const number=value=>{
     const text=String(value??'').trim().replace(/−/g,'-');
-    if(!/^[+-]?\d[\d\s]*(?:[.,]\d+)?(?:\s*(?:%|db|run|m³))?$/.test(text))return null;
-    const result=Number(text.replace(/\s/g,'').replace(/(?:%|db|run|m³)$/,'').replace(',','.'));
+    if(!/^[+-]?\d[\d\s]*(?:[.,]\d+)?(?:\s*(?:%|db|units|run|m³))?$/.test(text))return null;
+    const result=Number(text.replace(/\s/g,'').replace(/(?:%|db|units|run|m³)$/,'').replace(',','.'));
     return Number.isFinite(result)?result:null;
   };
   function compare(a,b,direction=1){
@@ -61,13 +62,13 @@ const EveTables=(()=>{
     if(setting.sort)sorted.sort((a,b)=>compare(value(a,setting.sort.column).sort,value(b,setting.sort.column).sort,setting.sort.direction)||info.order.get(a)-info.order.get(b));
     for(const row of sorted)table.tBodies[0].append(row);
     table.tBodies[0].append(info.empty);info.empty.hidden=visible!==0;
-    info.block.querySelector('[data-table-count]').textContent=`${visible.toLocaleString('hu-HU')} / ${info.rows.length.toLocaleString('hu-HU')} sor · ${setting.sort?'Egyéni rendezés':'Eredeti sorrend'}`;
+    info.block.querySelector('[data-table-count]').textContent=t(`${visible.toLocaleString('hu-HU')} / ${info.rows.length.toLocaleString('hu-HU')} sor · ${setting.sort?'Egyéni rendezés':'Eredeti sorrend'}`);
     info.block.querySelector('[data-table-reset]').disabled=!setting.sort&&!setting.filters.some(Boolean);
     const toggle=info.block.querySelector('[data-table-toggle-filters]'),activeFilters=setting.filters.filter(Boolean).length;
     table.querySelector('.table-filters').hidden=!setting.filtersOpen;
     toggle.setAttribute('aria-expanded',String(setting.filtersOpen));
-    toggle.textContent=(setting.filtersOpen?'Szűrők bezárása':'Szűrők megnyitása')+(activeFilters?` · ${activeFilters} aktív`:'');
-    toggle.title='A szűrősor becsukása nem törli a beállított szűrést.';
+    toggle.textContent=t((setting.filtersOpen?'Szűrők bezárása':'Szűrők megnyitása')+(activeFilters?` · ${activeFilters} aktív`:''));
+    toggle.title=t('A szűrősor becsukása nem törli a beállított szűrést.');
     for(const th of table.tHead.rows[0].cells){
       const active=setting.sort?.column===th.cellIndex;
       th.setAttribute('aria-sort',active?(setting.sort.direction===1?'ascending':'descending'):'none');
@@ -82,7 +83,8 @@ const EveTables=(()=>{
     const empty=document.createElement('tr');empty.className='table-empty-row';
     const message=document.createElement('td');message.colSpan=headers.length;message.textContent='Nincs a szűrésnek megfelelő sor.';empty.append(message);
     instances.set(table,{key,block,rows,order:new Map(rows.map((row,i)=>[row,i])),empty,characterColumns,search:'',searchAttribute:'search'});
-    table.setAttribute('aria-label',table.closest('.panel')?.querySelector('h2')?.textContent||'Táblázat');
+    const heading=table.closest('.panel')?.querySelector('h2');
+    table.setAttribute('aria-label',(typeof EveI18n==='undefined'?heading?.textContent:EveI18n.sourceText(heading))||'Táblázat');
     const filterRow=table.querySelector('.table-filters');filterRow.id='table-filters-'+(++filterRowId);
     const toggle=block.querySelector('[data-table-toggle-filters]');toggle.setAttribute('aria-controls',filterRow.id);
     toggle.addEventListener('click',()=>{setting.filtersOpen=!setting.filtersOpen;apply(table);});
@@ -116,6 +118,9 @@ const EveTables=(()=>{
     new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)scan(node);}).observe(document.body,{childList:true,subtree:true});
     scan(document.body);
   }
-  return {markup,enhance,setSearch,normalize,number,compare,matches};
+  function refreshAll(){if(typeof document!=='undefined')document.querySelectorAll('table[data-table-key]').forEach(table=>{if(instances.has(table))apply(table);});}
+  if(typeof window!=='undefined')window.addEventListener('eve-language-change',refreshAll);
+  return {markup,enhance,setSearch,normalize,number,compare,matches,refreshAll};
 })();
+globalThis.EveTables=EveTables;
 if(typeof module!=='undefined'&&module.exports)module.exports=EveTables;
