@@ -106,3 +106,8 @@ A kristályfül az SDE megfelelő feldolgozási skillje alapján párosítja a 2
 A kiadási csomagban nincs hold, karakter, mentett terv vagy saját készlet. A kézzel felvitt holdak a felhasználó saját `muhely.sqlite3` adatbázisában maradnak. Az SDE frissítése a holdakat megőrzi.
 
 Források: [CCP SDE](https://developers.eveonline.com/docs/services/static-data/), [Moon Mining](https://support.eveonline.com/hc/en-us/articles/115005404229-Moon-Mining), [Metenox](https://www.eveonline.com/news/view/equinox-expansion-notes), [aktuális Magmatic Gas fogyasztás](https://www.eveonline.com/news/view/patch-notes-version-23-01), [Tatara 5,5%](https://www.eveonline.com/news/view/patch-notes-version-20-03), [Resources Realigned](https://www.eveonline.com/news/view/resources-realigned).
+
+
+### Release upload recovery
+
+The publication workflow verifies and reconciles every reviewed `release-assets/v*/manifest.json` in numeric version order. It repairs missing installers on older mutable releases as well as publishing the latest version. Creation uses the REST response's numeric release ID directly; uploads and final publication checks also use IDs, so a freshly created draft need not appear in the release listing or tag index. Existing assets are SHA-256 checked and never overwritten. A draft is published only after every required asset has uploaded and verified successfully. An interrupted run resumes on the next push or manual workflow run.

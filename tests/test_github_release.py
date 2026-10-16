@@ -1,3 +1,4 @@
+import copy
 import hashlib
 import importlib.util
 import json
@@ -6,133 +7,138 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-spec = importlib.util.spec_from_file_location('github_release', Path(__file__).resolve().parents[1] / 'tools/publish_github_release.py')
-release = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(release)
+spec=importlib.util.spec_from_file_location('github_release',Path(__file__).resolve().parents[1]/'tools/publish_github_release.py')
+release=importlib.util.module_from_spec(spec);spec.loader.exec_module(release)
 
+class FakeGitHub:
+    """Lists may stay stale forever; direct release-ID operations still work."""
+    def __init__(self,test,existing=None):
+        self.test=test;self.record=copy.deepcopy(existing);self.operations=[]
+        self.list_calls=0;self.stale_listing=existing is None;self.upload_error=False;self.patch_error=False
+        self.final_lag=0;self.file=None;self.asset=None
+    def gh(self,*args):
+        self.test.assertEqual(args[0],'api','Tag-based gh release commands must not be used')
+        if '--paginate' in args:
+            self.list_calls+=1
+            return json.dumps([[] if self.stale_listing else [self.record]])
+        method=args[args.index('--method')+1] if '--method' in args else 'GET'
+        endpoint=next(a for a in args if a.startswith(('repos/','https://uploads.github.com/')))
+        payload=json.loads(Path(args[args.index('--input')+1]).read_text()) if '--input' in args and not endpoint.startswith('https:') else None
+        self.operations.append((method,endpoint,payload))
+        if method=='POST' and endpoint=='repos/owner/repo/releases':
+            self.test.assertEqual(payload['draft'],True);self.test.assertEqual(payload['target_commitish'],'main')
+            self.record={'id':123,'tag_name':payload['tag_name'],'draft':True,'assets':[],'body':payload['body']}
+        elif method=='POST' and endpoint.startswith('https://uploads.github.com/'):
+            self.test.assertIn('/releases/123/assets?name=installer.zip',endpoint)
+            self.test.assertEqual(Path(args[args.index('--input')+1]).read_bytes(),self.file.read_bytes())
+            if self.upload_error:raise RuntimeError('HTTP 403 upload denied')
+            self.record['assets'].append(copy.deepcopy(self.asset));return json.dumps(self.asset)
+        elif method=='PATCH':
+            self.test.assertEqual(endpoint,'repos/owner/repo/releases/123')
+            if self.patch_error:raise RuntimeError('HTTP 403 edit denied')
+            self.record.update(payload)
+        elif method=='GET':
+            self.test.assertEqual(endpoint,'repos/owner/repo/releases/123')
+            if self.final_lag:
+                self.final_lag-=1;return json.dumps({**self.record,'draft':True})
+        return json.dumps(self.record)
 
 class ReleaseTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
-        self.folder = Path(self.tmp.name)
-        self.path = self.folder / 'installer.zip'
-        self.path.write_bytes(b'clean test installer')
-        self.digest = hashlib.sha256(self.path.read_bytes()).hexdigest()
-        self.data = {'tag': 'v1.0.0', 'title': 'Test release', 'body': 'Test notes'}
-        self.files = [(self.path, self.digest)]
-        self.asset = {'name': self.path.name, 'state': 'uploaded', 'size': self.path.stat().st_size, 'digest': 'sha256:' + self.digest}
-
-    def test_corrupt_local_file_and_path_traversal_are_rejected(self):
-        manifest = self.folder / 'manifest.json'
-        manifest.write_text(json.dumps({'tag': 'v1', 'assets': [{'name': self.path.name, 'sha256': '0' * 64}]}))
-        with self.assertRaisesRegex(RuntimeError, 'SHA-256 mismatch'):
-            release.checked_bundle(manifest)
-        manifest.write_text(json.dumps({'tag': 'v1', 'assets': [{'name': '../private.zip', 'sha256': self.digest}]}))
-        with self.assertRaisesRegex(RuntimeError, 'filename'):
-            release.checked_bundle(manifest)
-
-    def test_release_lookup_includes_drafts_on_later_pages(self):
-        draft = {'tag_name': 'v1', 'draft': True, 'assets': []}
-        pages = [[{'tag_name': 'v2', 'draft': False}], [draft]]
-        with patch.object(release, 'gh', return_value=json.dumps(pages)) as gh:
-            self.assertEqual(release.release_info('owner/repo', 'v1'), draft)
-            self.assertIn('--paginate', gh.call_args.args)
-            self.assertIn('--slurp', gh.call_args.args)
-            self.assertNotIn('/tags/', gh.call_args.args[-1])
-
-    def test_api_errors_are_not_treated_as_missing_releases(self):
-        for status in [401, 403, 404, 500]:
-            with patch.object(release, 'gh', side_effect=RuntimeError('HTTP ' + str(status))):
-                with self.assertRaisesRegex(RuntimeError, str(status)):
-                    release.release_info('owner/repo', 'v1')
-        with patch.object(release, 'gh', return_value='[[]]'):
-            self.assertIsNone(release.release_info('owner/repo', 'v1'))
-
-    def test_corrupt_remote_file_is_never_overwritten(self):
-        bad = dict(self.asset, digest='sha256:' + '0' * 64)
-        with patch.object(release, 'release_info', return_value={'draft': True, 'assets': [bad]}), patch.object(release, 'gh') as gh:
-            with self.assertRaisesRegex(RuntimeError, 'Remote SHA-256 mismatch'):
-                release.publish('owner/repo', 'main', self.data, self.files)
-            gh.assert_not_called()
-
-    def test_immutable_incomplete_release_is_not_modified(self):
-        with patch.object(release, 'release_info', return_value={'draft': False, 'immutable': True, 'assets': []}), patch.object(release, 'gh') as gh:
-            with self.assertRaisesRegex(RuntimeError, 'Immutable release is incomplete'):
-                release.publish('owner/repo', 'main', self.data, self.files)
-            gh.assert_not_called()
-
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.folder=Path(self.tmp.name)
+        self.path=self.folder/'installer.zip';self.path.write_bytes(b'clean test installer')
+        self.digest=hashlib.sha256(self.path.read_bytes()).hexdigest()
+        self.data={'tag':'v1.0.0','title':'Release','body':'Download `installer.zip`\n\nSecond line'}
+        self.files=[(self.path,self.digest)]
+        self.asset={'id':456,'name':self.path.name,'state':'uploaded','size':self.path.stat().st_size,'digest':'sha256:'+self.digest}
+    def record(self,**kw):return {'id':123,'tag_name':'v1.0.0','draft':False,'assets':[self.asset],**kw}
+    def fake(self,existing=None):
+        f=FakeGitHub(self,existing);f.file=self.path;f.asset=self.asset;return f
+    def run_publish(self,f):
+        with patch.object(release,'gh',side_effect=f.gh),patch.object(release.time,'sleep'):
+            release.publish('owner/repo','main',self.data,self.files)
+    def test_fresh_draft_is_published_even_when_all_listings_remain_stale(self):
+        f=self.fake();self.run_publish(f)
+        self.assertEqual(f.list_calls,1)
+        self.assertEqual([o[0] for o in f.operations],['POST','POST','PATCH','GET'])
+        self.assertFalse(f.record['draft']);self.assertEqual(f.record['assets'],[self.asset])
+        self.assertIn('[installer.zip](https://github.com/owner/repo/releases/download/v1.0.0/installer.zip)',f.record['body'])
+        self.assertIn('\n\nSecond line',f.record['body'])
+    def test_existing_empty_published_release_is_repaired_by_id_without_recreation(self):
+        f=self.fake(self.record(assets=[],body='Owner notes: retained'));self.run_publish(f)
+        self.assertEqual([o[0] for o in f.operations],['POST','GET'])
+        self.assertEqual(f.record['body'],'Owner notes: retained')
+    def test_existing_draft_resumes_without_overwriting_verified_asset(self):
+        f=self.fake(self.record(draft=True));self.run_publish(f)
+        self.assertEqual([o[0] for o in f.operations],['PATCH','GET'])
     def test_identical_published_release_is_idempotent(self):
-        with patch.object(release, 'release_info', return_value={'draft': False, 'assets': [self.asset]}), patch.object(release, 'gh') as gh:
-            release.publish('owner/repo', 'main', self.data, self.files)
-            gh.assert_not_called()
+        f=self.fake(self.record(body='Existing owner notes'));self.run_publish(f);self.assertEqual([o[0] for o in f.operations],['GET'])
+    def test_corrupt_asset_is_never_overwritten(self):
+        f=self.fake(self.record(assets=[dict(self.asset,digest='sha256:'+'0'*64)]))
+        with self.assertRaisesRegex(RuntimeError,'Remote SHA-256 mismatch'):self.run_publish(f)
+        self.assertFalse(f.operations)
+    def test_immutable_incomplete_release_is_not_modified(self):
+        f=self.fake(self.record(assets=[],immutable=True))
+        with self.assertRaisesRegex(RuntimeError,'Immutable release'):self.run_publish(f)
+        self.assertFalse(f.operations)
+    def test_upload_failure_leaves_new_release_draft(self):
+        f=self.fake();f.upload_error=True
+        with self.assertRaisesRegex(RuntimeError,'upload denied'):self.run_publish(f)
+        self.assertTrue(f.record['draft']);self.assertNotIn('PATCH',[o[0] for o in f.operations])
+    def test_uploaded_response_must_have_expected_hash_before_publish(self):
+        f=self.fake();f.asset={**self.asset,'digest':'sha256:'+'0'*64}
+        with self.assertRaisesRegex(RuntimeError,'Remote SHA-256 mismatch'):self.run_publish(f)
+        self.assertTrue(f.record['draft'])
+    def test_publication_failure_not_reported_success(self):
+        f=self.fake();f.patch_error=True
+        with self.assertRaisesRegex(RuntimeError,'edit denied'):self.run_publish(f)
+        self.assertTrue(f.record['draft'])
+    def test_direct_read_lag_retried_without_any_extra_upload(self):
+        f=self.fake();f.final_lag=2;self.run_publish(f)
+        self.assertEqual([o[0] for o in f.operations],['POST','POST','PATCH','GET','GET','GET'])
+    def test_lookup_includes_drafts_on_later_pages(self):
+        draft=self.record(draft=True)
+        with patch.object(release,'gh',return_value=json.dumps([[{'tag_name':'v2'}],[draft]])) as gh:
+            self.assertEqual(release.release_info('owner/repo','v1.0.0'),draft)
+            self.assertIn('--paginate',gh.call_args.args);self.assertIn('--slurp',gh.call_args.args)
+            self.assertNotIn('/tags/',gh.call_args.args[-1])
+    def test_lookup_errors_and_duplicate_releases_are_not_absence(self):
+        with patch.object(release,'gh',side_effect=RuntimeError('HTTP 403')):
+            with self.assertRaisesRegex(RuntimeError,'HTTP 403'):release.release_info('owner/repo','v1.0.0')
+        with patch.object(release,'gh',return_value=json.dumps([[self.record(),self.record()]])):
+            with self.assertRaisesRegex(RuntimeError,'More than one release'):release.release_info('owner/repo','v1.0.0')
+    def test_bad_create_identity_prevents_upload(self):
+        for record in [{'id':True,'tag_name':'v1.0.0'},{'id':123,'tag_name':'v2'},{}]:
+            with self.subTest(record=record),patch.object(release,'release_info',return_value=None),patch.object(release,'api_json',return_value=record),patch.object(release,'upload_asset') as upload:
+                with self.assertRaisesRegex(RuntimeError,'invalid release identity'):release.publish('owner/repo','main',self.data,self.files)
+                upload.assert_not_called()
+    def test_local_corruption_and_path_traversal_rejected(self):
+        manifest=self.folder/'manifest.json'
+        for name,digest,expected in [('installer.zip','0'*64,'SHA-256'),('../private.zip',self.digest,'filename')]:
+            manifest.write_text(json.dumps({'tag':'v1','assets':[{'name':name,'sha256':digest}]}))
+            with self.assertRaisesRegex(RuntimeError,expected):release.checked_bundle(manifest)
+    def test_legacy_asset_download_uses_asset_id_not_release_tag(self):
+        def download(args,stdout,stderr):
+            self.assertEqual(args[-1],'repos/owner/repo/releases/assets/456')
+            self.assertNotIn('release',args)
+            stdout.write(self.path.read_bytes())
+            from types import SimpleNamespace
+            return SimpleNamespace(returncode=0)
+        with patch.object(release.subprocess,'run',side_effect=download):
+            release.verify_remote('owner/repo','v1.0.0',self.path,self.digest,{k:v for k,v in self.asset.items() if k!='digest'})
 
-    def test_interrupted_draft_upload_resumes_before_publishing(self):
-        before = {'draft': True, 'assets': []}
-        after = {'draft': True, 'assets': [self.asset]}
-        public = {'draft': False, 'assets': [self.asset]}
-        with patch.object(release, 'release_info', side_effect=[before, after, public]), patch.object(release, 'gh') as gh:
-            release.publish('owner/repo', 'main', self.data, self.files)
-            self.assertEqual([c.args[1] for c in gh.call_args_list], ['upload', 'edit'])
-            self.assertFalse(any('--clobber' in c.args for c in gh.call_args_list))
+    def test_all_versions_numeric_order_nine_before_ten(self):
+        for version in ['v0.10.0','v0.8.1','v0.9.0']:
+            folder=self.folder/'release-assets'/version;folder.mkdir(parents=True);(folder/'manifest.json').write_text('{}')
+        self.assertEqual([p.parent.name for p in release.all_manifests(self.folder)],['v0.8.1','v0.9.0','v0.10.0'])
+    def test_all_manifests_checked_before_first_publication(self):
+        with patch.object(release,'all_manifests',return_value=['first','second']),patch.object(release,'checked_bundle',side_effect=[(self.data,self.files),RuntimeError('corrupt second')]),patch.object(release,'publish') as publish,patch('sys.argv',['publish','--all']):
+            with self.assertRaisesRegex(RuntimeError,'corrupt second'):release.main()
+            publish.assert_not_called()
+    def test_failure_of_older_version_does_not_skip_newer_repair(self):
+        next_data={**self.data,'tag':'v2.0.0'}
+        with patch.object(release,'all_manifests',return_value=['first','second']),patch.object(release,'checked_bundle',side_effect=[(self.data,self.files),(next_data,self.files)]),patch.object(release,'publish',side_effect=[RuntimeError('old immutable'),None]) as publish,patch.dict('os.environ',{'GH_TOKEN':'unit-test-only'}),patch('sys.argv',['publish','--all']):
+            with self.assertRaisesRegex(RuntimeError,'v1.0.0: old immutable'):release.main()
+            self.assertEqual(publish.call_count,2)
 
-    def test_missing_release_is_draft_until_upload_verified(self):
-        draft = {'draft': True, 'assets': []}
-        uploaded = {'draft': True, 'assets': [self.asset]}
-        public = {'draft': False, 'assets': [self.asset]}
-        with patch.object(release, 'release_info', side_effect=[None, draft, uploaded, public]), patch.object(release, 'gh') as gh:
-            release.publish('owner/repo', 'main', self.data, self.files)
-            self.assertEqual([c.args[1] for c in gh.call_args_list], ['create', 'upload', 'edit'])
-            self.assertIn('--draft', gh.call_args_list[0].args)
-
-    def test_upload_failure_does_not_publish_draft(self):
-        with patch.object(release, 'release_info', return_value={'draft': True, 'assets': []}), patch.object(release, 'gh', side_effect=RuntimeError('upload failed')) as gh:
-            with self.assertRaisesRegex(RuntimeError, 'upload failed'):
-                release.publish('owner/repo', 'main', self.data, self.files)
-            self.assertEqual(gh.call_count, 1)
-            self.assertEqual(gh.call_args.args[1], 'upload')
-
-    def test_published_empty_release_is_repaired_without_recreating_it(self):
-        before = {'draft': False, 'immutable': False, 'assets': []}
-        after = {'draft': False, 'immutable': False, 'assets': [self.asset]}
-        with patch.object(release, 'release_info', side_effect=[before, after, after]), patch.object(release, 'gh') as gh:
-            release.publish('owner/repo', 'main', self.data, self.files)
-            self.assertEqual([c.args[1] for c in gh.call_args_list], ['upload'])
-            self.assertNotIn('--clobber', gh.call_args.args)
-
-    def test_download_links_preserve_owners_custom_notes(self):
-        body = 'Download `installer.zip`\n\nCustom changelog: retained'
-        info = {'draft': False, 'assets': [self.asset], 'body': body}
-        with patch.object(release, 'release_info', return_value=info), patch.object(release, 'gh') as gh:
-            release.publish('owner/repo', 'main', self.data, self.files)
-            args = gh.call_args.args
-            self.assertEqual(args[1], 'edit')
-            new_body = args[args.index('--notes') + 1]
-            self.assertIn('Custom changelog: retained', new_body)
-            self.assertIn('[installer.zip](https://github.com/owner/repo/releases/download/v1.0.0/installer.zip)', new_body)
-
-    def test_real_lookup_and_publishing_support_a_draft_with_no_public_tag(self):
-        # Model GitHub's documented API semantics rather than mocking release_info:
-        # a new draft appears in authenticated listings before publication.
-        remote = []
-        operations = []
-        def fake_gh(*args):
-            if args[0] == 'api':
-                self.assertNotIn('/tags/', args[-1])
-                return json.dumps([remote])
-            operations.append(args[1])
-            if args[1] == 'create':
-                remote.append({'tag_name': self.data['tag'], 'draft': True, 'assets': []})
-            elif args[1] == 'upload':
-                remote[0]['assets'] = [self.asset]
-            elif args[1] == 'edit':
-                remote[0]['draft'] = False
-            return ''
-        with patch.object(release, 'gh', side_effect=fake_gh):
-            release.publish('owner/repo', 'main', self.data, self.files)
-        self.assertEqual(operations, ['create', 'upload', 'edit'])
-        self.assertFalse(remote[0]['draft'])
-
-
-if __name__ == '__main__':
-    unittest.main()
+if __name__=='__main__':unittest.main()
