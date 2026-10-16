@@ -1,10 +1,10 @@
 # EVE Műhely
 
-Helyben futó, magyar nyelvű EVE Online gyártástervező macOS Apple Silicon és Windows 11 x64 rendszerhez. A felület a saját böngésződben nyílik meg: **http://127.0.0.1:8765**.
+Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple Silicon és Windows 11 x64 rendszerhez. A felület a saját böngésződben nyílik meg: **http://127.0.0.1:8765**.
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 0.10.0**, **Windows 11 x64 0.10.0**, magyar és angol felülettel, holdnyilvántartással.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 0.11.0**, **Windows 11 x64 0.11.0**, magyar és angol felülettel, Jita-árazással, ipari díjakkal és holdprofit-számítással.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -16,7 +16,9 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Mentett tervek készlet- és BPC-run-foglalással, valamint összesített beszerzési listával.
 - BPO/BPC ME, TE, példányszám és run kezelése; kézi beállítási lehetőségek.
 - Struktúrabónuszok és tervenként választott karakter skilljeivel számolt gyártási idő.
-- Skill- és tanulási sor figyelése, PI-áttekintés, sötét mód, rendezhető és szűrhető táblázatok.
+- Skill- és tanulási sor figyelése, PI-áttekintés időalapú termelési becsléssel, sötét mód, rendezhető és szűrhető táblázatok.
+- Jita buy/sell/split alapanyagárak, termékeladási érték, ESI-rendszerindex és beállítható ipari díjak.
+- Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
 
 ## Használat
 
@@ -113,7 +115,7 @@ Források: [CCP SDE](https://developers.eveonline.com/docs/services/static-data/
 The publication workflow verifies and reconciles every reviewed `release-assets/v*/manifest.json` in numeric version order. It repairs missing installers on older mutable releases as well as publishing the latest version. Creation uses the REST response's numeric release ID directly; uploads and final publication checks also use IDs, so a freshly created draft need not appear in the release listing or tag index. Existing assets are SHA-256 checked and never overwritten. A draft is published only after every required asset has uploaded and verified successfully. An interrupted run resumes on the next push or manual workflow run.
 
 
-## Helyi tesztváltozat – 0.11.0 (még nincs release)
+## A 0.11.0 kiadás újdonságai
 
 Jita-árazás a holdtermelés, a gyártási terv és az egyedi/összesített beszerzési lista mellé. A táblázaton kívül választható **Jita sell**, **Jita buy**, **Jita split**; a választást a böngésző megjegyzi. Forrás: a CCP nyilvános ESI API-ja, The Forge régió (10000002), kizárólag a Jita IV - Moon 4 - Caldari Navy Assembly Plant állomás (60003760). Buy = legmagasabb vételi ajánlat, sell = legalacsonyabb eladási ajánlat, split = ezek számtani átlaga. A lekérés nem igényel karakterengedélyt és nem ad fel megbízást.
 
@@ -125,7 +127,7 @@ A pénzszámítás négy tizedes egységárból, egész aritmetikával készül;
 
 A **Production by moon** és **Ore volume and processing** holdoszlopai pontos választólistás szűrést kaptak, a szűrősor továbbra is csukva indul. Az angol figyelmeztetések javítva; a karakter-, hold- és terméknevek változatlanok.
 
-Tesztváltozat: nincs új kiadási csomag, tag vagy GitHub Release. A korábbi telepítők változatlanok.
+A 0.11.0 Mac Apple Silicon és Windows 11 x64 csomagjai tiszta profillal készülnek. Frissítéskor a meglévő helyi karakterek, tervek, holdak és beállítások megmaradnak.
 
 A Consumption / Fogyasztás nézet az üzemanyagot is árazza: holdanként, Athanor/Metenox bontásban és összesítve. A négy Fuel Block közül választható típus (kezdetben Hydrogen) minden fúróra érvényes. A kézi, legfeljebb négy tizedesjegyes ISK-egységár csak a blokkok piaci árát írja felül; a Magmatic Gas a választott Jita buy/sell/split árral számít. Üres mező = visszatérés a piaci árhoz; nulla kézi ár is megadható. A típus és a felülírás gépenként mentődik. A költség a 720 órás fogyasztást és a külön megadott bekapcsolások blokkjait is tartalmazza. A struktúraszűrő az árazott mennyiségekre is hat.
 
@@ -133,7 +135,7 @@ A PI új **Időalapú termelési becslés** nézete a kolónia `last_update` ide
 
 Ez feltételes, új import nélküli előrejelzés. A fő becslés a kitermelőprogram végét és a ciklusonként változó kitermelést is figyelembe veszi a [CCP fejlesztői képletével](https://developers.eveonline.com/docs/guides/pi/): ciklushossz, alaphozam, csökkenés és ingadozás. A 0.012 / 0.8 dogma alapértékeket a 3607705-ös SDE-ben az összes ECU-típusra ellenőriztük. A **Csak tárolt készletből** oszlop külön, jövőbeli kitermelés nélkül mutatja a készletből fedezhető leállást. A program lejárta után új kitermelés nincs, de a meglévő anyagokból a gyárak tovább dolgozhatnak. Az adatideje előtti ciklusokat nem könyveljük jóvá újra. Régi/hiányzó gyári fázisnál a pillanatkép idején feltételezett újraindítást jelezzük. A közös készlet kiszolgálási sorrendje, kimeneti kapacitáskorlát, hibás időbélyeg és a számítási korlát külön jelzést kap. A modell legfeljebb 90 napot és 100 000 eseményt vizsgál; 30 napnál hosszabb jövőbeli fedezetet nem ígér. Az eredeti ESI-pillanatkép és annak készletellenőrzése külön megmarad; a becslést nem írjuk vissza a személyes vagy corp készletbe.
 
-### Ipari költségek, értékesítés és holdprofit (helyi tesztváltozat)
+### Ipari költségek, értékesítés és holdprofit
 
 A Struktúrák és bónuszok menüben manufacturinghoz és reakcióhoz külön rendszer választható a holdaknál használt, gépelésre szűkülő rendszerlistából. A system cost index a nyilvános ESI `/industry/systems/` végpontjáról érkezik; az EIV-hez szükséges adjusted price a `/markets/prices/` végpontról. A két adathalmaz külön, tartós cache-t és ETag-et használ, a frissítés a szerver lejáratát betartja. Hibánál a korábbi teljes adathalmaz megmarad, régi adatként jelölve. Hiányzó index vagy adjusted price esetén a teljes job cost nem jelenik meg nullaként.
 

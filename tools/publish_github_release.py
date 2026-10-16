@@ -12,7 +12,7 @@ import time
 from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = ROOT / 'release-assets/v0.10.0/manifest.json'
+MANIFEST = ROOT / 'release-assets/v0.11.0/manifest.json'
 
 
 def checked_bundle(manifest_path):

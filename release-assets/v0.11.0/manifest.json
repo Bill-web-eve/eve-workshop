@@ -1,0 +1,30 @@
+{
+  "tag": "v0.11.0",
+  "title": "EVE Workshop 0.11.0 – Jita pricing, industry costs and PI forecasts – Mac & Windows",
+  "assets": [
+    {
+      "name": "EVE_Muhely-0.11.0-Windows11-x64.sha256",
+      "sha256": "000455e2490a4730a33d74c234820710410e0179333275efb47248bb0673d8fd"
+    },
+    {
+      "name": "EVE_Muhely-0.11.0-Windows11-x64.zip",
+      "sha256": "1937b2f763fb37aa2558b73965dc6c68fb53cb619f66eb43cf4b40b2aa90d23e"
+    },
+    {
+      "name": "EVE_Muhely-0.11.0-macOS-AppleSilicon.dmg",
+      "sha256": "9691dd5f2aa876529fc124c8d116be00e3878ffa1f28423778dfd82454c9b5e0"
+    },
+    {
+      "name": "EVE_Muhely-0.11.0-macOS-AppleSilicon.sha256",
+      "sha256": "73cf12ec8bbebcee8ff3dfb97d37e8f0c965a850592346dd9da56ccde6f38063"
+    },
+    {
+      "name": "EVE_Muhely-Telepites.txt",
+      "sha256": "440d3ca3b126b915712943f00fcac2182e536e6debc6415c46931915e1522b47"
+    },
+    {
+      "name": "EVE_Muhely-Windows-Telepites.txt",
+      "sha256": "c2ffb6ac798e83449d65403802f755e08673b1b9bd2b3d96f6d6546ae3efcf97"
+    }
+  ]
+}

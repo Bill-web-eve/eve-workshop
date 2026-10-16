@@ -57,3 +57,9 @@ runtime/
 !release-assets/v0.10.0/EVE_Muhely-0.10.0-macOS-AppleSilicon.sha256
 !release-assets/v0.10.0/EVE_Muhely-0.10.0-Windows11-x64.zip
 !release-assets/v0.10.0/EVE_Muhely-0.10.0-Windows11-x64.sha256
+
+# Reviewed pricing, industry costs and PI forecast 0.11.0 release.
+!release-assets/v0.11.0/EVE_Muhely-0.11.0-macOS-AppleSilicon.dmg
+!release-assets/v0.11.0/EVE_Muhely-0.11.0-macOS-AppleSilicon.sha256
+!release-assets/v0.11.0/EVE_Muhely-0.11.0-Windows11-x64.zip
+!release-assets/v0.11.0/EVE_Muhely-0.11.0-Windows11-x64.sha256
