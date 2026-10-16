@@ -1,0 +1,39 @@
+name: Mac es Windows csomagok kozzetetele
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - release-assets/**
+      - tools/publish_github_release.py
+      - .github/workflows/publish-packages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-installers-v0.8.1
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'Bill-web-eve/eve-workshop' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Helyi csomagok es kozzetetel ellenorzese
+        run: |
+          python3 -m unittest discover -s tests -p test_github_release.py -v
+          python3 tools/publish_github_release.py --check
+      - name: Ellenorzott csomagok feltoltese a Releases oldalra
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TARGET: ${{ github.sha }}
+        run: python3 tools/publish_github_release.py

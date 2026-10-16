@@ -1,0 +1,30 @@
+{
+  "tag": "v0.8.1",
+  "title": "EVE Muhely – Mac 0.8.0 es Windows 0.8.1",
+  "assets": [
+    {
+      "name": "EVE_Muhely-0.8.0-macOS-AppleSilicon.dmg",
+      "sha256": "beaf940fb47e8ecbc472fa6d7d035dcf9528368458d551a425b984adb85149a0"
+    },
+    {
+      "name": "EVE_Muhely-0.8.0-macOS-AppleSilicon.sha256",
+      "sha256": "512a9c02148814d8b22986a00def539f9eee1e3b7e311100f1a08f3f6463146e"
+    },
+    {
+      "name": "EVE_Muhely-0.8.1-Windows11-x64.zip",
+      "sha256": "f7be995110144ea3157e294eb3bd4405b071e66e7d3fdf48d49c1d6484a57ad2"
+    },
+    {
+      "name": "EVE_Muhely-0.8.1-Windows11-x64.sha256",
+      "sha256": "08e6d01ef9dc11be94ad64455e0810dea1d68d639e9ebfe2145e20aab89b3442"
+    },
+    {
+      "name": "EVE_Muhely-Telepites.txt",
+      "sha256": "61bf02b1d500efa7cdd6f9b59ec979bac5a2376128746d9dde982173c2658ea9"
+    },
+    {
+      "name": "EVE_Muhely-Windows-Telepites.txt",
+      "sha256": "ed2cf62c8cd7a71462e732e15fdb655fd8d59824d5f327e7fd96b2ed2022b48b"
+    }
+  ]
+}

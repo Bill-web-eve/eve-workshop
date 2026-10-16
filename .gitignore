@@ -38,3 +38,9 @@ runtime/
 *.pyd
 *.zip
 *.sha256
+
+# Reviewed installers for the first automated GitHub release only.
+!release-assets/v0.8.1/EVE_Muhely-0.8.0-macOS-AppleSilicon.dmg
+!release-assets/v0.8.1/EVE_Muhely-0.8.0-macOS-AppleSilicon.sha256
+!release-assets/v0.8.1/EVE_Muhely-0.8.1-Windows11-x64.zip
+!release-assets/v0.8.1/EVE_Muhely-0.8.1-Windows11-x64.sha256

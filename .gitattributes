@@ -11,3 +11,6 @@
 *.m text eol=lf
 *.sqlite3 binary
 *.icns binary
+
+# Preserve exact installer, checksum and instruction bytes.
+release-assets/** -text

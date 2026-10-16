@@ -2,6 +2,12 @@
 
 Helyben futó, magyar nyelvű EVE Online gyártástervező macOS Apple Silicon és Windows 11 x64 rendszerhez. A felület a saját böngésződben nyílik meg: **http://127.0.0.1:8765**.
 
+## Letöltés
+
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 0.8.0**, **Windows 11 x64 0.8.1**. A két platform verziója eltér; a kiadási leírás ezt jelzi.
+
+A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
+
 ## Mit tud?
 
 - Több karakter személyes készlete, blueprintjei és gyártási munkái EVE ESI kapcsolattal.
