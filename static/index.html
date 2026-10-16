@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#122331">
+  <title>EVE Műhely · Gyártástervező</title>
+  <script src="/theme.js"></script>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/graph.css">
+  <script src="/tables.js" defer></script>
+  <script src="/numbers.js" defer></script>
+  <script src="/corporations.js" defer></script>
+  <script src="/graph.js" defer></script>
+  <script src="/skills.js" defer></script>
+  <script src="/pi.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="EVE Műhely kezdőlap"><img src="/icon.svg" alt=""><span>EVE <strong>MŰHELY</strong><small>EVE gyártástervező</small></span></a>
+    <div class="nav-label">A TERVED</div>
+    <nav aria-label="Főmenü">
+      <button class="nav active" data-view="queue"><span class="nav-icon">▤</span>Gyártási terv <span id="queue-count" class="nav-count">–</span></button>
+      <button class="nav" data-view="graph"><span class="nav-icon">⑂</span>Gyártási gráf</button>
+      <button class="nav" data-view="shopping"><span class="nav-icon">◈</span>Alapanyaghiány</button>
+      <button class="nav" data-view="inventory"><span class="nav-icon">▥</span>Készlet</button>
+      <button class="nav" data-view="blueprints"><span class="nav-icon">▧</span>Blueprint</button>
+      <button class="nav" data-view="jobs"><span class="nav-icon">◷</span>Folyamatban</button>
+    </nav>
+    <div class="nav-label second-label">A MŰHELYED</div>
+    <nav aria-label="Beállítások">
+      <button class="nav" data-view="skills"><span class="nav-icon">◴</span>Skillek és tanulás <span id="skill-count" class="nav-count">–</span></button>
+      <button class="nav" data-view="pi"><span class="nav-icon">◎</span>Bolygók és PI <span id="pi-count" class="nav-count">–</span></button>
+      <button class="nav" data-view="corporations"><span class="nav-icon">▦</span>Corporationok</button>
+      <button class="nav" data-view="settings"><span class="nav-icon">⚙</span>Struktúrák és bónuszok</button>
+      <button class="nav" data-view="connection"><span class="nav-icon">⌁</span>EVE-kapcsolat <span id="connection-dot" class="dot"></span></button>
+      <button class="nav" data-view="saved"><span class="nav-icon">▱</span>Mentett tervek</button>
+    </nav>
+    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Sötét mód" aria-pressed="true"><span class="nav-icon" aria-hidden="true">☾</span><span>Sötét mód</span><span class="theme-switch" aria-hidden="true"></span></button>
+    <div class="sidebar-bottom"><div class="local-indicator"><span class="dot online"></span>Helyben fut a Maceden</div><small id="sde-side">Receptadatok betöltése…</small><button id="shutdown" class="text-button">Alkalmazás leállítása</button></div>
+  </aside>
+
+  <main>
+    <header class="topbar"><span id="breadcrumb">Műhely / Gyártási terv</span><div><span id="source-pill" class="pill">Kézi készlet</span><button id="sync" class="button compact">↻ EVE-frissítés</button></div></header>
+    <div id="global-error" class="banner error" role="alert" hidden></div>
+    <div id="task-banner" class="banner" role="status" hidden></div>
+
+    <section class="plan-selector" aria-label="Gyártási cél">
+      <div class="eyebrow">MIT ÉPÍTÜNK?</div>
+      <div class="scope-selector"><label for="production-scope">Gyártási kör</label><select id="production-scope"><option value="">Személyes gyártás</option></select><span id="scope-hint">Csak a személyes készlet és jobok.</span></div>
+      <div class="scope-selector"><label for="manufacturer">Gyártó karakter</label><select id="manufacturer"><option value="manual">Válassz karaktert · addig kézi időbecslés</option></select><span>A választás a tervvel együtt mentődik; a készlet tulajdonosát nem változtatja.</span></div>
+      <form id="plan-form" autocomplete="off">
+        <div class="product-field"><label for="product-search">Termék</label><div class="search-wrap"><span class="search-icon">⌕</span><input id="product-search" type="search" placeholder="Hajó, modul, komponens vagy reakció…" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="search-results"><div id="search-results" class="search-results" role="listbox" hidden></div></div></div>
+        <div class="quantity-field"><label for="target-quantity">Célmennyiség</label><div class="input-unit"><input id="target-quantity" type="text" inputmode="numeric" data-grouped-number data-number-min="1" data-number-max="100000000" value="1" required><span>db</span></div></div>
+        <button id="calculate" type="submit" class="button primary">Terv kiszámítása <span>→</span></button>
+      </form>
+      <div class="selector-bottom"><div class="quick-products" id="saved-plan-shortcuts"><span>Mentett tervek</span></div><div class="plan-controls"><button id="new-plan" class="text-button" hidden>Új terv ezzel a céllal</button><button id="save-plan" class="text-button">＋ Terv mentése és foglalás</button></div></div>
+    </section>
+
+    <section class="content">
+      <div class="page-heading"><div><div id="page-eyebrow" class="eyebrow">GYÁRTÁSI SORREND</div><h1 id="page-title">A hátralévő munkák</h1><p id="page-description">Az alapreakcióktól a kész termékig, a készlet és az elindított jobok levonásával.</p></div><div id="view-actions"></div></div>
+      <div id="plan-status" class="banner" hidden></div>
+      <div id="view-content" aria-live="polite"><div class="empty"><div class="empty-icon">◈</div><h2>Előkészítjük a műhelyt</h2><p>A receptadatbázis és a beállítások betöltése folyamatban.</p></div></div>
+    </section>
+    <footer><span>EVE Műhely <span id="version"></span> · <span id="footer-scope">Személyes készlet</span> · Mentett tervek és foglalások</span><span id="calculated-at"></span></footer>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

@@ -1,0 +1,686 @@
+from __future__ import annotations
+
+import argparse
+import copy
+from datetime import datetime
+import hashlib
+from http.cookies import SimpleCookie
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import mimetypes
+import os
+from pathlib import Path
+import re
+import secrets
+import sqlite3
+import threading
+import time
+import urllib.parse
+import urllib.request
+import uuid
+import webbrowser
+
+from . import __version__
+from .catalog import Catalog, import_sde
+from .esi import EveConnection, EsiError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES
+from .corporations import dashboard as corporation_dashboard
+from .skills import dashboard as skill_dashboard
+from .production import profiles as production_profiles
+from .pi import dashboard as pi_dashboard
+from .planner import Planner, PlanningError, AssetSnapshotPending, integer, decimal_number, live_inventory
+from .reservations import allocate_plans, except_owner
+from .store import Store, default_data_dir, DEFAULT_SETTINGS
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+class App:
+    def __init__(self, folder, catalog_path, port=8765):
+        self.store = Store(folder)
+        self.catalog = Catalog(catalog_path,pi_fallback=ROOT/'data/catalog.sqlite3')
+        self.planner = Planner(self.catalog)
+        self.eve = EveConnection(self.store)
+        self.port = port
+        self.origin = f'http://127.0.0.1:{port}'
+        self.cookie = secrets.token_urlsafe(32)
+        self.csrf = secrets.token_urlsafe(32)
+        self.instance = secrets.token_urlsafe(24)
+        self.task_lock = threading.RLock()
+        self.planning_lock = threading.RLock()
+        self.task = {'running': False, 'kind': None, 'message': '', 'finished': None, 'results': []}
+
+    def start_task(self, kind):
+        with self.task_lock:
+            if self.task['running']:
+                raise PlanningError('Egy frissítés már folyamatban van.')
+            self.task = {'running': True, 'kind': kind, 'message': 'Frissítés folyamatban…', 'results': [], 'finished': None}
+        def work():
+            try:
+                if kind == 'sync':
+                    if not self.store.characters():
+                        raise PlanningError('Előbb adj hozzá egy karaktert az EVE-kapcsolat oldalon.')
+                    result = self.eve.sync()
+                    ok = all(r['ok'] for r in result)
+                    message = 'Az EVE-adatok frissítve.' if ok else 'Néhány karakter frissítése sikertelen. A részletek az EVE-kapcsolat oldalon láthatók.'
+                    if ok and result and self.store.enable_eve_after_sync():
+                        message += ' A terv most a személyes EVE-készlettel és jobkimenetekkel számol.'
+                    skill_results=self.eve.sync_skills()
+                    missing=sum(not r['ok'] for r in skill_results)
+                    if missing:
+                        message+=f' {missing} karakter skilladata engedélyezést vagy frissítést igényel; részletek a Skillek és tanulás menüben.'
+                    pi_results=self.eve.sync_pi()
+                    pi_missing=sum(not r['ok'] for r in pi_results)
+                    if pi_missing:message+=f' {pi_missing} karakter PI-adata engedélyezést vagy frissítést igényel; részletek a Bolygók és PI menüben.'
+                    if any(c['synced_at'] for c in self.store.corporations()):
+                        corp_results=self.eve.sync_corporations()
+                        message+=f" Corp-adatok: {sum(r['ok'] for r in corp_results)} sikeres lekérés; részletek a Corporationok oldalon."
+                elif kind == 'skills':
+                    if not self.store.characters():
+                        raise PlanningError('Előbb adj hozzá karaktert az EVE-kapcsolat oldalon.')
+                    result=self.eve.sync_skills()
+                    ok_count=sum(r['ok'] for r in result)
+                    message=f'Skilladatok ellenőrizve: {ok_count}/{len(result)} karakter. A részleteket a Skillek és tanulás oldalon találod.'
+                elif kind == 'pi':
+                    if not self.store.characters():raise PlanningError('Előbb adj hozzá karaktert az EVE-kapcsolat oldalon.')
+                    result=self.eve.sync_pi();ok_count=sum(r['ok'] for r in result)
+                    message=f'PI-adatok ellenőrizve: {ok_count}/{len(result)} karakter. Részletek a Bolygók és PI menüben.'
+                elif kind == 'corporations':
+                    if not self.store.characters():raise PlanningError('Előbb adj hozzá egy corp-hozzáférésre jogosult karaktert.')
+                    result=self.eve.sync_corporations();ok_count=sum(r['ok'] for r in result)
+                    message=f'Corp-adatok ellenőrizve: {ok_count} sikeres lekérés. A részleteket a Corporationok oldalon találod.'
+                else:
+                    self.update_catalog()
+                    result, message = [], 'Az EVE-receptadatbázis naprakész.'
+                with self.task_lock:
+                    self.task.update(running=False, message=message, results=result, finished=time.time())
+            except Exception as error:
+                message = str(error) if isinstance(error, (PlanningError, EsiError)) else 'A frissítés nem sikerült. Az előző adatok megmaradtak.'
+                with self.task_lock:
+                    self.task.update(running=False, message=message, finished=time.time(), results=[{'ok': False, 'error': message}])
+        threading.Thread(target=work, daemon=True).start()
+
+    def update_catalog(self):
+        url = 'https://developers.eveonline.com/static-data/tranquility/latest.jsonl'
+        req = urllib.request.Request(url, headers={'User-Agent': 'EveMuhely/'+__version__})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                records = [json.loads(line) for line in response if line.strip()]
+            latest = next(r for r in records if r['_key'] == 'sde')
+            if str(latest['buildNumber']) == self.catalog.meta.get('buildNumber'):
+                return
+            build = integer(latest['buildNumber'], 'SDE build', 10**12, 1)
+            archive = self.store.folder/'sde.download'
+            req = urllib.request.Request(f'https://developers.eveonline.com/static-data/tranquility/eve-online-static-data-{build}-jsonl.zip',
+                                         headers={'User-Agent': 'EveMuhely/'+__version__})
+            with urllib.request.urlopen(req, timeout=60) as response, archive.open('wb') as output:
+                total = 0
+                while block := response.read(1024*1024):
+                    total += len(block)
+                    if total > 400*1024*1024:
+                        raise PlanningError('A letöltött adatcsomag váratlanul nagy.')
+                    output.write(block)
+            target = self.store.folder/'catalog.sqlite3'
+            import_sde(archive, target)
+            with self.catalog.lock:
+                self.catalog.path = target
+                self.catalog.reload()
+            archive.unlink(missing_ok=True)
+        except PlanningError:
+            raise
+        except Exception:
+            raise PlanningError('Az EVE-adatcsomag frissítése sikertelen. Az előző adatbázis használható.') from None
+
+    def live_data(self, settings, strict=False):
+        chars = self.store.characters()
+        if settings['character_ids']:
+            chars = [c for c in chars if c['id'] in settings['character_ids']]
+            missing = set(settings['character_ids'])-{c['id'] for c in chars}
+            if missing and strict:
+                raise PlanningError('A kiválasztott karakterek egyike már nincs hozzáadva.')
+        snapshots, stale = [], []
+        if not chars and strict:
+            raise PlanningError('EVE-készlethez előbb adj hozzá karaktert, majd frissítsd az adatokat. Kézi készlettel addig is tervezhetsz.')
+        for char in chars:
+            parts = {kind: self.store.snapshot(char['id'], kind) for kind in ['assets', 'blueprints', 'jobs']}
+            if any(value is None for value in parts.values()):
+                if strict:
+                    raise PlanningError(f"{char['name']}: nincs teljes készlet-, blueprint- és jobadat. Nyomd meg az EVE-frissítést.")
+                continue
+            # Explicit refresh errors remain visible and block new live plans.
+            if char['error'] and strict:
+                raise PlanningError(f"{char['name']}: {char['error']} Kézi módban folytathatod a tervezést.")
+            if min(p['expires'] for p in parts.values()) <= time.time():
+                stale.append(char['name'])
+            snapshots.append({'character_id': char['id'], 'assets_as_of': parts['assets']['fetched'],
+                              'assets_expires':parts['assets']['expires'],'character_name':char['name'],
+                              **{k: v['data'] for k, v in parts.items()}})
+        result = live_inventory(self.catalog, snapshots, settings['location_ids'])
+        return (*result, stale)
+
+    def scope_label(self, corporation_id=None):
+        return (self.store.corporation(corporation_id) or {}).get('name',str(corporation_id)) if corporation_id is not None else 'Személyes gyártás'
+
+    def scope_id(self, value):
+        if value is None or value=='':return None
+        if isinstance(value,str):
+            if not re.fullmatch(r'[1-9][0-9]*',value):raise PlanningError('Hibás corporation azonosító.')
+            value=int(value)
+        cid=integer(value,'Corporation',2**53-1,1)
+        if not self.store.corporation(cid):raise PlanningError('Ismeretlen corporation. Előbb frissítsd a corp-adatokat.')
+        return cid
+
+    def scope_settings(self, corporation_id=None):
+        settings = self.store.settings()
+        if corporation_id is not None:
+            settings.update(source='eve',location_ids=settings.get('corporation_locations',{}).get(str(corporation_id),[]))
+        return settings
+
+    def corporation_data(self, corporation_id, settings, strict=False):
+        corp,members,parts=self.store.corporation_record(corporation_id)
+        reason=('Nincs hozzáadott, ehhez a corporationhöz tartozó karakter.' if not members else
+                (corp or {}).get('error') or ('Még nincs teljes corp készlet-, blueprint- és jobadat.' if not all(parts.values()) else None))
+        if reason:
+            if strict:raise PlanningError(self.scope_label(corporation_id)+': '+reason+' A Corporationok oldalon engedélyezd és frissítsd a hozzáférést.')
+            return {},{},[],[],[],[]
+        provider=next((c for c in members if c['id']==corp['provider_id']),None)
+        if provider is None:
+            if strict:raise PlanningError('A corp-adatot lekérő karakter már nem tag. Frissítsd a corporation adatait.')
+            return {},{},[],[],[],[]
+        snapshot={'character_id':provider['id'],'character_name':corp['name'],'corporation_id':corporation_id,
+                  'assets_as_of':parts['assets']['fetched'],'assets_expires':parts['assets']['expires'],
+                  **{k:p['data'] for k,p in parts.items()}}
+        stock,wip,bps,jobs,locations=live_inventory(self.catalog,[snapshot],settings['location_ids'])
+        names={c['id']:c['name'] for c in self.store.characters()}
+        for job in jobs:
+            job['corporation_id']=corporation_id
+            job['character_id']=job.get('installer_id')
+            job['character_name']=names.get(job.get('installer_id'),str(job.get('installer_id') or '–'))
+        stale=[corp['name']] if min(p['expires'] for p in parts.values())<=time.time() else []
+        return stock,wip,bps,jobs,locations,stale
+
+    def _context(self, corporation_id=None):
+        corporation_id=self.scope_id(corporation_id)
+        settings = self.scope_settings(corporation_id)
+        if corporation_id is not None:
+            stock,wip,bps,jobs,_,stale=self.corporation_data(corporation_id,settings,strict=True)
+        else:
+            stock, wip, bps, jobs, _, stale = self.live_data(settings, strict=settings['source'] == 'eve')
+        if settings['source'] != 'eve':
+            stock, wip = {}, {}
+        return dict(settings=settings, stock=stock, wip=wip, blueprints=bps, jobs=jobs, stale=stale,
+                    skill_profiles=production_profiles(self.store,settings,corporation_id),
+                    corporation_id=corporation_id,inventory=self.store.mapping('inventory',corporation_id),
+                    parameters=self.store.mapping('parameters',corporation_id))
+
+    def _calculate(self, product_id, quantity, context, reservations=None, own=None, manufacturer_id=None):
+        settings = context['settings']
+        plan = self.planner.calculate(product_id, quantity, settings, context['inventory'], context['parameters'],
+                                      context['stock'], context['wip'], context['blueprints'], context['jobs'],
+                                      reservations=reservations, own_reservations=own,
+                                      skill_profiles=context['skill_profiles'],manufacturer_id=manufacturer_id)
+        # Asset and job caches can disagree just after delivery. Do not allocate
+        # those materials or create duplicate production until the assets catch up.
+        planned = {r['id']: r for r in plan['rows']}
+        waiting = {}
+        for job in context['jobs'] if settings['source'] == 'eve' else []:
+            if settings['location_ids'] and job.get('output_location_id') not in settings['location_ids']:
+                continue
+            row = planned.get(job.get('product_type_id'))
+            if not row or not row['missing'] or row['manual_stock'] or job.get('status') != 'delivered' or job.get('activity_id') not in [1, 9]:
+                continue
+            recipe=self.catalog.recipes.get(job.get('product_type_id'))
+            if not recipe or job.get('blueprint_type_id')!=recipe['bp_id'] or job['activity_id']!=(9 if recipe['activity']=='reaction' else 1):
+                continue
+            if job.get('completed_date') and job.get('assets_as_of'):
+                completed = datetime.fromisoformat(job['completed_date'].replace('Z', '+00:00')).timestamp()
+                if completed > job['assets_as_of']:
+                    waiting[(job.get('character_id'),row['id'])]={'id':row['id'],'name':row['name'],
+                        'character_id':job.get('character_id'),'character_name':job.get('character_name'),
+                        'assets_as_of':job['assets_as_of'],'assets_expires':job.get('assets_expires'),
+                        'completed_at':completed}
+        if waiting:
+            items=list(waiting.values())
+            retry_at=min((item['assets_expires'] for item in items if item['assets_expires']),default=time.time()+60)
+            raise AssetSnapshotPending(items,retry_at)
+        plan.update(source=settings['source'], stale_characters=context['stale'], calculated_at=time.time(),
+                    corporation_id=context.get('corporation_id'),scope_label=self.scope_label(context.get('corporation_id')))
+        return plan
+
+    def _allocate(self, plans, context):
+        same_pool=[p for p in plans if p.get('corporation_id')==context.get('corporation_id')]
+        return allocate_plans(same_pool, lambda product, quantity, held: self._calculate(product, quantity, context, held),
+            calculate_saved=lambda saved,held:self._calculate(saved['product_id'],saved['quantity'],context,held,
+                                                            manufacturer_id=saved.get('manufacturer_id')))
+
+    def manufacturer(self,value,corporation_id=None,allow_missing=None):
+        if value is None or value in ['', 'auto']:return None
+        if value=='manual':return 0
+        if isinstance(value,str) and re.fullmatch(r'[0-9]+',value):value=int(value)
+        value=integer(value,'Gyártó karakter',2**53-1,0)
+        if value==0:return 0
+        if value==allow_missing:return value
+        character=next((c for c in self.store.characters() if c['id']==value),None)
+        if not character or corporation_id is not None and character.get('corporation_id')!=corporation_id:
+            raise PlanningError('A gyártó karakter nincs hozzáadva vagy nem ehhez a corporationhöz tartozik.')
+        return value
+
+    @staticmethod
+    def _saved(plans, plan_id):
+        found = next((p for p in plans if p['id'] == plan_id), None)
+        if not found:
+            raise PlanningError('Ez a mentett terv már nem található. Nyiss meg másik tervet vagy kezdj újat.')
+        return found
+
+    def plan(self, product_id, quantity, saved_plan_id=None, corporation_id=None, manufacturer_id='saved'):
+        with self.planning_lock, self.catalog.lock:
+            context = self._context(corporation_id)
+            plans = self.store.plans()
+            saved = self._saved(plans, saved_plan_id) if saved_plan_id else None
+            manufacturer_id=saved.get('manufacturer_id') if manufacturer_id=='saved' and saved else None if manufacturer_id=='saved' else self.manufacturer(manufacturer_id,context['corporation_id'],saved.get('manufacturer_id') if saved else None)
+            if saved and saved.get('corporation_id')!=context.get('corporation_id'):
+                raise PlanningError('A mentett terv másik készlethez tartozik. Nyisd meg a saját gyártási körében.')
+            if saved and saved['product_id'] != product_id:
+                raise PlanningError('Másik termékhez kezdj új tervet; a mentett terv saját foglalása csak a saját céljához használható.')
+            # Editing a saved quantity previews the same priority allocation that
+            # saving it will commit. No persistent reservation changes on GET.
+            preview = [{**p, 'quantity': quantity} if p['id'] == saved_plan_id else p for p in plans]
+            allocation = self._allocate(preview, context)
+            other, own = except_owner(allocation, saved_plan_id)
+            plan = self._calculate(product_id, quantity, context, other, own,manufacturer_id)
+            plan['saved_plan'] = ({**saved, 'preview_changed': quantity != saved['quantity'] or (manufacturer_id or 0)!=(saved.get('manufacturer_id') or 0)} if saved else None)
+            plan['reservation_summary'] = {'active_count': allocation['active_count'],
+                'other_plan_count': allocation['active_count']-int(bool(saved and saved['reserve_active'])),
+                'own': allocation['by_plan'].get(saved_plan_id)}
+            return plan
+
+    def shopping_summary(self):
+        """Preview every saved goal against one pool; no persistent holds change."""
+        with self.planning_lock, self.catalog.lock:
+            plans=self.store.plans()
+            if not plans:
+                return {'rows':[], 'plans':[], 'source':self.store.settings()['source'],
+                        'stale_characters':[], 'calculated_at':time.time()}
+            contexts={cid:self._context(cid) for cid in dict.fromkeys(p.get('corporation_id') for p in plans)}
+            # Active reservations retain their priority. Unreserved saved plans
+            # use only what remains, in creation order, without activating them.
+            last=max([time.time()]+[p['reserved_at'] or p['created'] for p in plans])
+            inactive=sorted((p for p in plans if not p['reserve_active']),key=lambda p:(p['created'],p['id']))
+            priority={p['id']:last+i+1 for i,p in enumerate(inactive)}
+            virtual=[{**p,'reserve_active':True,'reserved_at':priority[p['id']]} if not p['reserve_active'] else p for p in plans]
+            allocation={'by_plan':{}}
+            for context in contexts.values():allocation['by_plan'].update(self._allocate(virtual,context)['by_plan'])
+            rows={};included=[];formulas=set()
+            for saved in sorted(plans,key=lambda p:(self.scope_label(p.get('corporation_id')),allocation['by_plan'][p['id']]['priority'])):
+                result=allocation['by_plan'][saved['id']]
+                included.append({key:saved[key] for key in ['id','name','product_id','quantity','reserve_active','corporation_id']})
+                included[-1]['scope_label']=self.scope_label(saved.get('corporation_id'))
+                included[-1].update(priority=result['priority'],shopping_items=len(result['shopping']))
+                for material in result['shopping']:
+                    tid=material['id']
+                    reusable=material['category']=='Reakcióformula'
+                    pool=(saved.get('corporation_id'),tid)
+                    if reusable and pool in formulas:continue
+                    if reusable:formulas.add(pool)
+                    if tid not in rows:
+                        rows[tid]={key:material[key] for key in ['id','name','category','unit','copy_runs','note'] if key in material}
+                        rows[tid].update(required=0,used_stock=0,used_wip=0,buy=0,plans=[])
+                    row=rows[tid]
+                    for key in ['required','used_stock','used_wip','buy']:row[key]+=material[key]
+                    row['plans'].append({'id':saved['id'],'name':saved['name'],'quantity':saved['quantity'],'buy':material['buy'],
+                                         'corporation_id':saved.get('corporation_id'),'scope_label':self.scope_label(saved.get('corporation_id'))})
+            return {'rows':sorted(rows.values(),key=lambda r:(r['category'],r['name'].casefold())),
+                    'plans':included,'source':self.store.settings()['source'],'separate_pools':len(contexts)>1 or any(contexts),
+                    'stale_characters':list(dict.fromkeys(n for c in contexts.values() for n in c['stale'])),'calculated_at':time.time()}
+
+    def save_plan(self, data):
+        with self.planning_lock, self.catalog.lock:
+            product = integer(data.get('product_id'), 'Termék', 10**9, 1)
+            if product not in self.catalog.recipes:
+                raise PlanningError('Ismeretlen gyártható termék.')
+            quantity = integer(data.get('quantity'), 'Mennyiség', 10**8 if self.catalog.recipes[product]['activity']=='reaction' else 10**6, 1)
+            plans = self.store.plans()
+            old = self._saved(plans, data['id']) if data.get('id') else None
+            corporation_id=self.scope_id(data.get('corporation_id'))
+            manufacturer_id=self.manufacturer(data.get('manufacturer_id',old.get('manufacturer_id') if old else None),corporation_id,old.get('manufacturer_id') if old else None)
+            if old and old.get('corporation_id')!=corporation_id:
+                raise PlanningError('A terv készlettulajdonosa nem módosítható. Másik corporationhöz kezdj új tervet.')
+            if old and old['product_id'] != product:
+                raise PlanningError('Másik terméket új tervként ments el.')
+            now = time.time()
+            saved = {'id': old['id'] if old else str(uuid.uuid4()),
+                     'name': str(data.get('name') or self.catalog.name(product))[:120].strip(),
+                     'product_id': product, 'quantity': quantity,'manufacturer_id':manufacturer_id,
+                     'created': old['created'] if old else now, 'reserve_active': True,'corporation_id':corporation_id,
+                     'reserved_at': old['reserved_at'] if old and old['reserve_active'] else now}
+            proposed = [p for p in plans if p['id'] != saved['id']]+[saved]
+            allocation = self._allocate(proposed, self._context(corporation_id))
+            self.store.save_plan(saved)
+            return {'ok': True, 'id': saved['id'], 'allocation': allocation['by_plan'][saved['id']]}
+
+    def set_reservation(self, plan_id, active):
+        if not isinstance(active, bool):
+            raise PlanningError('A foglalás állapota igaz vagy hamis lehet.')
+        with self.planning_lock, self.catalog.lock:
+            plans = self.store.plans()
+            old = self._saved(plans, plan_id)
+            saved = {**old, 'reserve_active': active,
+                     'reserved_at': (old['reserved_at'] if old['reserve_active'] else time.time()) if active else None}
+            if active:
+                self._allocate([p for p in plans if p['id'] != plan_id]+[saved], self._context(old.get('corporation_id')))
+            self.store.save_plan(saved)
+
+    def remove_plan(self, plan_id):
+        with self.planning_lock:
+            self.store.remove_plan(plan_id)
+
+    def state(self, corporation_id=None):
+        with self.planning_lock, self.catalog.lock:
+            return self._state(self.scope_id(corporation_id))
+
+    def _state(self, corporation_id=None):
+        settings = self.scope_settings(corporation_id)
+        _, _, bps, jobs, locations, stale = (self.live_data(settings) if corporation_id is None else self.corporation_data(corporation_id,settings))
+        plans = self.store.plans()
+        reservation_error = None
+        delivery_wait = None
+        allocation = {'by_plan': {}}
+        for cid in dict.fromkeys(p.get('corporation_id') for p in plans if p['reserve_active']):
+            try:
+                allocation['by_plan'].update(self._allocate(plans, self._context(cid))['by_plan'])
+            except (PlanningError, EsiError) as error:
+                for p in plans:
+                    if p.get('corporation_id')==cid:p['allocation_error']=str(error)
+                if cid==corporation_id:
+                    reservation_error = str(error)
+                    if isinstance(error,AssetSnapshotPending):delivery_wait=error.info
+        for saved in plans:
+            saved['activity']=self.catalog.recipes.get(saved['product_id'],{}).get('activity')
+            saved['product_name'] = self.catalog.name(saved['product_id'])
+            saved['scope_label']=self.scope_label(saved.get('corporation_id'))
+            saved['allocation'] = allocation['by_plan'].get(saved['id'])
+        chars = self.store.characters()
+        for char in chars:
+            char['data_times'] = {kind: (self.store.snapshot(char['id'], kind) or {}).get('fetched') for kind in ['assets', 'blueprints', 'jobs']}
+        return {'version': __version__, 'csrf': self.csrf, 'settings': settings,
+                'corporation_id':corporation_id,'scope_label':self.scope_label(corporation_id),
+                'corporations':corporation_dashboard(self.store)['corporations'],'corporation_scopes':CORPORATION_SCOPES,
+                'production_characters':[{k:p[k] for k in ['id','name','available','as_of']} for p in production_profiles(self.store,settings,corporation_id)],
+                'characters': chars, 'plans': plans, 'reservation_error': reservation_error,'delivery_wait':delivery_wait,
+                'inventory': self.store.mapping('inventory',corporation_id), 'parameters': self.store.mapping('parameters',corporation_id),
+                'locations': locations, 'jobs': [j for j in jobs if j.get('status') in ['active', 'paused', 'ready']],
+                'blueprint_count': len(bps), 'stale_characters': stale, 'sde': self.catalog.meta,
+                'recipe_count': sum(self.catalog.types.get(i, {}).get('published', 0) for i in self.catalog.recipes),
+                'task': copy.deepcopy(self.task), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES,
+                'crypto_available': crypto_available()}
+
+
+def crypto_available():
+    try:
+        import cryptography
+        return bool(cryptography)
+    except ImportError:
+        return False
+
+
+def validated_settings(data, current):
+    result = copy.deepcopy(current)
+    for key, value in data.items():
+        if key == 'source':
+            if value not in ['manual', 'eve']:
+                raise PlanningError('Ismeretlen készletforrás.')
+            result['source_explicit'] = True
+        elif key == 'client_id':
+            if not isinstance(value, str) or len(value) > 200 or (value and not re.fullmatch(r'[A-Za-z0-9_-]+', value)):
+                raise PlanningError('Hibás Client ID; ide a nyilvános azonosító szükséges.')
+            if current['client_id'] and value != current['client_id']:
+                # Existing tokens retain the client ID used to issue them.
+                pass
+        elif key in ['character_ids', 'location_ids']:
+            if not isinstance(value, list) or len(value) > 1000:
+                raise PlanningError('Hibás karakter- vagy helylista.')
+            value = list(dict.fromkeys(integer(v, 'Azonosító', 2**53-1, 1) for v in value))
+        elif key in ['manufacturing', 'reaction']:
+            if not isinstance(value, dict) or set(value)-set(DEFAULT_SETTINGS[key]):
+                raise PlanningError('Ismeretlen struktúrabeállítás.')
+            group = result[key].copy()
+            for field, n in value.items():
+                group[field] = float(decimal_number(n, field, .01 if field == 'skill_time' else 0,
+                                                    1 if field == 'skill_time' else 99))
+            value = group
+        else:
+            raise PlanningError('Ismeretlen beállítás.')
+        result[key] = value
+    return result
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = 'EveMuhely/'+__version__
+
+    @property
+    def app(self):
+        return self.server.app
+
+    def log_message(self, *_args):
+        # OAuth callback query strings and character data must not enter logs.
+        pass
+
+    def send(self, status, data, content_type='application/json; charset=utf-8', cookie=False, headers=None):
+        if isinstance(data, (dict, list)):
+            data = json.dumps(data, ensure_ascii=False, allow_nan=False).encode()
+        elif isinstance(data, str):
+            data = data.encode()
+        self.send_response(status)
+        self.send_header('Content-Type', content_type)
+        self.send_header('Content-Length', str(len(data)))
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Referrer-Policy', 'no-referrer')
+        self.send_header('X-Frame-Options', 'DENY')
+        self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        if cookie:
+            self.send_header('Set-Cookie', f'eve_session={self.app.cookie}; HttpOnly; SameSite=Lax; Path=/')
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
+        self.end_headers()
+        self.wfile.write(data)
+
+    def host_ok(self):
+        return self.headers.get('Host', '') in [f'127.0.0.1:{self.app.port}', f'localhost:{self.app.port}']
+
+    def authorized(self):
+        try:
+            cookie = SimpleCookie(self.headers.get('Cookie', ''))
+            return secrets.compare_digest(cookie['eve_session'].value, self.app.cookie)
+        except (KeyError, ValueError):
+            return False
+
+    def do_GET(self):
+        try:
+            if not self.host_ok():
+                return self.send(403, {'error': 'Csak a helyi cím használható.'})
+            parsed = urllib.parse.urlsplit(self.path)
+            path = parsed.path
+            query = urllib.parse.parse_qs(parsed.query)
+            if path == '/health':
+                return self.send(200, {'app': 'eve-muhely', 'version': __version__})
+            if path == '/':
+                return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
+            if path in ['/app.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/icon.svg']:
+                return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
+                                 mimetypes.guess_type(path)[0] or 'application/octet-stream')
+            if not self.authorized():
+                return self.send(403, {'error': 'Nyisd meg az alkalmazás kezdőlapját.'})
+            if path == '/callback':
+                error = query.get('error')
+                if error:
+                    raise PlanningError('Az EVE-belépés megszakadt. Az EVE-kapcsolat oldalon újraindítható.')
+                self.app.eve.finish(query.get('state', [''])[0], query.get('code', [''])[0], self.app.cookie)
+                return self.send(303, b'', headers={'Location': '/?connected=1'})
+            if path == '/api/state':
+                return self.send(200, self.app.state(query.get('corporation_id',[None])[0]))
+            if path == '/api/corporations':
+                return self.send(200,corporation_dashboard(self.app.store))
+            if path == '/api/skills':
+                with self.app.catalog.lock:
+                    return self.send(200, skill_dashboard(self.app.store,self.app.catalog))
+            if path == '/api/pi':
+                with self.app.catalog.lock:
+                    return self.send(200,pi_dashboard(self.app.store,self.app.catalog,int(query.get('hours',['24'])[0])))
+            if path == '/api/search':
+                return self.send(200, self.app.catalog.search(query.get('q', [''])[0][:200], query.get('all', ['0'])[0] == '1'))
+            if path == '/api/plans/shopping':
+                return self.send(200,self.app.shopping_summary())
+            if path == '/api/plan':
+                return self.send(200, self.app.plan(int(query.get('product_id', ['0'])[0]), int(query.get('quantity', ['1'])[0]),
+                                                   query.get('saved_plan_id', [None])[0],query.get('corporation_id',[None])[0],query.get('manufacturer_id',['saved'])[0]))
+            return self.send(404, {'error': 'Nincs ilyen oldal.'})
+        except (PlanningError, EsiError, ValueError) as error:
+            message = str(error) if isinstance(error, (PlanningError, EsiError)) else 'Hibás kérés.'
+            if urllib.parse.urlsplit(self.path).path == '/callback':
+                import html
+                return self.send(400, '<!doctype html><html lang="hu"><meta charset="utf-8"><title>EVE-belépés</title><h1>A belépés nem fejeződött be</h1><p>'+html.escape(message)+'</p><a href="/">Vissza az alkalmazáshoz</a></html>', 'text/html; charset=utf-8')
+            return self.send(400, {'error': message,**({'delivery_wait':error.info} if isinstance(error,AssetSnapshotPending) else {})})
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception:
+            self.send(500, {'error': 'A kérés nem sikerült. A korábbi adatok megmaradtak.'})
+
+    def do_POST(self):
+        try:
+            origin = self.headers.get('Origin', '')
+            if (not self.host_ok() or not self.authorized() or
+                origin not in [self.app.origin, f'http://localhost:{self.app.port}'] or
+                not secrets.compare_digest(self.headers.get('X-CSRF-Token', ''), self.app.csrf)):
+                return self.send(403, {'error': 'A kérés csak az alkalmazás saját oldaláról indítható.'})
+            if self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
+                return self.send(415, {'error': 'JSON kérés szükséges.'})
+            length = int(self.headers.get('Content-Length', '0'))
+            if not 0 < length <= 2*1024*1024:
+                return self.send(413, {'error': 'A kérés túl nagy vagy üres.'})
+            data = json.loads(self.rfile.read(length))
+            if not isinstance(data, dict):
+                raise PlanningError('Hibás kérés.')
+            path = urllib.parse.urlsplit(self.path).path
+            query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            corporation_id=self.app.scope_id(query.get('corporation_id',[None])[0])
+            if path == '/api/settings':
+                if corporation_id is not None:
+                    if set(data)-{'location_ids','source'} or data.get('source','eve')!='eve':
+                        raise PlanningError('Corp gyártás kizárólag a saját corporation EVE-készletével számolhat.')
+                    updated=validated_settings(data,self.app.scope_settings(corporation_id))
+                    current=self.app.store.settings();current.setdefault('corporation_locations',{})[str(corporation_id)]=updated['location_ids']
+                    self.app.store.save_settings(current)
+                else:self.app.store.save_settings(validated_settings(data, self.app.store.settings()))
+            elif path in ['/api/inventory', '/api/parameters']:
+                table = 'inventory' if path.endswith('inventory') else 'parameters'
+                existing = self.app.store.mapping(table,corporation_id)
+                if len(data) > 4000:
+                    raise PlanningError('Túl sok módosítás egy kérésben.')
+                updates = {}
+                for tid, patch in data.items():
+                    type_id = integer(int(tid), 'Termékazonosító', 10**9, 1)
+                    if type_id not in self.app.catalog.types or not isinstance(patch, dict):
+                        raise PlanningError('Ismeretlen termék vagy hibás módosítás.')
+                    allowed = ['quantity', 'reserved', 'wip'] if table == 'inventory' else ['source', 'me', 'te', 'job_runs', 'total_runs', 'mode', 'item_id']
+                    if set(patch)-set(allowed):
+                        raise PlanningError('Ismeretlen mező.')
+                    value = existing.get(type_id, {}).copy()
+                    for key, n in patch.items():
+                        if n is None:
+                            value.pop(key, None)
+                        elif key in ['source', 'mode']:
+                            if n not in (['auto', 'manual'] if key == 'source' else ['build', 'buy']):
+                                raise PlanningError('Ismeretlen blueprintbeállítás.')
+                            value[key] = n
+                        else:
+                            value[key] = integer(n, key, 10 if key == 'me' else 20 if key == 'te' else 2**53-1 if key == 'item_id' else 10**6 if key == 'job_runs' else 10**12,
+                                                 1 if key in ['job_runs', 'item_id'] else 0)
+                    updates[type_id] = value
+                self.app.store.save_mapping(table, updates,corporation_id)
+            elif path == '/api/auth/start':
+                if not crypto_available():
+                    raise PlanningError('A belépéshez hiányzik a cryptography csomag. Futtasd az egyszeri telepítőt.')
+                char_id=data.get('character_id')
+                if char_id is not None:
+                    char_id=integer(char_id,'Karakter',2**53-1,1)
+                    if char_id not in {c['id'] for c in self.app.store.characters()}:
+                        raise PlanningError('A karakter már nincs hozzáadva.')
+                feature=data.get('feature')
+                if feature not in [None,'skills','pi','corporations']:raise PlanningError('Ismeretlen engedélyezési cél.')
+                return self.send(200, {'url': self.app.eve.start(self.app.cookie, self.app.origin+'/callback',char_id,feature)})
+            elif path == '/api/characters/remove':
+                self.app.eve.forget(integer(data.get('id'), 'Karakter', 2**53-1, 1))
+            elif path == '/api/sync':
+                self.app.start_task('sync')
+            elif path == '/api/skills/sync':
+                self.app.start_task('skills')
+            elif path == '/api/pi/sync':
+                self.app.start_task('pi')
+            elif path == '/api/corporations/sync':
+                self.app.start_task('corporations')
+            elif path == '/api/sde/update':
+                self.app.start_task('sde')
+            elif path == '/api/plans/save':
+                return self.send(200, self.app.save_plan(data))
+            elif path == '/api/plans/reservation':
+                self.app.set_reservation(str(data.get('id', '')), data.get('active'))
+            elif path == '/api/plans/remove':
+                self.app.remove_plan(str(data.get('id', '')))
+            elif path == '/api/shutdown':
+                self.send(200, {'ok': True})
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return
+            else:
+                return self.send(404, {'error': 'Nincs ilyen művelet.'})
+            return self.send(200, {'ok': True})
+        except (PlanningError, EsiError, ValueError, TypeError) as error:
+            message = str(error) if isinstance(error, (PlanningError, EsiError)) else 'Hibás kérés.'
+            self.send(400, {'error': message})
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception:
+            self.send(500, {'error': 'A módosítás nem sikerült. Az előző adatok megmaradtak.'})
+
+
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def __init__(self, app):
+        self.app = app
+        super().__init__(('127.0.0.1', app.port), Handler)
+        app.port = self.server_address[1]
+        app.origin = f'http://127.0.0.1:{app.port}'
+
+
+def main():
+    parser = argparse.ArgumentParser(description='EVE Műhely — helyi gyártástervező')
+    parser.add_argument('--port', type=int, default=8765)
+    parser.add_argument('--data-dir', type=Path, default=default_data_dir())
+    parser.add_argument('--no-browser', action='store_true')
+    args = parser.parse_args()
+    if not 1024 <= args.port <= 65535:
+        parser.error('A port 1024 és 65535 közé essen.')
+    os.umask(0o077)
+    writable_catalog = args.data_dir/'catalog.sqlite3'
+    catalog = writable_catalog if writable_catalog.exists() else ROOT/'data/catalog.sqlite3'
+    if not catalog.exists():
+        parser.error('Hiányzik a receptadatbázis; futtasd az egyszeri telepítőt.')
+    app = App(args.data_dir, catalog, args.port)
+    try:
+        server = Server(app)
+    except OSError:
+        raise SystemExit(f'A {args.port} port foglalt. Ha az alkalmazás már fut, nyisd meg: {app.origin}')
+    if not args.no_browser:
+        threading.Timer(.4, lambda: webbrowser.open(app.origin)).start()
+    print(f'EVE Műhely: {app.origin}\nAdatok: {args.data_dir}\nLeállítás: a felületen vagy Ctrl+C.', flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+
+
+if __name__ == '__main__':
+    main()
