@@ -185,7 +185,8 @@ function scheduleTaskPoll() {
         if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else await calculate(false);}
         else if(state.task.kind==='skills') await refreshSkills();
         else if(state.task.kind==='pi')await refreshPI();
-        else {skillData=null;piData=null;await calculate(false);}
+      else if(state.task.kind==='moons')await refreshMoons();
+        else {skillData=null;piData=null;moonData=null;await calculate(false);}
       }
     } catch(e) { error(e.message); }
   },1200);
@@ -227,21 +228,24 @@ async function calculate(refreshState=true) {
 }
 function navigate(next) {
   if(Object.keys(dirty).length && !confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?')) return false;
+  if(view==='moons'){moonEditing=false;moonSystemGeneration++;moonSearchGeneration++;clearTimeout(moonSearchTimer);}
   view=next; dirty={};
   clearTimeout(skillTimer);
   clearTimeout(piTimer);
   if(['skills','pi'].includes(next))error('');
   $$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
-  const names={queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',corporations:'Corporationok',settings:'Struktúrák és bónuszok',connection:'EVE-kapcsolat',saved:'Mentett tervek'};
+  const names={queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Struktúrák és bónuszok',connection:'EVE-kapcsolat',saved:'Mentett tervek'};
   $('#breadcrumb').textContent='Műhely / '+names[view]; render();return true;
 }
 function render() {
   if(!state) return;
+  if(view==='moons'&&(moonEditing&&$('#moon-form')||dirty.moon_settings&&$('#moon-settings')))return;
   const content=$('#view-content'); actions();
-  $('.plan-selector').hidden=['skills','pi','corporations'].includes(view);
+  $('.plan-selector').hidden=['skills','pi','corporations','moons'].includes(view);
   $('#plan-status').hidden=!plan?.stale_characters.length;
   if(view==='skills') return renderSkills(content);
   if(view==='pi') return renderPI(content);
+  if(view==='moons')return renderMoons(content);
   if(view==='corporations')return renderCorporations(content);
   if(view==='settings') return renderSettings(content);
   if(view==='connection') return renderConnection(content);
@@ -599,13 +603,14 @@ async function startTask(path) {
     error('');
     if(Object.keys(dirty).length) throw new Error('A frissítés előtt alkalmazd a megadott módosításokat.');
     await api(path,{}); await reloadState();
-    if(['skills','pi','corporations'].includes(view))render();
+    if(['skills','pi','corporations','moons'].includes(view))render();
     if(!state.task.running) {
       toast(state.task.message);
       if(!['skills','pi'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
       if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else await calculate(false);}
       else if(state.task.kind==='skills')await refreshSkills();
       else if(state.task.kind==='pi')await refreshPI();
+      else if(state.task.kind==='moons')await refreshMoons();
       else if(state.task.kind!=='skills'){skillData=null;piData=null;await calculate(false);}
     }
   } catch(e){error(e.message);}

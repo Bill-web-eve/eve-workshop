@@ -4,7 +4,7 @@ Helyben futó, magyar nyelvű EVE Online gyártástervező macOS Apple Silicon �
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 0.9.0**, **Windows 11 x64 0.9.0**, magyar és angol felülettel.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 0.10.0**, **Windows 11 x64 0.10.0**, magyar és angol felülettel, holdnyilvántartással.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -87,3 +87,22 @@ Windows stores profiles under `%LOCALAPPDATA%\EVE Muhely`. `muhely/windows_secur
 Hungarian is the default. The sidebar language buttons persist `eve-muhely-language` locally, independently of the theme. `static/i18n.js` projects canonical Hungarian presentation messages using the English catalogue in `static/i18n-en.js`. It updates existing text and accessibility attributes in place, including asynchronous content, without rerendering forms, making requests or changing API values. Known messages can contain numbered placeholders; captured names are preserved, and `:t` explicitly opts a captured UI fragment into recursive translation. Unknown messages are kept intact. Date presentation follows the selected language; quantities retain their requested three-digit space grouping.
 
 Names and other user-controlled labels must use `verbatim`, `data-i18n-skip` or the dedicated name renderers. Input values, select values, data attributes, credentials, EVE names and clipboard contents remain canonical. `EveI18n.t` also localizes confirmation messages, validation and CSV headings. No translation service or external script is used. Tests cover preference persistence, live changes, DOM updates, names, escaping, dates, table filters, input identity and 100-million-unit validation.
+
+
+## Holdak és kitermelés / Moons (0.10.0)
+
+A **Holdak és kitermelés** menüben kézzel rögzíthetők a holdak: kereshető rendszerlista, automatikus ESI-csillagkép, valódi holdválasztó, Athanor vagy Metenox, legfeljebb négy érc és százalékos aránya. A rendszerek, holdak és ércadatok a CCP nyilvános SDE-jéből előre elérhetők; a kiválasztott rendszert és csillagképet az ESI ellenőrzi. A nyilvános ESI-adatot 90 napig tároljuk, ETaggel frissítjük, hiba esetén az utolsó adatot vagy az SDE-t jelölve megtartjuk. Külön **Rendszeradatok ellenőrzése** gomb is van.
+
+Az öt nézet: nyilvántartás; 30 napos termelés holdanként, összesen és struktúránként; fogyasztás; kristálytípusok és érctérfogat-arányok; számítási beállítások. A táblázatok rendezhetők és becsukható szűrősort kaptak. A nyilvántartás közös a helyi profilban, nem a kiválasztott gyártási kör készlete. A becslés nem ír jóvá anyagot a készletben.
+
+Számítás: 720 óra × 30 000 m³/óra × a megadott ércarány. Az arányokat nem normalizáljuk: a hiányos összetételből csak az ismert ércek számítanak. A két tizedesből eredő kerekítési eltérést 100,02%-ig elfogadjuk; ennél nagyobb összeggel a hold menthető, de termelése és kristályaránya javításig kimarad. A működő fúró fogyasztása ilyenkor is számít.
+
+Athanor: nullsec T2 riges Tatara, minden finomítási skill V, alapértelmezetten 4%-os implant: `0.53 × 1.055 × 1.12 × 1.15 × 1.10 × 1.10 × 1.04 = 90.628105568%`. Teljes SDE szerinti finomítási adagokkal, anyagonként lefelé kerekítve, holdanként külön számolunk. Az implant és a begyűjtési arány szerkeszthető. A 100%-os begyűjtés a teljes ismert alapércmennyiség finomításának felső becslése. A tényleges bányászati veszteség, állásidő, jackpot, gazdag ércváltozat és kritikus találat nincs külön modellezve.
+
+Metenox: az SDE-ben szereplő 40%-os hatékonyságot, órás ciklust és 200 Magmatic Gas/ciklus fogyasztást használja; a finomítási skillek, implant és kézi begyűjtési arány nem hatnak rá. A havi termelés a lefelé kerekített órás becslés 720-szorosa. Csak holdanyagok keletkeznek, standard ásványok (Pyerite, Mexallon) nem. Mindkét fúró 5 Fuel Block/óra. A bekapcsolás külön mező: Athanor 360, Metenox 1000 Fuel Block/alkalom; az alapérték nulla. Más szolgáltatások és a külön Tatara üzemanyaga nincs beleszámítva.
+
+A kristályfül az SDE megfelelő feldolgozási skillje alapján párosítja a 20 alapércet az öt holdérckategóriához. A I/II, B I/II, C I/II változat választható; az alapérték A II. A százalék a megadott, bányászandó érctérfogatok aránya az adott holdon, illetve az összes beszámítható Athanoron. Nem kristálydarabszám vagy kopásbecslés; Metenoxhoz nincs kristályigény.
+
+A kiadási csomagban nincs hold, karakter, mentett terv vagy saját készlet. A kézzel felvitt holdak a felhasználó saját `muhely.sqlite3` adatbázisában maradnak. Az SDE frissítése a holdakat megőrzi.
+
+Források: [CCP SDE](https://developers.eveonline.com/docs/services/static-data/), [Moon Mining](https://support.eveonline.com/hc/en-us/articles/115005404229-Moon-Mining), [Metenox](https://www.eveonline.com/news/view/equinox-expansion-notes), [aktuális Magmatic Gas fogyasztás](https://www.eveonline.com/news/view/patch-notes-version-23-01), [Tatara 5,5%](https://www.eveonline.com/news/view/patch-notes-version-20-03), [Resources Realigned](https://www.eveonline.com/news/view/resources-realigned).

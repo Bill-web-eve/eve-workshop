@@ -21,6 +21,7 @@ import uuid
 import webbrowser
 
 from . import __version__
+from . import moons
 from .catalog import Catalog, import_sde
 from .esi import EveConnection, EsiError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES
 from .corporations import dashboard as corporation_dashboard
@@ -84,6 +85,9 @@ class App:
                     if not self.store.characters():raise PlanningError('Előbb adj hozzá karaktert az EVE-kapcsolat oldalon.')
                     result=self.eve.sync_pi();ok_count=sum(r['ok'] for r in result)
                     message=f'PI-adatok ellenőrizve: {ok_count}/{len(result)} karakter. Részletek a Bolygók és PI menüben.'
+                elif kind == 'moons':
+                    result=moons.refresh_universe(self.store,self.catalog,self.eve.http)
+                    message='A holdak rendszeradatai frissítve.' if all(r['ok'] for r in result) else 'Néhány rendszer ESI-adata nem frissült. A korábbi adatok megmaradtak.'
                 elif kind == 'corporations':
                     if not self.store.characters():raise PlanningError('Előbb adj hozzá egy corp-hozzáférésre jogosult karaktert.')
                     result=self.eve.sync_corporations();ok_count=sum(r['ok'] for r in result)
@@ -505,7 +509,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/icon.svg']:
+            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if not self.authorized():
@@ -523,6 +527,12 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/skills':
                 with self.app.catalog.lock:
                     return self.send(200, skill_dashboard(self.app.store,self.app.catalog))
+            if path == '/api/moons':
+                with self.app.catalog.lock:return self.send(200,moons.dashboard(self.app.store,self.app.catalog))
+            if path == '/api/moons/systems':
+                with self.app.catalog.lock:return self.send(200,moons.system_search(self.app.catalog,query.get('q',[''])[0]))
+            if path == '/api/moons/system':
+                return self.send(200,moons.system_info(self.app.store,self.app.catalog,self.app.eve.http,int(query.get('id',['0'])[0])))
             if path == '/api/pi':
                 with self.app.catalog.lock:
                     return self.send(200,pi_dashboard(self.app.store,self.app.catalog,int(query.get('hours',['24'])[0])))
@@ -563,7 +573,19 @@ class Handler(BaseHTTPRequestHandler):
             path = urllib.parse.urlsplit(self.path).path
             query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             corporation_id=self.app.scope_id(query.get('corporation_id',[None])[0])
-            if path == '/api/settings':
+            if path == '/api/moons/save':
+                with self.app.catalog.lock:
+                    value=moons.validate_moon(data,self.app.catalog,self.app.store.moon_records())
+                    self.app.store.save_moon(value)
+                return self.send(200,{'ok':True,'id':value['id']})
+            elif path == '/api/moons/remove':
+                if not isinstance(data.get('id'),str):raise PlanningError('Ismeretlen hold.')
+                self.app.store.remove_moon(data['id'])
+            elif path == '/api/moons/settings':
+                self.app.store.save_moon_preferences(moons.validate_preferences(data))
+            elif path == '/api/moons/sync':
+                self.app.start_task('moons')
+            elif path == '/api/settings':
                 if corporation_id is not None:
                     if set(data)-{'location_ids','source'} or data.get('source','eve')!='eve':
                         raise PlanningError('Corp gyártás kizárólag a saját corporation EVE-készletével számolhat.')

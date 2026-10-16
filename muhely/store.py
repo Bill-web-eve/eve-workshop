@@ -49,6 +49,10 @@ class Store:
         self.path = self.folder / 'muhely.sqlite3'
         with self.db() as db:
             db.executescript('''
+                CREATE TABLE IF NOT EXISTS moons(id TEXT PRIMARY KEY,moon_id INTEGER UNIQUE NOT NULL,data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS moon_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS universe_cache(kind TEXT,id INTEGER,data TEXT NOT NULL,
+                    fetched REAL NOT NULL,etag TEXT,PRIMARY KEY(kind,id));
                 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS inventory(type_id INTEGER PRIMARY KEY,data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS parameters(type_id INTEGER PRIMARY KEY,data TEXT NOT NULL);
@@ -275,3 +279,35 @@ class Store:
     def corporation_error(self, corporation_id, message):
         with self.db() as db:
             db.execute('UPDATE corporations SET error=? WHERE id=?',(message,corporation_id))
+
+    def moon_records(self):
+        with self.db() as db:
+            return [json.loads(r['data']) for r in db.execute('SELECT data FROM moons ORDER BY moon_id')]
+
+    def save_moon(self, value):
+        with self.db() as db:
+            other=db.execute('SELECT id FROM moons WHERE moon_id=?',(value['moon_id'],)).fetchone()
+            if other and other['id']!=value['id']:
+                from .planner import PlanningError
+                raise PlanningError('Ez a hold már szerepel a nyilvántartásban.')
+            db.execute('INSERT INTO moons VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET moon_id=excluded.moon_id,data=excluded.data',
+                       (value['id'],value['moon_id'],json.dumps(value)))
+
+    def remove_moon(self, value):
+        with self.db() as db:db.execute('DELETE FROM moons WHERE id=?',(value,))
+
+    def moon_preferences(self):
+        with self.db() as db:return {r['key']:json.loads(r['value']) for r in db.execute('SELECT * FROM moon_settings')}
+
+    def save_moon_preferences(self, value):
+        with self.db() as db:db.executemany('INSERT OR REPLACE INTO moon_settings VALUES (?,?)',
+            ((k,json.dumps(v)) for k,v in value.items()))
+
+    def universe_cached(self, kind, item_id):
+        with self.db() as db:
+            row=db.execute('SELECT * FROM universe_cache WHERE kind=? AND id=?',(kind,item_id)).fetchone()
+            return {**dict(row),'data':json.loads(row['data'])} if row else None
+
+    def save_universe_cache(self, kind, item_id, data, fetched, etag=None):
+        with self.db() as db:db.execute('INSERT OR REPLACE INTO universe_cache VALUES (?,?,?,?,?)',
+                                       (kind,item_id,json.dumps(data),fetched,etag))

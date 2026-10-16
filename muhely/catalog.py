@@ -77,6 +77,8 @@ def import_sde(archive_path, target):
                            (systems.get(r['solarSystemID'],str(r['solarSystemID']))+' '+roman(r.get('celestialIndex',0)))
                 db.executemany('INSERT INTO pi_planets VALUES (?,?,?,?)',
                     ((r['_key'],planet_name(r),r['solarSystemID'],r['typeID']) for r in rows('mapPlanets.jsonl')))
+            from .moon_catalog import import_moons
+            import_moons(db, archive)
             duplicate_count = 0
             for r in rows('blueprints.jsonl'):
                 blueprint = db.execute('SELECT published FROM types WHERE id=?', (r['blueprintTypeID'],)).fetchone()
@@ -158,6 +160,27 @@ class Catalog:
                     self.pi_systems=dict(pi_db.execute('SELECT id,name FROM pi_systems'))
                     self.pi_meta=dict(pi_db.execute('SELECT key,value FROM meta'))
                     break
+
+            self.moon_systems,self.moon_ores,self.moon_crystals,self.moon_rules={},{},{},{}
+            self.moon_source=None;self.moon_meta={}
+            for source in dict.fromkeys(p for p in [self.path,self.pi_fallback] if p):
+                with closing(sqlite3.connect(source)) as moon_db:
+                    moon_db.row_factory=sqlite3.Row
+                    tables={r[0] for r in moon_db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                    if not {'moon_systems','moon_locations','moon_ores','moon_crystals'}.issubset(tables):continue
+                    self.moon_systems={r['id']:dict(r) for r in moon_db.execute('SELECT * FROM moon_systems')}
+                    self.moon_ores={r['id']:json.loads(r['data']) for r in moon_db.execute('SELECT * FROM moon_ores')}
+                    self.moon_crystals={r['id']:json.loads(r['data']) for r in moon_db.execute('SELECT * FROM moon_crystals')}
+                    meta=dict(moon_db.execute('SELECT key,value FROM meta'))
+                    self.moon_rules=json.loads(meta.get('moonRules','{}'));self.moon_meta=meta
+                    self.moon_source=source
+                    break
+
+    def moon_locations(self, system_id):
+        if not self.moon_source:return []
+        with self.lock,closing(sqlite3.connect(self.moon_source)) as db:
+            db.row_factory=sqlite3.Row
+            return [dict(r) for r in db.execute('SELECT * FROM moon_locations WHERE system_id=? ORDER BY id',(system_id,))]
 
     def name(self, type_id):
         return self.types.get(int(type_id), {}).get('name', f'Type {type_id}')
