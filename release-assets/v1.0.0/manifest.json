@@ -1,0 +1,30 @@
+{
+  "tag": "v1.0.0",
+  "title": "EVE Workshop 1.0.0 – Production scheduler, moon calendar and complete user guide – Mac & Windows",
+  "assets": [
+    {
+      "name": "EVE_Muhely-1.0.0-Windows11-x64.sha256",
+      "sha256": "70e3103e1e4790deef93ef5ad07b3b52edd3ef99dfd56e45efc6c1db608d8bc2"
+    },
+    {
+      "name": "EVE_Muhely-1.0.0-Windows11-x64.zip",
+      "sha256": "6b1aca60c1acfdb5e85f8b718a27f9c683cde2c6aeb7901b982d63d5156f42ee"
+    },
+    {
+      "name": "EVE_Muhely-1.0.0-macOS-AppleSilicon.dmg",
+      "sha256": "de19b060e2f6031e3fd6c6820eeaf368a7b3fc89ef0fa8881823f3693938cfe3"
+    },
+    {
+      "name": "EVE_Muhely-1.0.0-macOS-AppleSilicon.sha256",
+      "sha256": "6081f60e499f55bff4cfe65695fc460d1006cb3ca8019b24e834c9ce24e590f2"
+    },
+    {
+      "name": "EVE_Muhely-Telepites.txt",
+      "sha256": "4df5b41b033da97e16b73cb8f3f012551bc2fcf731747e72b6f1bb13c01c6044"
+    },
+    {
+      "name": "EVE_Muhely-Windows-Telepites.txt",
+      "sha256": "33111313152fc70aa3c569bcfb2526c48495baba52d6a845afd42bc03f8e5357"
+    }
+  ]
+}

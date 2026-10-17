@@ -63,3 +63,9 @@ runtime/
 !release-assets/v0.11.0/EVE_Muhely-0.11.0-macOS-AppleSilicon.sha256
 !release-assets/v0.11.0/EVE_Muhely-0.11.0-Windows11-x64.zip
 !release-assets/v0.11.0/EVE_Muhely-0.11.0-Windows11-x64.sha256
+
+# Reviewed 1.0.0 Mac and Windows release.
+!release-assets/v1.0.0/EVE_Muhely-1.0.0-macOS-AppleSilicon.dmg
+!release-assets/v1.0.0/EVE_Muhely-1.0.0-macOS-AppleSilicon.sha256
+!release-assets/v1.0.0/EVE_Muhely-1.0.0-Windows11-x64.zip
+!release-assets/v1.0.0/EVE_Muhely-1.0.0-Windows11-x64.sha256

@@ -129,7 +129,7 @@ Hivatalos Apple-útmutató: https://support.apple.com/102445
     (disk/'Telepites.txt').write_text(instructions,encoding='utf-8')
     name=f'EVE_Muhely-{version}-macOS-AppleSilicon'
     dmg=output/(name+'.dmg')
-    subprocess.run(['/usr/bin/hdiutil','create','-volname','EVE Műhely','-srcfolder',str(disk),'-format','UDZO','-ov',str(dmg)],check=True)
+    subprocess.run(['/usr/bin/hdiutil','create','-volname',f'EVE Muhely {version}','-srcfolder',str(disk),'-fs','HFS+','-format','UDZO','-ov',str(dmg)],check=True)
     subprocess.run(['/usr/bin/hdiutil','verify',str(dmg)],check=True)
     checksum=hashlib.sha256(dmg.read_bytes()).hexdigest()
     (output/(name+'.sha256')).write_text(checksum+'  '+dmg.name+'\n')

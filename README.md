@@ -4,7 +4,7 @@ Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple S
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 0.11.0**, **Windows 11 x64 0.11.0**, magyar és angol felülettel, Jita-árazással, ipari díjakkal és holdprofit-számítással.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.0.0**, **Windows 11 x64 1.0.0**, magyar és angol felülettel, Jita-árazással, ipari díjakkal és holdprofit-számítással.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -20,11 +20,18 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Jita buy/sell/split alapanyagárak, termékeladási érték, ESI-rendszerindex és beállítható ipari díjak.
 - Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
 
-## Helyi fejlesztői változat · még nincs kiadás
+## Az 1.0.0 kiadás újdonságai
 
-Az új forrásváltozatban Multibuy-kompatibilis, blueprint nélküli bevásárlólista, kézzel vezethető account/Omega/MCT-nyilvántartás és a tanulási jogosultsághoz igazított figyelmeztetés is van. A külön **Production scheduler / Gyártásütemező** karakteres skill-, slot-, anyag- és blueprintkorlátokkal készít jobtervet; választható a kizárólag meglévő BPO/BPC-kre támaszkodó mód. Az accountok és a többi beállítás a **Settings / Beállítások** menüben található. Részletek és feltételezések: [Hasznalat.md](Hasznalat.md).
+- **Gyártásütemező:** karakterenkénti aktív skillek és fizikai blueprintek, külön gyártási és reakciós slotkeret, anyagfüggőségek és érkezési idők. Kizárólag meglévő BPO/BPC vagy további beszerzést is megengedő mód.
+- **Áttekinthető idővonal:** karakterszűrés, állítható látható napok (alapból 7), előző/következő időszak, teljes időtáv, jobrészletek és CSV-export. Állítható minimum jobhossz (alapból 12 óra), kötelező jobközi várakozás nélkül.
+- **Moon management:** holdnyilvántartás, 30 napos termelés, fogyasztás és profit, ércértesítések és ESI kitermelési naptár, 1–9 közötti kristályarányok és helyi naptárfeliratkozás.
+- **Accountok és tanulás:** kézi accountcsoportok, Omega/MCT-lejáratok és tanulási helyek; a nem tanítható karakterek nem kapnak indokolatlan üres-sor figyelmeztetést.
+- **Közös beállítások:** struktúrák, EVE-kapcsolat, adathozzáférések, holdszámítás, naptárszinkron és accountok egy lenyitható menüben.
+- **Beszerzés:** EVE Multibuy formátumú egyedi és közös lista, BPO/BPC-k nélkül; hiányzó blueprintrunok külön jelölve.
+- **Dokumentáció:** teljes magyar és angol kézikönyv a bal oldali menü alján, kereséssel, tartalomjegyzékkel, letöltéssel és nyomtatás/PDF lehetőséggel.
+- A korábbi Jita buy/sell/split árak, ipari díjak, PI-előrejelzések, corporation elkülönítés, foglalások, sötét mód és táblázatszűrők megmaradtak. A kész jobokat külön figyelmeztetés jelzi.
 
-Ezek a változtatások a fenti 0.11.0-s letöltésekben még nincsenek benne; új release egyelőre nem készül.
+A teljes útmutató: [Magyar](Hasznalat.md) · [English](UserGuide.en.md). A kiadás üres profilt tartalmaz; a meglévő saját helyi adatok frissítéskor megmaradnak.
 
 ## Használat
 
@@ -34,9 +41,9 @@ A kész alkalmazás futtatásához nem kell Excel, Codex vagy külön Python. Wi
 
 A saját karaktereidet az **EVE-kapcsolat** menüben adhatod hozzá. A kiadások nem tartalmaznak karaktert, mentett tervet, készletet vagy belépési tokent; csak a nyilvános EVE Client ID lehet előre beállítva. Forrásból indításkor saját Client ID is megadható. Részletes útmutató: [Hasznalat.md](Hasznalat.md).
 
-A GitHub-tároló a forráskódot, teszteket, fordítási eszközöket és a CCP nyilvános SDE-adataiból készített katalógust tartalmazza. A személyes profilok és a kész alkalmazáscsomagok nem részei a forráskódnak. Az EVE Online és a kapcsolódó játékadatok a CCP Games tulajdonát képezik; ez a projekt nem hivatalos CCP-termék.
+A GitHub-tároló a forráskódot, teszteket, fordítási eszközöket és a CCP nyilvános SDE-adataiból készített katalógust tartalmazza. A személyes profilok nem részei a tárolónak. Az ellenőrzött telepítőcsomagokat a release-assets mappa tartalmazza az automatikus közzétételhez. Az EVE Online és a kapcsolódó játékadatok a CCP Games tulajdonát képezik; ez a projekt nem hivatalos CCP-termék.
 
-Local Hungarian EVE Online industry planner. Developer and build notes follow below.
+Local Hungarian/English EVE Online industry planner. Developer and build notes follow below.
 
 ## Development
 
@@ -52,7 +59,7 @@ Local Hungarian EVE Online industry planner. Developer and build notes follow be
 
 ## Boundaries
 
-The production planner covers manufacturing and reactions. Net stock and WIP once per type, after aggregated parent demand. PI production scheduling, invention, ISK and slot scheduling are outside this version. Fuel inputs default to buy; explicit build/buy overrides supported. BPCs with different ME/TE are not pooled. Job/run capacity warnings do not suppress full material-demand planning.
+The production planner covers manufacturing and reactions. Net stock and WIP once per type, after aggregated parent demand. The separate scheduler assigns manufacturing/reaction slots and physical blueprints with material dependencies. PI forecasts are estimates, not an import/hauling schedule; invention and copying research jobs are not scheduled. ISK estimates use Jita prices and configurable industry fees. Fuel inputs default to buy; explicit build/buy overrides supported. BPCs with different ME/TE are not pooled. Job/run capacity warnings do not suppress full material-demand planning.
 
 Saved plans reserve the stock and active-job output they actually consume. Allocations rebuild from one snapshot in activation order; each saved plan can use its own allocations, and drafts subtract every active allocation. Completed components replace their raw-material holds. Editing an older plan previews its priority effect on later plans before save. Source/location/character and blueprint settings remain shared. The additive schema migration preserves legacy plans as unreserved until activation. Since 0.8.0, BPC run capacity is also reserved by blueprint item ID within the plan's stock owner.
 
@@ -64,7 +71,7 @@ The tests include synthetic graph and SSO cases, local HTTP integration, and the
 
 PI monitoring (`muhely/pi.py`, `static/pi.js`, `/api/pi?hours=24`) lists every connected character and their colonies. Separate atomic `pi` snapshots/status preserve industry and skills on API failure. The GET-only ESI colony calls use `esi-planets.manage_planets.v1`, conditional ETags and a 600-second local cache ceiling. Feature-specific reauthorization preserves existing grants without requiring unrelated new scopes. Official SDE planetary schematics supply input/output quantities and cycles; a packaged fallback also supports older user catalogues.
 
-PI supply uses factory-local buffers and a route-constrained bipartite maximum flow over existing storage stocks, counting shared stock once. It checks the next cycle and 1/6/24/72-hour horizons, reports finite stock coverage, missing outputs, expired extraction programs and full stores. Upstream extraction/production is dependency evidence, never fabricated inventory. Link bandwidth, import scheduling, future extraction yield and continuous production simulation are not modeled. ESI advances colony information only when viewed in game: timestamps stay visible, factory snapshots older than 30 minutes and failed/stale HTTP data stay unknown. No game changes or external notifications occur.
+PI supply uses factory-local buffers and a route-constrained bipartite maximum flow over existing storage stocks, counting shared stock once. It checks the next cycle and 1/6/24/72-hour horizons, reports finite stock coverage, missing outputs, expired extraction programs and full stores. Upstream extraction/production is dependency evidence, never fabricated inventory. A separate snapshot-anchored forecast estimates varying extraction yield and routed factory production. Link bandwidth and future imports are not scheduled. ESI advances colony information only when viewed in game: timestamps stay visible, factory snapshots older than 30 minutes and failed/stale HTTP data stay unknown. No game changes or external notifications occur.
 
 Saved-plan shortcuts replace the fixed sample products. They open the actual saved ID, quantity and ownership context. `/api/plans/shopping` previews all saved goals against one stock/WIP pool: active reservations retain priority, unreserved goals follow in creation order using remaining stock without persistent activation. It reuses the production allocation pass and aggregates positive purchase shortages by type with per-plan contributions. The all-plans view is independent of the current unsaved target, supports CSV/clipboard and invalidates after state reloads. Tests cover shared stock, active/inactive ordering, no mutation, completed Archon pruning, WIP, deletion and endpoint authentication.
 
@@ -151,17 +158,17 @@ A Production material cost panelhez hozzáadódik a hátralévő jobok díja és
 
 A holdak Production value at Jita paneljében az üzemanyag, Magmatic Gas, megadott holdbérlet, egyéb havi költség és értékesítési díj összege, valamint a 30 napos profit is megjelenik. A hold szerkesztőjében adható meg a bérlet és az egyéb költség; az utóbbiba tartozhat bányászat, finomítás, külön Tatara-fogyasztás, szállítás vagy amortizáció. Az összeg működési állapottól független fix költség. A Számítási beállításokban megadott eladási adó minden eladásra, a broker fee sell/split módban hat; buy módban nem adunk hozzá új eladási megbízási díjat. A díjak kezdetben 0%-osak, így csak a ténylegesen megadott költségek számítanak. Hiányzó árnál nem állítunk teljes költséget vagy profitot. A struktúraszűrő a bevételt és a költségeket együtt szűri. A Fuel Block kézi árában az ezresek tagoltak, a négy tizedesjegy megmarad.
 
-## Helyi tesztfejlesztés a 0.11.0 után – még nincs új release
+## Az 1.0.0 holdnaptárának működése
 
 A Folyamatban oldalon külön figyelmeztetés és menüjelzés mutatja az átvehető (`ready`) jobokat. A még `active` állapotú, de időben már lejárt jobot „várhatóan elkészült” jelzéssel mutatjuk; szüneteltetett, átvett vagy törölt job nem kap készjelzést.
 
-A Holdak és kitermelés új **Kitermelési naptár** füle UTC havi naptárat, részleteket és holdankénti figyelmeztetést ad. A karakter naptárát (`esi-calendar.read_calendar_events.v1`) és a corporation kitermelési időzítőit (`esi-industry.read_corporation_mining.v1`) külön engedélyezett, csak olvasó ESI-kérésekkel olvassa. A hozzáférés a naptárfülön adható meg. A Client ID tulajdonosának az EVE Developer alkalmazásban is engedélyeznie kell a két scope-ot. A corporation szerepkörei továbbra is szükségesek; más corporation bérelt fúrója nem feltétlenül látható. A naptár hallgatásából nem állítjuk, hogy biztosan nincs extraction. A Metenoxnak nincs kézi extraction-időzítője, így nem adunk ilyen figyelmeztetést rá.
+A Holdak és kitermelés új **Kitermelési naptár** füle UTC havi naptárat, részleteket és holdankénti figyelmeztetést ad. A karakter naptárát (`esi-calendar.read_calendar_events.v1`) és a corporation kitermelési időzítőit (`esi-industry.read_corporation_mining.v1`) külön engedélyezett, csak olvasó ESI-kérésekkel olvassa. A hozzáférés a Settings → Data access részben adható meg. A Client ID tulajdonosának az EVE Developer alkalmazásban is engedélyeznie kell a naptár, corporation mining és karakterértesítési scope-okat. A corporation szerepkörei továbbra is szükségesek; más corporation bérelt fúrója nem feltétlenül látható. A naptár hallgatásából nem állítjuk, hogy biztosan nincs extraction. A Metenoxnak nincs kézi extraction-időzítője, így nem adunk ilyen figyelmeztetést rá.
 
 Az ESI `natural_decay_time` **automatikus széttörés**, nem az ércek eltűnése. Az ércek eltűnését az érkezés–automatikus széttörés tartományából és a holdnál szerkeszthető élettartamból becsüljük (alapérték 48 óra). A korábbi kézi széttörés, a rig és a játékon belüli eltérés miatt ez nem garantált időpont. [CCP: Moon Mining](https://support.eveonline.com/hc/en-us/articles/115005404229-Moon-Mining), [CCP: Refineries and moon mining](https://www.eveonline.com/de/news/view/the-goo-must-flow-everything-about-refineries-and-moon-mining).
 
 A kitermelési időzítő nem ad ércösszetételt. Ha a holdhoz egyértelműen kapcsolható naptárbejegyzés ércenként explicit m³-adatot tartalmaz, abból számolunk automatikus térfogatarányt. Ezt **ESI naptár · automatikus** forrásjelzéssel, az eredeti kézi adat megőrzésével használjuk. Hiányzó, elavult, ismeretlen vagy ellentmondó adatra nem írunk felül kézi ércarányt. Más esetben a térfogat a kitermelés ESI-időtartama × az ismert órás ütem × a kézi arány, látható becslésjelzéssel. A HTTP-cache és az ETag tiszteletben marad; egy hibás/hiányos frissítés megőrzi az előző teljes pillanatképet. A már látott korábbi események legfeljebb 90 napig maradnak meg; a friss listából eltűnt jövőbeli időzítő nem jelenik meg újra aktívként.
 
-A Bányászkristályok fülön hold és konkrét kitermelés, illetve 30 napos becslés választható. A kristályokat igénylő érceket kategóriánként összevonjuk, és a térfogatarány **legkisebb egész számarányát** adjuk: 75% / 25% → **3 / 1 kristály**. Nincs kopás-, ciklus- vagy hajókihozatal-számítás. Ez arányos készletjavaslat; töredezett arányok nagy egész számokat is eredményezhetnek. Metenoxhoz nem kell kristály.
+A Bányászkristályok fülön hold és konkrét kitermelés, illetve 30 napos becslés választható. A kristályokat igénylő érceket kategóriánként összevonjuk, és a térfogatarány **legkisebb egész számarányát** adjuk: 75% / 25% → **3 / 1 kristály**. Nincs kopás-, ciklus- vagy hajókihozatal-számítás. Ez arányos készletjavaslat: a számok 1–9 közöttiek; szükség esetén felfelé kerekített közelítő arányt használunk. Metenoxhoz nem kell kristály.
 
 ### Ércadatok karakterértesítésekből és pontos hozzáférési állapot
 
@@ -173,4 +180,4 @@ Az SDE-alapú katalógus 60 tömörítetlen alap-, gazdagabb és jackpot holdér
 
 Csak a holdkitermelési értesítéseket tároljuk, más értesítések szövegét nem. Nincs új függőség vagy általános YAML-futtatás; kizárólag a szükséges számmezőket és ércmennyiség-térképet értelmezzük. A HTTP-cache, ETag és a korábbi teljes pillanatkép megőrzése változatlan. Az új scope-ot a Client ID EVE Developer alkalmazásában is engedélyezni kell, majd az érintett karakterrel egyszer újra be kell lépni.
 
-Források: [ESI OpenAPI](https://esi.evetech.net/meta/openapi.json), [goesi notification modellek](https://pkg.go.dev/github.com/antihax/goesi/notification#MoonminingExtractionStarted), [CCP SDE](https://developers.eveonline.com/docs/services/static-data/). Ez helyi tesztfejlesztés; nincs új release.
+Források: [ESI OpenAPI](https://esi.evetech.net/meta/openapi.json), [goesi notification modellek](https://pkg.go.dev/github.com/antihax/goesi/notification#MoonminingExtractionStarted), [CCP SDE](https://developers.eveonline.com/docs/services/static-data/). A funkciók az 1.0.0 kiadás részei.
