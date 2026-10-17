@@ -1,6 +1,16 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Látható napok": "Visible days",
+  "Teljes időtáv": "Full time range",
+  "← Előző időszak": "← Previous period",
+  "Következő időszak →": "Next period →",
+  "időszak": "period",
+  "job az időszakban": "jobs in this period",
+  "A napok száma csak az idővonalat nagyítja. Üresen a teljes időtáv látszik; az időszakgombokkal léphetsz előre és hátra.": "The number of days only changes the timeline view. Leave it empty for the full time range; use the period buttons to move backwards and forwards.",
+  "Ebben az időszakban nincs ütemezett job.": "No jobs are scheduled in this period.",
+  "A látható napok száma 1 és 3650 közötti egész szám lehet.": "Visible days must be a whole number between 1 and 3650.",
+
   "Dokumentáció": "Documentation",
   "SEGÍTSÉG": "HELP",
   "Súgó": "Help",

@@ -233,11 +233,19 @@ Batch changes can alter rounding, so the scheduler recalculates and displays its
 
 ### Schedule graph and timeline
 
-Separate **Reaction schedule** and **Manufacturing schedule** tables use independent slot budgets. The common timeline shows separate lanes per character, activity and slot. Use the character selector to display everyone or a single character. Filtering changes only the timeline, not the schedule or tables; the time axis stays aligned with the whole plan. Selecting another character's job adjusts the filter and page.
+Separate **Reaction schedule** and **Manufacturing schedule** tables use independent slot budgets. The common timeline shows separate lanes per character, activity and slot. Use the character selector to display everyone or a single character. Filtering changes only the timeline, not the schedule or tables; the time axis stays the same across characters within the selected period. Selecting another character's job adjusts the filter and page.
 
 Select a timeline bar or a Job number to inspect each input's quantity, source and arrival, plus downstream consumers. Job links can jump across pages. Timeline and activity tables paginate separately. Stock, purchases, existing active output and new scheduled output remain distinct sources. A job can still wait for a slot or blueprint after its materials arrive.
 
 Consecutive reactions on the same character, slot and physical formula are combined only when all inputs were available at the first start and no consumer would be delayed. The combined material rounding and dependency references are rebuilt. Short jobs needed for early downstream output or later input arrivals remain separate.
+
+### Visible days on the timeline
+
+Set **Visible days** in **Schedule graph and timeline** to any whole number from **1 to 3650**. The default is up to **7 days** at once, and your browser remembers the setting. Leave the field empty or choose **Full time range** to fit the entire schedule.
+
+Use **Previous period / Next period** to move between windows containing the selected number of 24-hour days. The last period can be shorter when the schedule ends earlier. The displayed dates and period counter identify the current window. A job crossing a boundary appears in each overlapping period, with only its visible portion drawn. Its tooltip and details retain the full job times.
+
+The character filter applies within the same time window. The separate 100-job pagination pages through jobs matching that period and character; it does not change periods. Selecting a job in another period automatically moves the timeline to it. A new calculation starts at the first period. This setting does not change job durations, minimum job duration, material dependencies, activity tables or the CSV export.
 
 ### Minimum job duration
 

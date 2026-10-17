@@ -369,10 +369,20 @@ Egy bemenet csak egyszer költhető el, a következő job pedig csak az összes 
 
 A **Production material cost** összesítésében a célmennyiség teljes eladási értéke mellett külön **Sell price per unit · Jita sell** sor mutatja a késztermék darabonkénti Jita sell árát. Ez nem változik az anyagár módjával vagy a célmennyiséggel.
 
-A **Schedule graph and timeline** karakterválasztó listájával az összes karakter vagy egyetlen karakter munkái jeleníthetők meg. A szűrés az idővonalra vonatkozik; az ütemezést és a táblázatokat nem módosítja. A lapozás a kiválasztott karakter jobjaihoz igazodik, az időtengely a teljes tervvel azonos marad. Másik karakter jobjára ugorva a szűrő automatikusan követi a kiválasztást.
+### Az idővonalon látható napok
+
+A **Schedule graph and timeline / Ütemezési gráf és idővonal** panel **Látható napok** mezőjében 1–3650 közötti egész számot adhatsz meg. Alapból legfeljebb **7 nap** látszik egyszerre. A böngésző megjegyzi a napok számát. Üres mező vagy a **Teljes időtáv** gomb az egész ütemtervet mutatja.
+
+Az **Előző időszak / Következő időszak** gombok a kiválasztott számú, 24 órás napokból álló időablakok között lépnek. Az utolsó időszak rövidebb lehet, ha a terv előbb véget ér. A dátumtartomány és az időszakszámláló jelzi, hol jársz. Az ablakon átnyúló job minden érintett időszakban látszik, csak a sáv látható része rajzolódik ki; a részletek és a felugró szöveg a teljes jobidőt mutatják.
+
+A karakterszűrő ugyanarra az időablakra vonatkozik. A 100 jobos lapozás az adott időszakban és a kiválasztott karakterhez látható munkákat lapozza; nem az időszakot váltja. Másik időszakban lévő jobra kattintva az idővonal automatikusan odaugrik. Új ütemezés a terv első időszakán kezdődik. A napok száma nem módosítja a gyártási időket, a minimum jobhosszt, az anyagfüggőségeket, a táblázatokat vagy a CSV-exportot.
+
+A **Schedule graph and timeline** karakterválasztó listájával az összes karakter vagy egyetlen karakter munkái jeleníthetők meg. A szűrés az idővonalra vonatkozik; az ütemezést és a táblázatokat nem módosítja. A lapozás a kiválasztott karakter és időszak jobjaihoz igazodik; az időtengely a karakterek között azonos marad. Másik karakter jobjára ugorva a szűrő automatikusan követi a kiválasztást.
 
 Az ütemező összevonja az azonos karakteren, sloton és ugyanazzal a formulával közvetlenül egymás után futó reakciókat, ha minden bemenet már az első induláskor elérhető, és az összevonás miatt egyetlen felhasználó job sem indulna később. Kikapcsolt minimum jobhossznál megtartja a beállított run/job korlátot; a maximális jobidőt mindig betartja. Az összevont job tényleges anyagigényét újrakerekíti, az anyaghiányt és a jobfüggőségeket is ehhez igazítja. A korai részeredményért vagy későbbi anyagérkezés miatt szükséges rövid jobok megmaradnak.
 
+
+### Minimum jobhossz
 
 A **Minimum job duration (hours) / Minimum jobhossz (óra)** alapértéke 12 óra, és a böngésző megjegyzi a beállítást. A minimum a gyártásra és a reakciókra is vonatkozik, a karakter skilljeivel, TE-vel és struktúrabónuszokkal számolt tényleges futásidő alapján. Szükség esetén növeli a szokásos Run/job felosztást, és kiegyenlíti a jobméreteket a rövid maradékok elkerülésére. A 0 érték kikapcsolja a minimumot.
 
