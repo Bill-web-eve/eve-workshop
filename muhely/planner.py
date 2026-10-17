@@ -47,25 +47,27 @@ def material_for_batch(base, runs, factor):
     return max(runs, int(amount.to_integral_value(rounding=ROUND_CEILING)))
 
 
-def batches(runs, batch_size, capacities=None):
+def batches(runs, batch_size, capacities=None, minimum=0, maximum=None):
     """Compressed job batches, split at each BPC's run boundary."""
     result = defaultdict(int)
+    def add(n):
+        if not n:return
+        if minimum:
+            cap=maximum or batch_size
+            low=(n+cap-1)//cap;high=n//minimum
+            if low<=high:
+                count=max(low,min(high,(n+batch_size-1)//batch_size))
+                size,extra=divmod(n,count)
+                result[size+1]+=extra;result[size]+=count-extra
+                return
+        full,tail=divmod(n,batch_size);result[batch_size]+=full
+        if tail:result[tail]+=1
     remaining = runs
     for capacity in capacities or []:
-        n = min(remaining, max(0, capacity))
-        full, tail = divmod(n, batch_size)
-        result[batch_size] += full
-        if tail:
-            result[tail] += 1
-        remaining -= n
-        if not remaining:
-            break
-    # Missing BPC capacity is exposed separately. Materials for all required runs
-    # are still planned, using the same selected ME/TE and batch size.
-    full, tail = divmod(remaining, batch_size)
-    result[batch_size] += full
-    if tail:
-        result[tail] += 1
+        n = min(remaining, max(0, capacity));add(n);remaining-=n
+        if not remaining:break
+    # Missing capacity remains a separately reported blueprint requirement.
+    add(remaining)
     return [{'runs': n, 'count': count} for n, count in sorted(result.items(), reverse=True) if count]
 
 
@@ -216,7 +218,9 @@ class Planner:
                                'PI termék' if c.types.get(tid, {}).get('pi') else 'Alapanyag'}
             if recipe:
                 runs = (missing+recipe['output']-1)//recipe['output']
-                groups = batches(runs, params['job_runs'], params.get('capacities'))
+                groups = batches(runs, params['job_runs'], params.get('capacities'),
+                                 integer(overrides.get(tid,{}).get('_minimum_job_runs',0),'Minimum run/job'),
+                                 integer(overrides.get(tid,{}).get('_maximum_job_runs',params['job_runs']),'Maximum run/job',minimum=1))
                 facility = settings[recipe['activity']]
                 factor = (1-Decimal(params['me'])/100)
                 for key in ['material_role', 'material_rig']:

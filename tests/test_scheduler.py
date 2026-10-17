@@ -28,6 +28,7 @@ class SchedulerTests(unittest.TestCase):
         self.catalog.recipe(tid,materials,**kw);self.catalog.recipes[tid]['skills']=[]
     def jobs(self,cid,rows):self.store.save_snapshots(cid,{'jobs':dict(data=rows,fetched=NOW,expires=NOW+3600,etag=None)})
     def run_plan(self,quantity=10,product=100,**opts):
+        opts.setdefault('min_job_hours',0)
         def calc(ctx):
             result=self.planner.calculate(product,quantity,ctx['settings'],ctx['inventory'],ctx['parameters'],ctx['stock'],ctx['wip'],ctx['blueprints'],ctx['jobs'],reservations=ctx['reservations'],skill_profiles=ctx['skill_profiles'])
             return dict(result,source='manual',scope_label='Personal')
@@ -291,3 +292,48 @@ class SchedulerTests(unittest.TestCase):
         result=self.run_plan(quantity=50,_granularity=4);self.assertTrue(result['complete'])
         self.assertEqual(sum(j['runs'] for j in result['jobs']),50);self.assertEqual(len(result['jobs']),2)
         self.assertTrue(all(j['seconds']<=30*86400 for j in result['jobs']))
+
+    def test_minimum_duration_makes_longer_batches_without_padding_or_extra_output(self):
+        self.catalog.recipes[100].update(seconds=4500,copy_limit=13)  # One hour per run; at most 13 runs/job
+        self.context['blueprints']=[bp(1)]
+        result=self.run_plan(quantity=25,min_job_hours=12)
+        self.assertTrue(result['complete']);self.assertEqual(sum(j['runs'] for j in result['jobs']),25)
+        self.assertTrue(all(j['seconds']>=12*3600 for j in result['jobs']))
+        self.assertEqual(result['jobs'][0]['start'],NOW)
+        self.assertEqual(result['jobs'][1]['start'],result['jobs'][0]['end'])
+        self.assertNotIn('available_at',result['jobs'][0])
+        self.assertEqual(result['seconds'],25*3600);self.assertEqual(result['short_jobs'],0)
+
+    def test_minimum_can_raise_ordinary_run_split_and_zero_restores_it(self):
+        self.catalog.recipes[100]['seconds']=4500
+        self.context['blueprints']=[bp(1)];self.context['parameters']={100:{'job_runs':2}}
+        result=self.run_plan(quantity=24,min_job_hours=12)
+        self.assertTrue(all(j['runs']>=12 for j in result['jobs']));self.assertEqual(result['runs'],24)
+        legacy=self.run_plan(quantity=24,min_job_hours=0)
+        self.assertTrue(all(j['runs']<=2 for j in legacy['jobs']))
+
+    def test_unavoidable_short_job_does_not_overproduce_or_add_idle_time(self):
+        self.catalog.recipes[100]['seconds']=4500;self.context['blueprints']=[bp(1,runs=7)]
+        result=self.run_plan(quantity=7,min_job_hours=12)
+        self.assertTrue(result['complete']);self.assertEqual(result['runs'],7)
+        self.assertEqual(len(result['jobs']),1);self.assertEqual(result['jobs'][0]['seconds'],7*3600)
+        self.assertEqual(result['finish'],NOW+7*3600);self.assertEqual(result['short_jobs'],1)
+        self.assertTrue(result['jobs'][0]['below_minimum'])
+
+    def test_minimum_keeps_bpc_boundaries_and_material_dependencies(self):
+        self.recipe(100,{130:1});self.recipe(130,{200:1},activity='reaction')
+        self.catalog.recipes[100]['seconds']=4500;self.catalog.recipes[130]['seconds']=4500
+        self.context['blueprints']=[bp(1,runs=10),bp(2,runs=10),bp(3,product=130)]
+        result=self.run_plan(quantity=20,min_job_hours=12);self.assertTrue(result['complete'])
+        jobs={j['id']:j for j in result['jobs']};bp_runs={}
+        for j in result['jobs']:
+            bp_runs[j['blueprint_item_id']]=bp_runs.get(j['blueprint_item_id'],0)+j['runs']
+            for d in j['dependencies']:self.assertGreaterEqual(j['start'],jobs[d['job_id']]['end'])
+        self.assertLessEqual(bp_runs.get(1,0),10);self.assertLessEqual(bp_runs.get(2,0),10)
+        self.assertTrue(any(j['below_minimum'] for j in result['jobs'] if j['product_id']==100))
+
+    def test_minimum_option_validation_and_default(self):
+        from muhely.scheduler import minimum_hours
+        self.assertEqual(minimum_hours({}),12);self.assertEqual(minimum_hours({'min_job_hours':1.5}),1.5)
+        for value in [True,False,'12',None,-1,721,float('nan'),float('inf')]:
+            with self.subTest(value=value),self.assertRaises(PlanningError):self.run_plan(min_job_hours=value)

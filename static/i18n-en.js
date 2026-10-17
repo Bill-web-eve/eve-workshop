@@ -1,6 +1,11 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Minimum jobhossz (óra)": "Minimum job duration (hours)",
+  "A minimum a Run/job felosztást is növelheti. A hiányzó mennyiség vagy a blueprint korlátja miatt rövidebb job megmaradhat; nem gyártunk többletet. A jobok közé nem kerül várakozás. 0: nincs minimum.": "The minimum may increase the Runs/job split. A small remaining quantity or blueprint limit may require a shorter job; no extra output is added. No waiting time is inserted between jobs. 0: no minimum.",
+  "A minimum jobhossz 0 és 720 óra közötti szám lehet.": "Minimum job duration must be a number between 0 and 720 hours.",
+  "Minimum alatti · maradék / BP-korlát": "Below minimum · remainder / blueprint limit",
+
   "\u00d6sszes karakter": "All characters",
   "Teljes gyártási függőségi lánc": "Full production dependency chain",
   "Reakció → reakció → komponens → késztermék": "Reaction → reaction → component → finished product",

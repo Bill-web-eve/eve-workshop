@@ -17,6 +17,13 @@ from .production import duration_skills
 MAX_JOBS=10000
 
 
+def minimum_hours(options):
+    value=options.get('min_job_hours',12)
+    if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or not 0<=value<=720:
+        raise PlanningError('A minimum jobhossz 0 és 720 óra közötti szám lehet.')
+    return value
+
+
 def all_jobs(store):
     result={};checked={};seen_at={}
     for char in store.characters():
@@ -198,6 +205,7 @@ def _strategy(context,store,catalog,calculate,options,now=None,granularity=1):
     if any(isinstance(v,bool) or not isinstance(v,(float,int)) or not math.isfinite(v) or not 0<v<now+10*365*86400 for v in [start,supply]):
         raise PlanningError('Hibás ütemezési kezdés vagy anyagérkezés.')
     start=max(now,start);supply=max(start,supply)
+    min_hours=minimum_hours(options);minimum_seconds=min_hours*3600
     selected=options.get('characters')
     known={p['id'] for p in context['skill_profiles']}
     if selected is not None and (not isinstance(selected,list) or any(isinstance(i,bool) or not isinstance(i,int) or i not in known for i in selected)):
@@ -223,8 +231,20 @@ def _strategy(context,store,catalog,calculate,options,now=None,granularity=1):
         recipe=catalog.recipes[row['id']]
         per_run=max([duration(row,recipe,p,context['settings'],1) for _,p in capable] or [recipe['seconds']])
         limit=max(1,int(30*86400/per_run))
-        batch=min(row['parameters']['job_runs'],max(1,math.ceil(row['runs']/(parallel*granularity)) if granularity else 1),limit,recipe['copy_limit'])
-        context['parameters'].setdefault(row['id'],{})['job_runs']=batch
+        cap=min(limit,recipe['copy_limit'])
+        preferred=max(1,math.ceil(row['runs']/(parallel*granularity)) if granularity else 1)
+        configured=row['parameters']['job_runs']
+        batch=min(configured,preferred,cap)
+        params=context['parameters'].setdefault(row['id'],{})
+        if minimum_seconds:
+            fastest=min([duration(row,recipe,p,context['settings'],1) for _,p in capable] or [per_run])
+            minimum=max(1,math.ceil(minimum_seconds/fastest))
+            batch=min(cap,max(minimum,batch))
+            params.update(_minimum_job_runs=minimum,_maximum_job_runs=cap)
+            # Minimum duration can increase the ordinary Run/job split; physical
+            # BPC capacity, copy/run and maximum duration limits still apply.
+            merge_limits[row['id']]=cap
+        params['job_runs']=batch
     plan=calculate(context)
     if sum(r['jobs'] for r in plan['queue'])>MAX_JOBS:raise PlanningError('Az ütemezés több mint 10 000 jobot igényel. Növeld a Run/job értéket vagy csökkentsd a célmennyiséget.')
     ledger=Materials();pending={};pools={};critical={};eligibility={};warnings=[]
@@ -314,7 +334,8 @@ def _strategy(context,store,catalog,calculate,options,now=None,granularity=1):
     target_ready=ledger.ready(plan['product_id'],plan['quantity'])
     finish=max([start]+[j['end'] for j in scheduled]+([target_ready] if math.isfinite(target_ready) else []))
     scheduled,shopping,merged=compact_reactions(scheduled,initial,catalog,context['settings'],merge_limits,start,plan['shopping'])
-    return {'jobs':sorted(scheduled,key=lambda j:(j['start'],j['end'],j['id'])),'merged_reaction_jobs':merged,'blocked':blocked,'blueprint_shortages':shortages,
+    for j in scheduled:j['below_minimum']=bool(minimum_seconds and j['seconds']+1e-6<minimum_seconds)
+    return {'min_job_hours':min_hours,'short_jobs':sum(j['below_minimum'] for j in scheduled),'jobs':sorted(scheduled,key=lambda j:(j['start'],j['end'],j['id'])),'merged_reaction_jobs':merged,'blocked':blocked,'blueprint_shortages':shortages,
             'workers':[{k:w[k] for k in ['id','name','capacity','as_of','jobs_as_of','stale','excluded','until']} for w in workers],
             'material_shortfall':shopping,'material_warnings':warnings,'start':start,'finish':finish if not blocked and not warnings else None,
             'partial_finish':finish,'seconds':finish-start,'complete':not blocked and not warnings,'owned_only':owned,

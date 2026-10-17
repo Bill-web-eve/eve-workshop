@@ -232,5 +232,17 @@ class RealCatalogTests(unittest.TestCase):
         self.assertEqual(rows[11532]['runs'],0)
         self.assertLess(sum(r['buy'] for r in after['shopping']),sum(r['buy'] for r in before['shopping']))
 
+class MinimumBatchTests(unittest.TestCase):
+    def test_balance_minimum_without_splitting_a_small_tail(self):
+        from muhely.planner import batches
+        self.assertEqual(batches(25,8,minimum=8,maximum=9),[{'runs':9,'count':1},{'runs':8,'count':2}])
+        self.assertEqual(batches(600,540,minimum=540,maximum=1000),[{'runs':600,'count':1}])
+    def test_minimum_never_combines_distinct_bpc_capacities_or_adds_runs(self):
+        from muhely.planner import batches
+        self.assertEqual(batches(25,8,[10,10,5],8,100),[{'runs':10,'count':2},{'runs':5,'count':1}])
+        groups=batches(25,8,[7,7,7],8,100)
+        self.assertEqual(sum(g['runs']*g['count'] for g in groups),25)
+        self.assertTrue(all(g['runs']<=7 for g in groups))
+
 
 if __name__=='__main__':unittest.main()
