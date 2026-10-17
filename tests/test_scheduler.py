@@ -186,3 +186,62 @@ class SchedulerTests(unittest.TestCase):
             dict(quantity=2,available_at=NOW,source='stock',job_id=None),
             dict(quantity=2,available_at=NOW+100,source='job',job_id=5)])
         self.assertEqual(materials.consume(1,1,NOW+100)[0]['quantity'],1)
+
+    def test_multi_stage_reactions_gate_manufacturing_and_partial_output_can_pipeline(self):
+        self.recipe(100,{110:1});self.recipe(110,{120:2});self.recipe(120,{130:2},activity='reaction');self.recipe(130,{200:1},activity='reaction')
+        self.context['blueprints']=[bp(1),bp(2,product=110),bp(3,product=120),bp(4,product=130)]
+        self.context['skill_profiles']=self.context['skill_profiles'][:1]
+        # Small installed batches let downstream jobs use only completed output.
+        self.context['parameters']={tid:{'job_runs':1} for tid in [100,110,120,130]}
+        result=self.run_plan(quantity=2);self.assertTrue(result['complete']);jobs={j['id']:j for j in result['jobs']}
+        reactions=[j for j in result['jobs'] if j['activity']=='reaction']
+        components=[j for j in result['jobs'] if j['product_id']==110]
+        self.assertTrue(components);self.assertGreaterEqual(components[0]['start'],NOW+400)
+        # All dependency edges, including reaction -> reaction, must obey time.
+        pairs=set()
+        for job in result['jobs']:
+            for dep in job['dependencies']:
+                source=jobs[dep['job_id']];self.assertLessEqual(source['end'],job['start']);pairs.add((source['product_id'],job['product_id']))
+        self.assertEqual(pairs,{(130,120),(120,110),(110,100)})
+        self.assertLess(components[0]['start'],max(j['end'] for j in reactions))
+
+    def test_partial_stock_only_covers_its_own_jobs_not_the_rest_of_the_chain(self):
+        self.recipe(100,{130:1});self.recipe(130,{200:1},activity='reaction')
+        self.context['blueprints']=[bp(1),bp(2,product=130)];self.context['skill_profiles']=self.context['skill_profiles'][:1]
+        self.context['parameters']={100:{'job_runs':1},130:{'job_runs':1}};self.context['stock']={130:1}
+        result=self.run_plan(quantity=3);jobs={j['id']:j for j in result['jobs']};manufacturing=[j for j in result['jobs'] if j['activity']=='manufacturing']
+        self.assertTrue(result['complete']);self.assertEqual(manufacturing[0]['start'],NOW)
+        stock_uses=0;reaction_uses=0
+        for job in manufacturing:
+            for m in job['materials']:
+                for a in m['allocations']:
+                    if a['source']=='stock':stock_uses+=a['quantity']
+                    if a['source']=='job':reaction_uses+=a['quantity'];self.assertGreaterEqual(job['start'],jobs[a['job_id']]['end'])
+        self.assertEqual(stock_uses,1);self.assertEqual(reaction_uses,2)
+
+    def test_real_fusion_thruster_waits_for_all_three_reaction_products(self):
+        from pathlib import Path
+        from muhely.catalog import Catalog
+        self.catalog=Catalog(Path(__file__).resolve().parents[1]/'data/catalog.sqlite3');self.planner=Planner(self.catalog)
+        product=next(tid for tid in self.catalog.recipes if self.catalog.name(tid)=='Fusion Thruster')
+        levels={s['typeID']:5 for recipe in self.catalog.recipes.values() for s in recipe.get('skills',[])}
+        levels.update({3380:5,3388:5,45746:5})
+        for w in self.context['skill_profiles']:w['levels']=levels
+        self.context['blueprints']=[]
+        result=self.run_plan(quantity=10,product=product,owned_only=False)
+        self.assertTrue(result['complete']);jobs={j['id']:j for j in result['jobs']}
+        fusion=[j for j in result['jobs'] if j['product_id']==product]
+        self.assertTrue(fusion)
+        for job in fusion:
+            self.assertGreater(job['start'],NOW)
+            self.assertEqual({m['name'] for m in job['materials']},{'Tungsten Carbide','Phenolic Composites','Ferrogel'})
+            self.assertEqual({d['material_id'] for d in job['dependencies']},{m['id'] for m in job['materials']})
+            for m in job['materials']:
+                self.assertEqual(sum(a['quantity'] for a in m['allocations']),m['quantity'])
+                for a in m['allocations']:
+                    self.assertEqual(a['source'],'job');source=jobs[a['job_id']]
+                    self.assertEqual(source['activity'],'reaction');self.assertLessEqual(source['end'],job['start'])
+        # With enough existing inputs, early manufacturing is intentional.
+        self.context['stock']={m['typeID']:1000000 for m in self.catalog.recipes[product]['materials']}
+        covered=self.run_plan(quantity=10,product=product,owned_only=False)
+        self.assertTrue(covered['complete']);self.assertTrue(all(j['start']==NOW for j in covered['jobs']))

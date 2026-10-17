@@ -1,6 +1,15 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Teljes gyártási függőségi lánc": "Full production dependency chain",
+  "Reakció → reakció → komponens → késztermék": "Reaction → reaction → component → finished product",
+  "Első indítás": "First start",
+  "Utolsó befejezés": "Last completion",
+  "Szélességhez igazítás": "Fit to width",
+  "A teljes terv termékenként összevonva látható, az idővonal lapozásától függetlenül. A nyilak a ténylegesen felhasznált jobkimenetek útját mutatják. Egy kártyára kattintva megnyílik egy hozzá tartozó job részlete.": "The full plan is grouped by product, independently of timeline pagination. Arrows follow the job outputs actually consumed. Select a card to open one of its jobs.",
+  "Részmennyiségből egy későbbi gyártási job már elindulhat, miközben további reakciós jobok még futnak. A készleten már meglévő anyagra nem kell várni.": "A downstream manufacturing job can start from a completed partial quantity while further reaction jobs are still running. Materials already in stock require no wait.",
+  "Az idővonal az aktuális oldal összes anyagkapcsolatát mutatja; a kijelölt job teljes függőségi lánca kiemelt. A lapozástól független teljes lánc a fenti gráfon látható. Egy job csak a saját indításához szükséges teljes anyagmennyiség megérkezése után indul.": "The timeline shows every material link on the current page and highlights the selected job’s full dependency chain. The graph above shows the full chain across all pages. A job starts only once the full material quantity needed for that job has arrived.",
+
   "Forrás": "Source",
   "Eladási egységár · Jita sell": "Sell price per unit · Jita sell",
   "Reakciók ütemterve": "Reaction schedule",
