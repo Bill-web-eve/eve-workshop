@@ -31,3 +31,11 @@ test('plan job costs add to materials; target buy and sell values remain indepen
  run(`state.settings.manufacturing.system_id=99;$('main').innerHTML=planEconomics({product_id:1,quantity:3,queue:[]});applyEconomics();`);
  assert.equal(value('jobs'),'–');assert.equal(value('total'),'–');dom.window.close();
 });
+
+test('unit sell price keeps four-decimal precision and does not multiply by target quantity or use material mode',()=>{
+ const {dom,run,d}=setup();
+ run(`jitaData.quotes[1].sell='1234.5678';jitaMode='buy';$('main').innerHTML=planEconomics({product_id:1,quantity:7,queue:[]});applyEconomics();`);
+ const cell=d.querySelector('[data-economic-value=sell_unit]');assert.equal(cell.textContent,'1 234,5678 ISK');assert.equal(cell.dataset.sortValue,'1234.5678');
+ assert.equal(d.querySelector('[data-economic-value=sell]').textContent,'8 641,97 ISK');
+ run(`delete jitaData.quotes[1].sell;applyEconomics();`);assert.equal(cell.textContent,'–');assert.equal(cell.dataset.sortValue,'');dom.window.close();
+});

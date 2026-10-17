@@ -67,7 +67,7 @@ class ServerTests(unittest.TestCase):
         status,_,headers=self.request('/')
         self.assertIn('HttpOnly',headers['Set-Cookie'])
         self.assertIn("frame-ancestors 'none'",headers['Content-Security-Policy'])
-        for path in ['/graph.js','/graph.css','/skills.js','/pi.js','/numbers.js','/i18n.js','/i18n-en.js','/settings.js','/accounts.js','/schedule.js','/multibuy.js']:
+        for path in ['/graph.js','/graph.css','/skills.js','/pi.js','/numbers.js','/i18n.js','/i18n-en.js','/settings.js','/accounts.js','/schedule.js','/schedule-graph.js','/multibuy.js']:
             status,content,headers=self.request(path)
             self.assertEqual(status,200)
             self.assertTrue(content)

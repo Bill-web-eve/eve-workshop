@@ -14,7 +14,7 @@ function planEconomics(p){
   const key=JSON.stringify([p.queue.map(r=>({id:r.id,batches:r.batches})),state.settings.manufacturing,state.settings.reaction]);
   economicPanels.set('plan-materials',{type:'plan',plan:p,key});
   return `<div data-economic-panel="plan-materials">${EveTables.markup(['Gyártási és eladási összesítés','ISK'],[
-    economicRow('Job cost','jobs'),economicRow('Összes gyártási költség','total'),economicRow('Célmennyiség eladási értéke · Jita buy','buy'),economicRow('Célmennyiség eladási értéke · Jita sell','sell')],'economic-table','plan-economics')}<p class="warning-text" data-economic-warning></p><p class="footnote">Az eladási érték a terv teljes célmennyiségének bruttó értéke, piaci díjak nélkül. A gyártási költség csak a hátralévő munkákra és bemeneteikre vonatkozik; a már kész céltermék értékét nem adja hozzá.</p><button type="button" class="button compact" data-industry-refresh>↻ Ipari költségadatok frissítése</button> <small data-industry-status></small><p><button type="button" class="text-button" data-cost-settings>Gyártási hely és adók beállítása</button></p><details><summary>Job cost részletezése</summary><div data-job-cost-details></div></details></div>`;
+    economicRow('Eladási egységár · Jita sell','sell_unit'),economicRow('Job cost','jobs'),economicRow('Összes gyártási költség','total'),economicRow('Célmennyiség eladási értéke · Jita buy','buy'),economicRow('Célmennyiség eladási értéke · Jita sell','sell')],'economic-table','plan-economics')}<p class="warning-text" data-economic-warning></p><p class="footnote">Az eladási érték a terv teljes célmennyiségének bruttó értéke, piaci díjak nélkül. A gyártási költség csak a hátralévő munkákra és bemeneteikre vonatkozik; a már kész céltermék értékét nem adja hozzá.</p><button type="button" class="button compact" data-industry-refresh>↻ Ipari költségadatok frissítése</button> <small data-industry-status></small><p><button type="button" class="text-button" data-cost-settings>Gyártási hely és adók beállítása</button></p><details><summary>Job cost részletezése</summary><div data-job-cost-details></div></details></div>`;
 }
 function applyEconomics(){
   $$('[data-economic-panel]').forEach(el=>{
@@ -35,6 +35,7 @@ function applyEconomics(){
       const current=jobCostData&&jobCostKey===c.key?jobCostData:null;
       values.jobs=current?.complete?BigInt(current.cents):null;
       values.total=v.missing||values.jobs===null?null:v.cents+values.jobs;
+      values.sell_unit=EveCosts.unit(jitaData.quotes[String(c.plan.product_id)],'sell');
       for(const mode of ['buy','sell']){const sale=EveCosts.value([{id:c.plan.product_id,quantity:c.plan.quantity}],jitaData.quotes,mode);values[mode]=sale.missing?null:sale.cents;}
       if(values.buy===null||values.sell===null)warnings.push('A céltermék Jita buy vagy sell ára hiányzik; az eladási érték részben nem számolható.');
       if(!current)warnings.push('A job cost adatai még töltődnek.');
@@ -46,7 +47,7 @@ function applyEconomics(){
         detail.innerHTML=table(['Termék','Tevékenység','Rendszer','System index','EIV / run','Index díja','Facility tax','SCC','Alpha','Job cost'],current.rows.map(r=>`<tr><td>${itemName(r.name)}</td><td>${r.activity==='reaction'?'Reakció':'Gyártás'}</td><td>${r.system_name?verbatim(r.system_name):'Nincs kiválasztva'}</td><td class="num">${r.system_index===null?'–':(Number(r.system_index)*100).toLocaleString('hu-HU',{maximumFractionDigits:6})+'%'}</td><td class="num">${r.eiv_per_run===null?'–':EveCosts.format(EveCosts.money(r.eiv_per_run))}</td>${['system','facility','scc','alpha'].map(k=>`<td class="num">${r.components?EveCosts.format(BigInt(r.components[k])):'–'}</td>`).join('')}<td class="num">${r.cents===null?'–':EveCosts.format(BigInt(r.cents))}</td></tr>`),'job-cost-table');
       }
     }
-    el.querySelectorAll('[data-economic-value]').forEach(cell=>{const amount=values[cell.dataset.economicValue];cell.textContent=EveCosts.format(amount);cell.dataset.sortValue=amount==null?'':String(Number(amount)/100);cell.classList.toggle('danger',amount!=null&&amount<0n);});
+    el.querySelectorAll('[data-economic-value]').forEach(cell=>{const amount=values[cell.dataset.economicValue];const unit=cell.dataset.economicValue==='sell_unit';cell.textContent=unit?EveCosts.formatUnit(amount):EveCosts.format(amount);cell.dataset.sortValue=amount==null?'':String(Number(amount)/(unit?10000:100));cell.classList.toggle('danger',amount!=null&&amount<0n);});
     el.querySelector('[data-economic-warning]').textContent=warnings.join(' ');
   });
   if(industryData)$$('[data-industry-status]').forEach(el=>el.textContent=industryData.running?'Ipari költségadatok betöltése…':Object.keys(industryData.errors||{}).length?'Az ipari költségadatok nem frissültek; korábbi adatokkal számolhatunk.':industryData.resources.systems.checked?'Ipari adatok ellenőrizve: '+date(Math.min(industryData.resources.systems.checked,industryData.resources.prices.checked||Infinity)):'Az ipari költségadatok még nem érkeztek meg.');

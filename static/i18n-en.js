@@ -1,6 +1,22 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Forrás": "Source",
+  "Eladási egységár · Jita sell": "Sell price per unit · Jita sell",
+  "Reakciók ütemterve": "Reaction schedule",
+  "Gyártás ütemterve": "Manufacturing schedule",
+  "Külön slotkeret · a másik tevékenységgel párhuzamosan futhat": "Separate slot pool · can run alongside the other activity",
+  "Anyagok rendelkezésre állnak": "Materials available",
+  "Ütemezési gráf és idővonal": "Schedule graph and timeline",
+  "Közös időtengely · reakció és gyártás külön sávokon": "Shared time axis · separate reaction and manufacturing lanes",
+  "Válassz egy jobot az anyagforrások és függőségek megtekintéséhez.": "Select a job to see its material sources and dependencies.",
+  "A nyilak a kijelölt job anyagfüggőségeit mutatják az aktuális oldalon. A többi függőség a forráslistában nyitható meg. Egy job csak minden bemenet megérkezése után indulhat.": "Arrows show the selected job’s material dependencies on the current page. Other dependencies can be opened from the source list. Each job starts only after all its inputs have arrived.",
+  "Folyamatban lévő job": "Existing job",
+  "Beszerzés": "Procurement",
+  "Ütemezett job": "Scheduled job",
+  "Érkezés": "Arrival",
+  "Kimenetet felhasználó jobok": "Jobs consuming this output",
+
   "{0} választható gyártható termék. Adatcsomag kiadása: {1}. Az anyag-, idő- és becsült jobköltség mellett külön Gyártásütemező is használható.": "{0} selectable products. Data package released: {1}. Material, time and estimated job costs are available, along with a separate production scheduler.",
   "A skilladat elavult vagy hibás; frissítsd a skilleket.": "The skill snapshot is stale or failed; refresh skills.",
   "Accountok összes lejárata": "All account expiry dates",

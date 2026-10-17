@@ -306,7 +306,7 @@ A Skillek és tanulás nézetben az összes megadott lejárat megtekinthető, a 
 
 A **Production scheduler / Gyártásütemező** a felül kiválasztott termékhez, célmennyiséghez és személyes vagy corp gyártási körhöz készít kézzel indítható jobtervet. Válaszd ki a bevonható karaktereket, majd nyomd meg a Calculate schedule / Ütemterv kiszámítása gombot.
 
-- A gyártási slotkeret: 1 + aktív Mass Production + aktív Advanced Mass Production. A reakcióké külön: 1 + Mass Reactions + Advanced Mass Reactions. A tudományos jobok nem foglalnak gyártási slotot, de a bennük használt blueprintet igen. Az app a karakterek személyes és az összes betöltött corporation jobját együtt, Job ID alapján egyszer számolja. Az egy napnál régebbi/hibás skill- vagy hiányzó/egy napnál régebbi jobadatot frissíteni kell.
+- A gyártási slotkeret: 1 + aktív Mass Production + aktív Advanced Mass Production. A reakcióké külön: 1 + Mass Reactions + Advanced Mass Reactions. A tudományos jobok nem foglalnak gyártási slotot, de a bennük használt blueprintet igen. Az app a karakterek személyes és az összes betöltött corporation jobját együtt, Job ID alapján egyszer számolja. Az elavult/hibás skilladatot, valamint a hiányzó vagy egy napnál régebbi jobadatot frissíteni kell.
 - Csak a recept közvetlen aktív skillkövetelményeit teljesítő karakter kap munkát. A gyártási időben az ő skilljei, a blueprint TE-je és az aktuális struktúrabónuszok szerepelnek. A tanulásfigyelésből kizárt karakter industry slotjai továbbra is használhatók. Slotmechanika: https://support.eveonline.com/hc/en-us/articles/203210272-Activities-and-Job-Types
 - A **Use only owned BPOs/BPCs / Csak a meglévő BPO/BPC készlettel** módban tényleges, a kiválasztott ME/TE-vel egyező assetpéldányok kellenek. A kézi runkeret nem helyettesít fizikai blueprintet. A más tervek által lefoglalt BPC-runokat és a futó jobokba kötött runokat levonjuk. Ugyanazt a példányt nem használjuk két egyidejű jobhoz. A BPC-k eltérő ME/TE-csoportjait nem vonjuk össze; a Blueprint oldalon választható másik csoport.
 - Ha a meglévő készletre korlátozás ki van kapcsolva, a gyorsabb párhuzamos munkához további BPC-ket vagy reakcióformulákat is tervezhet. A szükséges példányszámot, runokat és feltételezett run/BPC értéket külön táblázat mutatja. A beszerzés vagy másolás/invention ideje az általad megadott új-blueprint-érkezés; ezeket a külön kutatási jobokat nem indítjuk vagy ütemezzük.
@@ -316,3 +316,13 @@ A **Production scheduler / Gyártásütemező** a felül kiválasztott termékhe
 - Az új jobfelosztás anyagkerekítése különbséget okozhat az eredeti tervhez képest: az ütemező saját, újraszámolt anyaghiányát is megmutatja, Multibuy-másolással. A mentett terv foglalását nem módosítja. Az ütemterv CSV-be menthető; egyszerre legfeljebb 10 000 job tervezhető. A felület 100 jobot mutat oldalanként.
 
 Az ütemező nem indít vagy módosít EVE-jobot, és a készletet sem írja át. Ha új jobot indítasz vagy átveszel az EVE-ben, frissítsd az EVE-adatokat, majd készíts új ütemtervet.
+
+### Reakciók, gyártás és anyagfüggőségek
+
+Az ütemező külön **Reaction schedule / Reakciók ütemterve** és **Manufacturing schedule / Gyártás ütemterve** táblázatot mutat. A reakció és a gyártás ugyanannál a karakternél is párhuzamosan futhat, ha az anyagok és a megfelelő blueprintek rendelkezésre állnak. A külön slotkeretek nem foglalják egymást.
+
+A **Schedule graph and timeline / Ütemezési gráf és idővonal** közös időtengelyen, karakterenként és tevékenységenként külön sávokon mutatja a jobokat. Kattints egy sávra vagy a táblázat Job-számára: az alatta megjelenő lista megmutatja minden bemenet mennyiségét, forrását és érkezését. A kapcsolónyilak a kijelölt job és az aktuális oldalon látható forrásai/felhasználói között futnak. A forrás vagy felhasználó Job-számával másik oldalra is át lehet ugrani. A gráf és a két táblázat külön lapozható, 100 jobos oldalakon.
+
+Egy bemenet csak egyszer költhető el, a következő job pedig csak az összes szükséges mennyiség megérkezése után indul. Készlet, beszerzés, meglévő folyamatban lévő munka és az újonnan ütemezett jobok kimenete külön forrásként látszik. Az anyag rendelkezésre állása után még a slotra vagy a blueprintre is várhat a job.
+
+A **Production material cost** összesítésében a célmennyiség teljes eladási értéke mellett külön **Sell price per unit · Jita sell** sor mutatja a késztermék darabonkénti Jita sell árát. Ez nem változik az anyagár módjával vagy a célmennyiséggel.

@@ -97,23 +97,28 @@ def blueprints(row,context,held,jobs,now,workers,transfer=False):
 
 class Materials:
     def __init__(self):self.items=defaultdict(list)
-    def add(self,tid,quantity,when):
-        if quantity>0 and math.isfinite(when):self.items[tid].append([when,quantity]);self.items[tid].sort()
+    def add(self,tid,quantity,when,source='stock',job_id=None):
+        if quantity>0 and math.isfinite(when):
+            self.items[tid].append([when,quantity,source,job_id]);self.items[tid].sort(key=lambda item:item[0])
     def ready(self,tid,quantity):
         if quantity<=0:return 0
         have=0
-        for when,amount in self.items[tid]:
+        for when,amount,_,_ in self.items[tid]:
             have+=amount
             if have>=quantity:return when
         return math.inf
     def consume(self,tid,quantity,when):
-        remaining=quantity
+        remaining=quantity;allocations=[]
+        # Check before mutating, so an invalid request cannot partially spend stock.
+        if self.ready(tid,quantity)>when:raise PlanningError('Az ütemezés anyagegyenlege nem zárható.')
         for item in self.items[tid]:
             if item[0]>when:break
             take=min(item[1],remaining);item[1]-=take;remaining-=take
+            if take:allocations.append(dict(quantity=take,available_at=item[0],source=item[2],job_id=item[3]))
             if not remaining:break
         if remaining:raise PlanningError('Az ütemezés anyagegyenlege nem zárható.')
         self.items[tid]=[i for i in self.items[tid] if i[1]]
+        return allocations
 
 
 def duration(row,recipe,producer,settings,runs):
@@ -162,9 +167,9 @@ def _strategy(context,store,catalog,calculate,options,now=None,granularity=1):
         if row['used_wip']:
             matching=[j for j in relevant_jobs if j.get('product_type_id')==row['id'] and j.get('expected_output',0)>0 and j.get('status') in ['active','ready','paused']]
             when=max([release(j,start) for j in matching]) if matching and not row['manual_wip'] else math.inf
-            ledger.add(row['id'],row['used_wip'],when)
+            ledger.add(row['id'],row['used_wip'],when,'wip')
             if not math.isfinite(when):warnings.append({'id':row['id'],'name':row['name'],'reason':'A folyamatban lévő anyag érkezése nem ellenőrizhető.'})
-        if row['buy']:ledger.add(row['id'],row['buy'],supply)
+        if row['buy']:ledger.add(row['id'],row['buy'],supply,'purchase')
     for row in plan['queue']:
         eligible=qualified(row,catalog,workers);eligibility[row['id']]=eligible
         held=context.get('reservations',{}).get(row['parameters']['bp_id'],{}).get('blueprint_runs',{})
@@ -206,12 +211,17 @@ def _strategy(context,store,catalog,calculate,options,now=None,granularity=1):
                 if best is None or score<best[0]:best=(score,row,runs,worker,slot,bp,materials,begin,seconds)
         if best is None:break
         _,row,runs,worker,slot,bp,materials,begin,seconds=best;end=begin+seconds
-        for mid,n in materials:ledger.consume(mid,n,begin)
-        ledger.add(row['id'],runs*row['parameters']['output'],end)
+        job_id=len(scheduled)+1;inputs=[];dependencies=[]
+        for mid,n in materials:
+            allocations=ledger.consume(mid,n,begin)
+            inputs.append(dict(id=mid,name=catalog.name(mid),quantity=n,allocations=allocations))
+            dependencies.extend(dict(job_id=a['job_id'],material_id=mid,quantity=a['quantity']) for a in allocations if a['source']=='job')
+        material_ready=max([start]+[a['available_at'] for m in inputs for a in m['allocations']])
+        ledger.add(row['id'],runs*row['parameters']['output'],end,'job',job_id)
         worker['slots'][row['activity']][slot]=end;bp['available']=end;bp['used']+=runs
         if bp['remaining'] is not None:bp['remaining']-=runs
         pending[row['id']].pop(0)
-        scheduled.append({'id':len(scheduled)+1,'product_id':row['id'],'name':row['name'],'activity':row['activity'],
+        scheduled.append({'id':job_id,'materials':inputs,'dependencies':dependencies,'materials_ready':material_ready,'material_wait':material_ready-start,'product_id':row['id'],'name':row['name'],'activity':row['activity'],
                           'character_id':worker['id'],'character_name':worker['name'],'slot':slot+1,'runs':runs,
                           'output':runs*row['parameters']['output'],'start':begin,'end':end,'seconds':seconds,
                           'blueprint_id':row['parameters']['bp_id'],'blueprint_item_id':bp['item_id'],'blueprint_key':bp['key'],

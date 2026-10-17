@@ -133,3 +133,56 @@ class SchedulerTests(unittest.TestCase):
         self.assertEqual(materials.ready(1,3),NOW+100);materials.consume(1,2,NOW)
         self.assertEqual(materials.ready(1,3),NOW+100)
         with self.assertRaises(PlanningError):materials.consume(1,4,NOW+100)
+
+    def test_independent_manufacturing_and_reaction_overlap_on_same_character(self):
+        self.recipe(100,{110:1,130:1});self.recipe(110,{200:1});self.recipe(130,{200:1},activity='reaction')
+        self.context['blueprints']=[bp(1),bp(2,product=110),bp(3,product=130)]
+        self.context['skill_profiles']=self.context['skill_profiles'][:1]
+        result=self.run_plan(quantity=1);self.assertTrue(result['complete'])
+        jobs={j['product_id']:j for j in result['jobs']}
+        self.assertEqual(jobs[110]['start'],NOW);self.assertEqual(jobs[130]['start'],NOW)
+        self.assertEqual(jobs[110]['slot'],jobs[130]['slot'])
+        self.assertEqual(jobs[110]['character_id'],jobs[130]['character_id'])
+        self.assertGreaterEqual(jobs[100]['start'],max(jobs[110]['end'],jobs[130]['end']))
+        self.assertEqual({d['job_id'] for d in jobs[100]['dependencies']},{jobs[110]['id'],jobs[130]['id']})
+
+    def test_every_input_arrival_and_shared_output_allocation_gate_downstream_jobs(self):
+        self.recipe(100,{110:1,120:1});self.recipe(110,{130:1});self.recipe(120,{130:1});self.recipe(130,{200:1},activity='reaction')
+        self.catalog.recipes[120]['seconds']=300
+        self.context['blueprints']=[bp(1),bp(2,product=110),bp(3,product=120),bp(4,product=130)]
+        self.context['stock']={130:1}
+        result=self.run_plan(quantity=1);self.assertTrue(result['complete'])
+        jobs={j['id']:j for j in result['jobs']};spent={}
+        for j in result['jobs']:
+            latest=NOW
+            for m in j['materials']:
+                self.assertEqual(sum(a['quantity'] for a in m['allocations']),m['quantity'])
+                for a in m['allocations']:
+                    latest=max(latest,a['available_at']);self.assertLessEqual(a['available_at'],j['start'])
+                    if a['source']=='job':
+                        source=jobs[a['job_id']];self.assertEqual(source['product_id'],m['id'])
+                        self.assertEqual(a['available_at'],source['end'])
+                        spent[source['id']]=spent.get(source['id'],0)+a['quantity']
+            self.assertEqual(j['materials_ready'],latest)
+            self.assertEqual(j['material_wait'],latest-NOW)
+        self.assertTrue(all(n<=jobs[k]['output'] for k,n in spent.items()))
+        parent=next(j for j in result['jobs'] if j['product_id']==100)
+        self.assertEqual(parent['start'],max(j['end'] for j in result['jobs'] if j['product_id'] in [110,120]))
+        self.assertEqual(len(parent['dependencies']),2)
+
+    def test_existing_wip_and_purchase_arrivals_are_visible_material_sources(self):
+        self.recipe(100,{110:1,200:1});self.recipe(110,{200:1})
+        self.context['wip']={110:1};self.context['jobs']=[dict(product_type_id=110,expected_output=1,status='active',end_date=iso(NOW+900))]
+        result=self.run_plan(quantity=1,supply_at=NOW+500);job=result['jobs'][0]
+        self.assertEqual(job['materials_ready'],NOW+900);self.assertEqual(job['start'],NOW+900)
+        allocations={m['id']:m['allocations'][0] for m in job['materials']}
+        self.assertEqual(allocations[110]['source'],'wip');self.assertEqual(allocations[200]['source'],'purchase')
+        self.assertEqual(job['dependencies'],[])
+
+    def test_failed_ledger_consumption_does_not_destroy_future_material(self):
+        materials=Materials();materials.add(1,2,NOW,'stock');materials.add(1,3,NOW+100,'job',5)
+        with self.assertRaises(PlanningError):materials.consume(1,4,NOW)
+        self.assertEqual(materials.consume(1,4,NOW+100),[
+            dict(quantity=2,available_at=NOW,source='stock',job_id=None),
+            dict(quantity=2,available_at=NOW+100,source='job',job_id=5)])
+        self.assertEqual(materials.consume(1,1,NOW+100)[0]['quantity'],1)
