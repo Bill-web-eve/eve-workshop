@@ -2,10 +2,10 @@
 // A common time axis keeps independent reaction/manufacturing slots comparable.
 const EveScheduleGraph=(()=>{
   const PAGE_SIZE=100;
-  function build(data,page=0){
-    const all=data.jobs,pages=Math.max(1,Math.ceil(all.length/PAGE_SIZE));
+  function build(data,page=0,characterId=null){
+    const all=data.jobs,filtered=characterId===null?all:all.filter(j=>j.character_id===characterId),pages=Math.max(1,Math.ceil(filtered.length/PAGE_SIZE));
     page=Math.max(0,Math.min(pages-1,page));
-    const jobs=all.slice(page*PAGE_SIZE,(page+1)*PAGE_SIZE),laneMap=new Map();
+    const jobs=filtered.slice(page*PAGE_SIZE,(page+1)*PAGE_SIZE),laneMap=new Map();
     for(const j of jobs){const key=[j.activity,j.character_id,j.slot].join(':');if(!laneMap.has(key))laneMap.set(key,{key,activity:j.activity,character_id:j.character_id,name:j.character_name,slot:j.slot});}
     const lanes=[...laneMap.values()].sort((a,b)=>(a.activity==='reaction'?0:1)-(b.activity==='reaction'?0:1)||a.character_id-b.character_id||a.slot-b.slot);
     lanes.forEach((l,i)=>{l.y=65+i*38;});

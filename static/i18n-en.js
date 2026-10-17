@@ -1,6 +1,7 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "\u00d6sszes karakter": "All characters",
   "Teljes gyártási függőségi lánc": "Full production dependency chain",
   "Reakció → reakció → komponens → késztermék": "Reaction → reaction → component → finished product",
   "Első indítás": "First start",

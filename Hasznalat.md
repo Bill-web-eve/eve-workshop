@@ -326,3 +326,5 @@ A **Schedule graph and timeline / Ütemezési gráf és idővonal** közös idő
 Egy bemenet csak egyszer költhető el, a következő job pedig csak az összes szükséges mennyiség megérkezése után indul. Készlet, beszerzés, meglévő folyamatban lévő munka és az újonnan ütemezett jobok kimenete külön forrásként látszik. Az anyag rendelkezésre állása után még a slotra vagy a blueprintre is várhat a job.
 
 A **Production material cost** összesítésében a célmennyiség teljes eladási értéke mellett külön **Sell price per unit · Jita sell** sor mutatja a késztermék darabonkénti Jita sell árát. Ez nem változik az anyagár módjával vagy a célmennyiséggel.
+
+A **Schedule graph and timeline** karakterválasztó listájával az összes karakter vagy egyetlen karakter munkái jeleníthetők meg. A szűrés az idővonalra vonatkozik; az ütemezést és a táblázatokat nem módosítja. A lapozás a kiválasztott karakter jobjaihoz igazodik, az időtengely a teljes tervvel azonos marad. Másik karakter jobjára ugorva a szűrő automatikusan követi a kiválasztást.
