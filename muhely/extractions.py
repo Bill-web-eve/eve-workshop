@@ -325,6 +325,14 @@ def crystal_plan(store,catalog,moon_record_id,event_id=None):
     integers=[int(c['weight']*denominator) for c in rows]
     divisor=reduce(math.gcd,integers) if integers else 1
     total=sum((c['weight'] for c in rows),Fraction(0))
-    for c,n in zip(rows,integers):
-        c['count']=n//divisor;c['share']=float(c.pop('weight')/total*100)
-    return {'rows':rows,'source':source,'event_id':event_id,'automatic':False,'unavailable':not rows,'total_count':sum(c['count'] for c in rows)}
+    counts=[n//divisor for n in integers]
+    approximate=bool(counts and max(counts)>9)
+    if approximate:
+        largest=max(counts)
+        counts=[(n*9+largest-1)//largest for n in counts]
+        rounded_divisor=reduce(math.gcd,counts)
+        counts=[n//rounded_divisor for n in counts]
+    for c,n in zip(rows,counts):
+        c['count']=n;c['share']=float(c.pop('weight')/total*100)
+
+    return {'rows':rows,'source':source,'event_id':event_id,'automatic':False,'unavailable':not rows,'approximate':approximate,'total_count':sum(c['count'] for c in rows)}

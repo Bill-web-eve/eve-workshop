@@ -266,12 +266,26 @@ Az eladási adót és a broker fee-t a holdak **Számítási beállítások** la
 
 ## Holdkitermelések a helyi naptárban
 
-A **Moon management / Holdak és kitermelés** menü a bal oldali sávban lenyitható. Az almenükből közvetlenül megnyitható a holdnyilvántartás, a 30 napos termelés, a fogyasztás, a kitermelési naptár, a kristályterv és a számítási beállítások.
+A **Moon management / Holdak és kitermelés** menü a bal oldali sávban lenyitható. Az almenükből közvetlenül megnyitható a holdnyilvántartás, a 30 napos termelés, a fogyasztás, a kitermelési naptár és a kristályterv.
 
-A **Kitermelési naptár → Helyi naptár szinkronizálása** részben engedélyezd a naptárszinkront, majd válaszd a **Feliratkozás a helyi naptárban** gombot. Macen a Naptár alkalmazásban a **Saját Mac / On My Mac** helyet és az óránkénti automatikus frissítést válaszd. Kézzel is feliratkozhatsz a kimásolható URL-re. A működés az Apple naptárfeliratkozási lehetőségét használja: https://support.apple.com/en-ie/102301
+A **Beállítások → Naptárszinkron → Helyi naptár szinkronizálása** részben engedélyezd a naptárszinkront, majd válaszd a **Feliratkozás a helyi naptárban** gombot. Macen a Naptár alkalmazásban a **Saját Mac / On My Mac** helyet és az óránkénti automatikus frissítést válaszd. Kézzel is feliratkozhatsz a kimásolható URL-re. A működés az Apple naptárfeliratkozási lehetőségét használja: https://support.apple.com/en-ie/102301
 
 A naptár a működő Athanorok már betöltött kitermeléseit tartalmazza, a hold nevével és a kőzet megérkezési idejével; a leírásban az ismert ércmennyiségekkel és a becsült eltűnési adatokkal. A kliens helyi időzónában mutatja az időpontot. Az esemény egy időpontjelölő, nem bányászati időtartam. Az app és az EVE-frissítés továbbra is szükséges az új adatokhoz. A naptár lekérdezése nem indít külön ESI-frissítést.
 
 A feliratkozás csak ezen a gépen működik, futó app mellett. Felhős naptárszolgáltatás és másik eszköz nem éri el a localhost címet. A naptár csak olvasható; nem módosítja az EVE-adatokat. Az **Új hivatkozás** érvényteleníti a régit, ezért új feliratkozás kell; a **Szinkronizálás letiltása** megszünteti a hozzáférést. A már letöltött eseményeket a naptáralkalmazásból külön kell eltávolítani.
 
 Az **ICS letöltése** egy egyszer importálható fájlt ad. Ez nem frissül automatikusan; ismételt importáláskor a naptárkliens duplikálhat eseményeket. A feliratkozás ajánlott a folyamatos frissítéshez.
+
+## Közös beállítások
+
+A bal oldali **Settings / Beállítások** menü lenyitható, és az alábbi részeket fogja össze:
+
+- **Structures and bonuses / Struktúrák és bónuszok:** gyártás és reakció bónuszai, rendszer, adók, készletforrás, receptadatbázis.
+- **EVE connection / EVE-kapcsolat:** Client ID, karakterek hozzáadása, kiválasztása és eltávolítása.
+- **Data access / Adathozzáférések:** karakterenkénti skill-, PI-, corporation- és holdadatengedélyek, scope-ok, frissítési lehetőségek.
+- **Moon calculation settings / Holdak számítási beállításai:** finomítás, implant, kristályváltozat, üzemanyagtípus, kézi üzemanyagár és gazdasági paraméterek.
+- **Calendar sync / Naptárszinkron:** helyi naptárfeliratkozás és ICS-letöltés. A meglévő feliratkozások változatlanul működnek.
+
+A műveleti nézeteken a hozzáférési és beállítási panelek helyett rövid hivatkozások mutatnak az új helyre. Az EVE-engedélyezés után a megfelelő Beállítások lap nyílik meg. A még nem mentett értékekre lapváltáskor figyelmeztetünk.
+
+A Mining crystals / Bányászkristályok nézet nem mutat Tatara-kihozatalt. A kristályarány minden tagja 1–9 közötti egész szám. Az azonos kristályt igénylő érceket előbb összevonjuk. A legkisebb pontos arányt megtartjuk, ha minden tagja legfeljebb 9 (75:25 → 3:1). Egyébként a legnagyobb tagot 9-re skálázzuk, minden tagot felfelé kerekítünk, majd a közös osztóval egyszerűsítünk (99,99:0,01 → 9:1; 37,3:62,7 → 2:3). Ez közelítő készletarány, nem kopásból számolt tényleges fogyasztás; egyetlen szükséges kristálytípus sem tűnik el nullára kerekítés miatt.

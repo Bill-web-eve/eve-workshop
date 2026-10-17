@@ -19,6 +19,7 @@
   <script src="/pi.js" defer></script>
   <script src="/extractions.js" defer></script>
   <script src="/moons.js" defer></script>
+  <script src="/settings.js" defer></script>
   <script src="/costs.js" defer></script>
   <script src="/prices.js" defer></script>
   <script src="/economics.js" defer></script>
@@ -48,12 +49,19 @@
           <button data-moon-nav="consumption">Fogyasztás</button>
           <button data-moon-nav="calendar">Kitermelési naptár</button>
           <button data-moon-nav="crystals">Bányászkristályok</button>
-          <button data-moon-nav="settings">Számítási beállítások</button>
         </div>
       </div>
       <button class="nav" data-view="corporations"><span class="nav-icon">▦</span>Corporationok</button>
-      <button class="nav" data-view="settings"><span class="nav-icon">⚙</span>Struktúrák és bónuszok</button>
-      <button class="nav" data-view="connection"><span class="nav-icon">⌁</span>EVE-kapcsolat <span id="connection-dot" class="dot"></span></button>
+      <div class="nav-group">
+        <button class="nav" data-view="settings" aria-expanded="false" aria-controls="settings-submenu"><span class="nav-icon">⚙</span><span>Beállítások</span><span class="nav-chevron" aria-hidden="true">▸</span></button>
+        <div id="settings-submenu" class="nav-submenu" hidden>
+          <button data-settings-nav="structures">Struktúrák és bónuszok</button>
+          <button data-settings-nav="connection">EVE-kapcsolat <span id="connection-dot" class="dot"></span></button>
+          <button data-settings-nav="access">Adathozzáférések</button>
+          <button data-settings-nav="moons">Holdak számítási beállításai</button>
+          <button data-settings-nav="calendar">Naptárszinkron</button>
+        </div>
+      </div>
       <button class="nav" data-view="saved"><span class="nav-icon">▱</span>Mentett tervek</button>
     </nav>
     <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Sötét mód" aria-pressed="true"><span class="nav-icon" aria-hidden="true">☾</span><span>Sötét mód</span><span class="theme-switch" aria-hidden="true"></span></button>

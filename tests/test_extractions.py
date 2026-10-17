@@ -52,6 +52,32 @@ class ExtractionTests(unittest.TestCase):
     def test_exact_decimal_ratio_and_no_false_wear(self):
         self.moon['ores']=[{'id':45490,'percent':37.5},{'id':45494,'percent':12.5}];self.s.save_moon(self.moon)
         self.assertEqual([r['count'] for r in crystal_plan(self.s,self.c,self.moon['id'])['rows']],[3,1])
+    def test_crystal_counts_are_single_digit_upward_rounded_ratios(self):
+        for percentages,expected in [([75,25],[3,1]),([90,10],[9,1]),([99.99,.01],[9,1]),([37.3,62.7],[2,3]),([51,49],[1,1])]:
+            with self.subTest(percentages=percentages):
+                self.moon['ores']=[{'id':45490,'percent':percentages[0]},{'id':45494,'percent':percentages[1]}]
+                self.s.save_moon(self.moon)
+                result=crystal_plan(self.s,self.c,self.moon['id'])
+                self.assertEqual([r['count'] for r in result['rows']],expected)
+                self.assertTrue(all(1<=r['count']<=9 for r in result['rows']))
+                self.assertAlmostEqual(sum(r['share'] for r in result['rows']),100)
+                self.assertEqual(result['total_count'],sum(expected))
+    def test_notification_volume_ratio_is_bounded_without_zeroing_small_ore(self):
+        self.event['text']='Zeolites 999,999 m³<br>Cobaltite 1 m³';self.seed()
+        event=report(self.s,self.c)['events'][0]
+        result=crystal_plan(self.s,self.c,self.moon['id'],event['id'])
+        self.assertEqual([r['count'] for r in result['rows']],[9,1])
+        self.assertTrue(result['approximate'])
+    def test_four_crystal_groups_stay_present_and_at_most_nine(self):
+        ids=[];skills=set()
+        for ore in self.c.moon_ores.values():
+            if ore['skill_id'] not in skills:ids.append(ore['id']);skills.add(ore['skill_id'])
+            if len(ids)==4:break
+        self.moon['ores']=[{'id':i,'percent':p} for i,p in zip(ids,[.01,10.12,30.34,59.53])]
+        self.s.save_moon(self.moon)
+        rows=crystal_plan(self.s,self.c,self.moon['id'])['rows']
+        self.assertEqual(len(rows),4)
+        self.assertTrue(all(1<=r['count']<=9 for r in rows))
     def test_metenox_never_warns_or_needs_crystals(self):
         self.moon['structure']='Metenox';self.s.save_moon(self.moon)
         self.assertEqual(report(self.s,self.c)['moons'][self.moon['id']]['status'],'not_applicable')

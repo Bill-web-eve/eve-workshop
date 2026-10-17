@@ -1,0 +1,77 @@
+'use strict';
+let settingsTab='structures',settingsAccessData=null,settingsAccessRequest=null;
+const settingsSections={structures:'Struktúrák és bónuszok',connection:'EVE-kapcsolat',access:'Adathozzáférések',moons:'Holdak számítási beállításai',calendar:'Naptárszinkron'};
+function settingsShortcut(message,tab='access'){
+  return `<div class="banner"><span>${esc(message)}</span> <button class="text-button" data-open-settings="${tab}">Beállítások megnyitása</button></div>`;
+}
+function setSettingsMenu(open){
+  $('#settings-submenu').hidden=!open;
+  $('[data-view="settings"]').setAttribute('aria-expanded',String(open));
+}
+function syncSettingsNavigation(){
+  $$('[data-settings-nav]').forEach(button=>{
+    const active=view==='settings'&&settingsTab===button.dataset.settingsNav;
+    button.classList.toggle('active',active);
+    if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');
+  });
+}
+function openSettingsTab(tab){
+  if(!Object.prototype.hasOwnProperty.call(settingsSections,tab))return false;
+  if(view==='settings'&&settingsTab===tab){setSettingsMenu(true);return true;}
+  if(view!=='settings'){
+    const previous=settingsTab;settingsTab=tab;
+    if(!navigate('settings')){settingsTab=previous;return false;}
+    return true;
+  }
+  if(Object.keys(dirty).length&&!confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?'))return false;
+  dirty={};settingsTab=tab;setSettingsMenu(true);render();return true;
+}
+function renderSettings(content){
+  content.innerHTML=`<div class="shopping-tabs" role="group" aria-label="Beállításcsoportok">${Object.entries(settingsSections).map(([key,label])=>`<button data-settings-tab="${key}" aria-pressed="${key===settingsTab}">${esc(label)}</button>`).join('')}</div><div id="settings-content"></div>`;
+  $$('[data-settings-tab]').forEach(button=>button.onclick=()=>openSettingsTab(button.dataset.settingsTab));
+  const target=$('#settings-content');
+  $('#plan-status').hidden=true;
+  if(settingsTab==='structures')renderStructureSettings(target);
+  else if(settingsTab==='connection')renderConnection(target);
+  else if(!moonData){target.innerHTML=empty('Holdadatok betöltése');void refreshMoons();}
+  else if(settingsTab==='moons')renderMoonSettings(target);
+  else if(settingsTab==='calendar'){target.innerHTML=calendarIntegrationPanel();bindCalendarIntegration();}
+  else{
+    target.innerHTML=moonAuthPanel()+generalAccessPanel();bindMoonAuth();bindGeneralAccess();
+    if(!settingsAccessData)void loadSettingsAccess();
+  }
+  setHead('BEÁLLÍTÁSOK',settingsSections[settingsTab],'Az alkalmazás kapcsolatai, jogosultságai és közös számítási beállításai.');
+  $('#breadcrumb').textContent='Műhely / Beállítások / '+settingsSections[settingsTab];
+}
+function generalAccessPanel(){
+  const d=settingsAccessData;
+  const feature=(char,key)=>{
+    if(!d)return '<span>Adatok betöltése…</span>';
+    const entry=d[key]?.characters.find(c=>c.id===char.id),status=key==='corporations'?entry?.access:entry;
+    const label=!status?'Még nincs lekérdezés':status.error?status.error:status.needs_auth?'Engedélyezés szükséges':'Olvasási engedély megadva';
+    return `<span>${esc(label)}</span>`;
+  };
+  const labels={skills:'Skillek engedélyezése',pi:'PI engedélyezése',corporations:'Corp-hozzáférés engedélyezése'};
+  return panel('Karakterek adathozzáférései','Skillek, PI és corporation olvasási engedélyek',`<div class="panel-body"><div class="section-actions"><button class="button compact" id="access-status-refresh">Hozzáférések ellenőrzése</button>${Object.entries({skills:'Skilladatok frissítése',pi:'PI-adatok frissítése',corporations:'Corp-adatok frissítése'}).map(([key,label])=>`<button class="button compact" data-access-sync="${key}" ${state.task.running?'disabled':''}>${esc(label)}</button>`).join('')}</div>${d?.error?'<p class="warning-text">Néhány hozzáférési állapot nem olvasható. Próbáld újra az ellenőrzést.</p>':''}</div>`+
+    (state.characters.length?table(['Karakter','Skillek és tanulás','Bolygók és PI','Corporationok'],state.characters.map(char=>`<tr><td>${verbatim(char.name)}</td>${Object.entries(labels).map(([key,label])=>`<td>${feature(char,key)}<div><button class="text-button" data-access-feature="${key}" data-access-character="${char.id}">${esc(label)}</button></div></td>`).join('')}</tr>`),'access-overview'):empty('Még nincs hozzáadott karakter','Az EVE-kapcsolat oldalon add hozzá a karaktereidet.'))+
+    `<details class="panel-body"><summary>Szükséges jogosultságok</summary>${Object.entries(labels).map(([key,label])=>`<h3>${esc(label)}</h3><code>${(state[{skills:'skill_scopes',pi:'pi_scopes',corporations:'corporation_scopes'}[key]]||[]).map(esc).join('\n')}</code>`).join('')}<p>Az új scope-okat az EVE Developer alkalmazásban is engedélyezni kell. A meglévő karaktert válaszd újra az engedélyezéskor.</p><p>A corp készlethez és blueprintekhez Director, a jobokhoz Factory Manager szerepkör szükséges.</p></details>`);
+}
+async function loadSettingsAccess(){
+  if(settingsAccessRequest)return settingsAccessRequest;
+  settingsAccessRequest=(async()=>{
+    const keys=['skills','pi','corporations'];
+    const results=await Promise.allSettled(keys.map(key=>api('/api/'+key)));
+    settingsAccessData={error:results.some(r=>r.status==='rejected')};
+    results.forEach((result,i)=>{if(result.status==='fulfilled')settingsAccessData[keys[i]]=result.value;});
+    if(view==='settings'&&settingsTab==='access')render();
+  })();
+  try{await settingsAccessRequest;}finally{settingsAccessRequest=null;}
+}
+function bindGeneralAccess(){
+  $('#access-status-refresh').onclick=()=>void loadSettingsAccess();
+  $$('[data-access-sync]').forEach(button=>button.onclick=async()=>{await startTask('/api/'+button.dataset.accessSync+'/sync');await loadSettingsAccess();});
+  $$('[data-access-feature]').forEach(button=>button.onclick=async()=>{
+    try{button.disabled=true;error('');const auth=await api('/api/auth/start',{character_id:Number(button.dataset.accessCharacter),feature:button.dataset.accessFeature});sessionStorage.setItem('eve-muhely-auth-return','settings:access');window.location.assign(auth.url);}
+    catch(e){error(e.message);button.disabled=false;}
+  });
+}

@@ -12,6 +12,7 @@ function syncMoonNavigation(){
   });
 }
 function selectMoonTab(tab){
+  if(tab==='settings')return openSettingsTab('moons');
   if(view==='moons'&&moonTab===tab){setMoonMenu(true);return;}
   if(view!=='moons'){
     const previous=moonTab;moonTab=tab;
@@ -26,13 +27,18 @@ const moonDecimal=n=>new Intl.NumberFormat('hu-HU',{maximumFractionDigits:4}).fo
 const moonPercent=n=>`${moonDecimal(n)}%`;
 const moonStatus=m=>!m.enabled?'Leállítva':m.status==='invalid'?'100% felett · javítandó':m.status==='partial'?'Részleges összetétel':'Rendben';
 const moonNumber=value=>Number(String(value).replace(/\s/g,'').replace(',','.'));
-async function refreshMoons(){
-  if(moonRequest)return moonRequest;
-  moonRequest=api('/api/moons');
-  try{moonData=await moonRequest;if(view==='moons'&&!moonEditing&&!dirty.moon_settings&&!dirty.moon_fuel&&!dirty.moon_crystals)render();}
-  catch(e){if(view==='moons')error(e.message);}
-  finally{moonRequest=null;}
+async function refreshMoons(fresh=false){
+  if(moonRequest){if(!fresh)return moonRequest;await moonRequest;return refreshMoons();}
+  moonRequest=(async()=>{
+    try{
+      moonData=await api('/api/moons');
+      if((view==='moons'||view==='settings')&&!moonEditing&&!Object.keys(dirty).length)render();
+    }catch(e){if(view==='moons'||view==='settings')error(e.message);}
+    finally{moonRequest=null;}
+  })();
+  return moonRequest;
 }
+
 function moonTable(headers,rows,key){return EveTables.markup(headers,rows,'moon-table','moons:'+key,{selectColumns:/^(production-moons|ore-volumes)-/.test(key)?[0]:[]});}
 function renderMoons(content){
   setHead('HOLDGAZDÁLKODÁS','Holdak és kitermelés','Holdnyilvántartás, ESI kitermelési naptár, termelés, üzemanyag és kristálytervezés.');
@@ -42,8 +48,8 @@ function renderMoons(content){
   $('#moon-refresh').onclick=()=>startTask('/api/moons/sync');
   if(!moonData){content.innerHTML=empty('Holdadatok betöltése');void refreshMoons();return;}
   const d=moonData,s=d.summary;
-  content.innerHTML=`<div class="shopping-tabs moon-tabs" role="group" aria-label="Holdnézet"><button data-moon-tab="register" aria-pressed="${moonTab==='register'}">Holdnyilvántartás</button><button data-moon-tab="production" aria-pressed="${moonTab==='production'}">30 napos termelés</button><button data-moon-tab="consumption" aria-pressed="${moonTab==='consumption'}">Fogyasztás</button><button data-moon-tab="calendar" aria-pressed="${moonTab==='calendar'}">Kitermelési naptár</button><button data-moon-tab="crystals" aria-pressed="${moonTab==='crystals'}">Bányászkristályok</button><button data-moon-tab="settings" aria-pressed="${moonTab==='settings'}">Számítási beállítások</button></div>
-    <div class="metrics"><div class="metric"><div class="metric-label">Nyilvántartott holdak</div><strong>${fmt(s.count)}</strong><small>hold</small></div><div class="metric"><div class="metric-label">Termelésbe beszámítva</div><strong>${fmt(s.included)}</strong><small>hold</small></div><div class="metric"><div class="metric-label">Javítandó összetétel</div><strong>${fmt(s.invalid)}</strong><small>100% feletti arány</small></div><div class="metric"><div class="metric-label">Tatara kihozatal</div><strong>${moonPercent(d.refining_yield*100)}</strong><small>Nullsec · T2 rig · minden skill V · ${d.settings.implant}% implant</small></div></div>
+  content.innerHTML=`<div class="shopping-tabs moon-tabs" role="group" aria-label="Holdnézet"><button data-moon-tab="register" aria-pressed="${moonTab==='register'}">Holdnyilvántartás</button><button data-moon-tab="production" aria-pressed="${moonTab==='production'}">30 napos termelés</button><button data-moon-tab="consumption" aria-pressed="${moonTab==='consumption'}">Fogyasztás</button><button data-moon-tab="calendar" aria-pressed="${moonTab==='calendar'}">Kitermelési naptár</button><button data-moon-tab="crystals" aria-pressed="${moonTab==='crystals'}">Bányászkristályok</button></div>
+    <div class="metrics ${moonTab==='crystals'?'crystal-metrics':''}"><div class="metric"><div class="metric-label">Nyilvántartott holdak</div><strong>${fmt(s.count)}</strong><small>hold</small></div><div class="metric"><div class="metric-label">Termelésbe beszámítva</div><strong>${fmt(s.included)}</strong><small>hold</small></div><div class="metric"><div class="metric-label">Javítandó összetétel</div><strong>${fmt(s.invalid)}</strong><small>100% feletti arány</small></div>${moonTab==='crystals'?'':`<div class="metric"><div class="metric-label">Tatara kihozatal</div><strong>${moonPercent(d.refining_yield*100)}</strong><small>Nullsec · T2 rig · minden skill V · ${d.settings.implant}% implant</small></div>`}</div>
     <div class="moon-toolbar"><label>Struktúraszűrő <select id="moon-filter"><option value="all">Összes struktúra</option><option value="Athanor">Athanor</option><option value="Metenox">Metenox</option></select></label><span>Időszak: 30 nap · 720 óra</span></div><div id="moon-body"></div>`;
   $('#moon-filter').value=moonFilter;
   $('#moon-filter').onchange=e=>{if((dirty.moon_fuel||dirty.moon_settings||dirty.moon_crystals)&&!confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?')){e.target.value=moonFilter;return;}dirty={};moonFilter=e.target.value;renderMoonBody();};
@@ -57,7 +63,6 @@ function renderMoonBody(){
   const d=moonData,moons=d.moons.filter(m=>moonFilter==='all'||m.structure===moonFilter);
   if(moonTab==='calendar')return renderMoonCalendar(target,moons);
   if(moonTab==='crystals')return renderCrystalPlanner(target,moons);
-  if(moonTab==='settings')return renderMoonSettings(target);
   if(moonTab==='register'){
     target.innerHTML=`<div class="moon-toolbar"><p class="muted">A nyilvántartás közös ezen a gépen. A becsült termelés nem kerül automatikusan a gyártási készletbe.</p><button id="moon-add" class="button primary compact">＋ Hold felvétele</button></div><div id="moon-editor"></div>`;
     target.innerHTML+=panel('Bérelt holdak',`${fmt(moons.length)} hold`,moons.length?moonTable(['Hold','Rendszer','Csillagkép','Struktúra','Ércek és arányok','Arányösszeg','Állapot','Megjegyzés','Művelet'],moons.map(m=>`<tr><td>${verbatim(m.name)}</td><td>${verbatim(m.system.name)}</td><td>${verbatim(m.system.constellation)}<small class="sub">${m.esi_checked?'ESI · '+esc(date(m.esi_checked)):'SDE · ESI-ellenőrzés szükséges'}</small></td><td>${esc(m.structure)}</td><td><span class="badge">${m.composition_source==='manual'?'Kézi összetétel':moonSource(m.composition_source)}</span> ${m.ores.map(o=>`${itemName(o.name)} ${moonPercent(o.percent)}`).join('<br>')}</td><td class="num" data-sort-value="${m.percent_total}">${moonPercent(m.percent_total)}</td><td><span class="badge ${m.status==='invalid'?'warn':''}">${moonStatus(m)}</span></td><td>${verbatim(m.notes)}</td><td><button data-edit-moon="${esc(m.id)}" class="text-button">Szerkesztés</button></td></tr>`),'register'):empty('Még nincs hold ebben a nézetben','A Hold felvétele gombbal válassz rendszert és holdat, majd add meg az érceket.'));
@@ -84,15 +89,14 @@ function renderMoonBody(){
     const fuelName=d.fuel_blocks.find(f=>f.id===fuel).name;
     const costRows=(fuelQty,gasQty)=>[{id:fuel,name:fuelName,quantity:fuelQty,unit:'db',manual_price:manual},{id:gas,name:d.magmatic_gas.name,quantity:gasQty,unit:'db'}].filter(r=>r.quantity>0);
     const composite=(key,rows)=>{jitaGroups.set(key,rows);return `<td class="num" data-cost-lines="${esc(key)}" data-sort-value="">–</td>`;};
-    target.innerHTML+=`<form id="moon-fuel-settings" class="panel panel-body moon-toolbar"><label>Fuel Block típusa<select name="fuel_block_id">${d.fuel_blocks.map(f=>`<option data-i18n-skip value="${f.id}" ${f.id===fuel?'selected':''}>${esc(f.name)}</option>`).join('')}</select></label><label>Kézi Fuel Block egységár (ISK)<input name="fuel_block_price" data-grouped-money data-money-max="1000000000000" type="text" inputmode="decimal" placeholder="Üresen: Jita-ár" value="${manual===null?'':esc(String(manual).replace('.',','))}"></label><button class="button primary compact">Üzemanyagár alkalmazása</button><p class="footnote">A kiválasztott blokktípussal számolunk minden holdfúrónál. A kézi ár felülírja a Fuel Block Jita-árát; a Magmatic Gas továbbra is a választott Jita-árral számít. Az üres mező visszaállítja a piaci árazást.</p></form>`;
+    target.innerHTML+='<p><button class="text-button" data-open-settings="moons">Üzemanyagbeállítások</button></p>';
     const keys=moonFilter==='all'?['Athanor','Metenox','all']:[moonFilter];
     const combined=moons.flatMap(m=>costRows(m.fuel+m.online_fuel,m.gas).map(r=>({...r,context:m.name})));
     target.innerHTML+=costSummary('moon-fuel',combined,'30 napos üzemanyagköltség','A működés és a megadott bekapcsolások üzemanyaga, Magmatic Gas fogyasztással együtt.',true);
     if(manual!==null)target.innerHTML+='<div class="banner">Kézi Fuel Block ár aktív. A Jita-mód váltása csak a Magmatic Gas árazását módosítja.</div>';
     target.innerHTML+=panel('Összesített fogyasztás','30 nap',moonTable(['Struktúra','Működő holdak','Fuel Block / nap','Fuel Block / 30 nap','Magmatic Gas / nap','Magmatic Gas / 30 nap','Bekapcsolási Fuel Block','Teljes Fuel Block','Üzemanyagköltség'],keys.map(k=>{const c=d.consumption[k];return `<tr><td>${k==='all'?'Összesen':k}</td><td class="num">${fmt(c.count)}</td><td class="num">${fmt(c.fuel/30)}</td><td class="num">${fmt(c.fuel)}</td><td class="num">${fmt(c.gas/30)}</td><td class="num">${fmt(c.gas)}</td><td class="num">${fmt(c.online_fuel)}</td><td class="num">${fmt(c.fuel+c.online_fuel)}</td>${composite('moon-fuel-total-'+k,moons.filter(m=>k==='all'||m.structure===k).flatMap(m=>costRows(m.fuel+m.online_fuel,m.gas)))}</tr>`;}),'consumption-'+moonFilter));
     target.innerHTML+=panel('Fogyasztás holdanként','A hold szerkesztésénél állítható az üzem és a bekapcsolások száma',moonTable(['Hold','Struktúra','Fuel Block / nap','Fuel Block / 30 nap','Magmatic Gas / nap','Magmatic Gas / 30 nap','Bekapcsolások','Bekapcsolási Fuel Block','Üzemanyagköltség'],moons.map(m=>`<tr><td>${verbatim(m.name)}</td><td>${m.structure}</td><td class="num">${fmt(m.fuel/30)}</td><td class="num">${fmt(m.fuel)}</td><td class="num">${fmt(m.gas/30)}</td><td class="num">${fmt(m.gas)}</td><td class="num">${fmt(m.online_starts)}</td><td class="num">${fmt(m.online_fuel)}</td>${composite('moon-fuel-'+m.id,costRows(m.fuel+m.online_fuel,m.gas))}</tr>`),'consumption-moons-'+moonFilter));
-    const form=$('#moon-fuel-settings');form.oninput=()=>{dirty.moon_fuel=true;};
-    form.onsubmit=async e=>{e.preventDefault();try{const f=new FormData(form),price=String(f.get('fuel_block_price')).replace(/\s/g,'').replace(',','.');await api('/api/moons/settings',{fuel_block_id:Number(f.get('fuel_block_id')),fuel_block_price:price||null});dirty={};await refreshMoons();toast('Üzemanyagár mentve.');}catch(e){error(e.message);}};
+
     bindJita(combined.filter(r=>r.manual_price==null).map(r=>r.id));
   }
 }
@@ -100,8 +104,10 @@ function renderMoonSettings(target){
   const d=moonData;
   target.innerHTML=panel('Finomítás és kristályváltozat','A beállítások az összes holdra érvényesek',`<form id="moon-settings" class="panel-body moon-settings"><label>Finomítási implant<select name="implant">${[0,1,2,4].map(n=>`<option value="${n}" ${d.settings.implant===n?'selected':''}>${n}%</option>`).join('')}</select></label><label>Begyűjtött arány (%)<input name="mining_recovery" type="text" inputmode="decimal" required value="${moonDecimal(d.settings.mining_recovery)}"></label><label>Kristályváltozat<select name="crystal_variant">${d.crystal_variants.map(v=>`<option data-i18n-skip value="${v}" ${d.settings.crystal_variant===v?'selected':''}>${v}</option>`).join('')}</select></label><label>Eladási adó (%)<input name="sales_tax" type="text" inputmode="decimal" value="${moonDecimal(d.settings.sales_tax)}"></label><label>Broker fee · sell / split (%)<input name="broker_fee" type="text" inputmode="decimal" value="${moonDecimal(d.settings.broker_fee)}"></label><button class="button primary compact">Beállítások mentése</button><p>A begyűjtött arány a kézi bányászat utáni, finomításra ténylegesen megmaradó érc. 100% esetén teljes begyűjtést feltételezünk; a bányászati veszteséget, a kihagyott érceket és az állásidőt ezzel csökkentheted.</p></form>`);
   target.innerHTML+=panel('Számítási alapok','CCP-adatok és látható feltételezések',`<div class="panel-body"><p>30 nap = 720 óra. Alap kitermelés: ${fmt(d.rules.extraction_m3_hour)} m³/óra, megszorozva a megadott ércaránnyal. Az ismeretlen részt nem pótoljuk, a 100,02% feletti összeget javításig kihagyjuk.</p><p>Tatara · nullsec · T2 reprocessing rig · Reprocessing V · Reprocessing Efficiency V · megfelelő Moon Ore Processing V.</p><p data-i18n-skip>${d.rules.rig_base} × (1 + ${d.rules.tatara_bonus}/100) × ${d.rules.rig_nullsec} × 1.15 × 1.10 × 1.10 × (1 + ${d.settings.implant}/100) = ${moonPercent(d.refining_yield*100)}</p><p>Az Athanor-érceknél teljes finomítási adagokkal és anyagonként lefelé kerekítéssel számolunk. A Metenox órás kihozatalát külön lefelé kerekítjük; a finomítási implant rá nem hat. A Metenox csak holdanyagokat ad, Pyerite és Mexallon nem keletkezik.</p><p>Csak az alapérceket vesszük figyelembe. A gazdagabb változatokat, jackpotot, bányászati kritikus találatokat és kompressziós veszteséget nem feltételezzük.</p><p>SDE build: ${esc(d.sde.buildNumber)}</p><ul>${d.sources.map(s=>`<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" data-i18n-skip>${esc(s.name)}</a></li>`).join('')}</ul></div>`);
+  target.insertAdjacentHTML('beforeend',moonFuelSettingsMarkup());bindMoonFuelSettings();
+  target.insertBefore($('#moon-fuel-settings'),target.children[1]);
   const form=$('#moon-settings');form.oninput=()=>{dirty.moon_settings=true;};
-  form.onsubmit=async e=>{e.preventDefault();try{const f=new FormData(form);await api('/api/moons/settings',{implant:Number(f.get('implant')),mining_recovery:moonNumber(f.get('mining_recovery')),crystal_variant:f.get('crystal_variant'),sales_tax:moonNumber(f.get('sales_tax')),broker_fee:moonNumber(f.get('broker_fee'))});dirty={};await refreshMoons();toast('Holdbeállítások mentve.');}catch(e){error(e.message);}};
+  form.onsubmit=async e=>{e.preventDefault();try{const f=new FormData(form);await api('/api/moons/settings',{implant:Number(f.get('implant')),mining_recovery:moonNumber(f.get('mining_recovery')),crystal_variant:f.get('crystal_variant'),sales_tax:moonNumber(f.get('sales_tax')),broker_fee:moonNumber(f.get('broker_fee'))});delete dirty.moon_settings;await refreshMoons(true);toast('Holdbeállítások mentve.');}catch(e){error(e.message);}};
 }
 function openMoonEditor(record){
   moonEditing=true;moonSelected=record?{id:record.system_id,name:record.system.name}:null;
@@ -143,3 +149,12 @@ async function selectMoonSystem(system,moonId){
   }catch(e){if(generation===moonSystemGeneration){error(e.message);$('#moon-system-status').textContent='A rendszeradat nem tölthető be. Válaszd ki újra a rendszert.';}}
 }
 async function closeMoonEditor(refresh=false){moonSystemGeneration++;moonSearchGeneration++;clearTimeout(moonSearchTimer);moonEditing=false;dirty={};error('');if(refresh)await refreshMoons();else render();}
+
+function moonFuelSettingsMarkup(){
+  const d=moonData,fuel=d.settings.fuel_block_id,manual=d.settings.fuel_block_price;
+  return `<form id="moon-fuel-settings" class="panel panel-body moon-toolbar"><label>Fuel Block típusa<select name="fuel_block_id">${d.fuel_blocks.map(f=>`<option data-i18n-skip value="${f.id}" ${f.id===fuel?'selected':''}>${esc(f.name)}</option>`).join('')}</select></label><label>Kézi Fuel Block egységár (ISK)<input name="fuel_block_price" data-grouped-money data-money-max="1000000000000" type="text" inputmode="decimal" placeholder="Üresen: Jita-ár" value="${manual===null?'':esc(String(manual).replace('.',','))}"></label><button class="button primary compact">Üzemanyagár alkalmazása</button><p class="footnote">A kiválasztott blokktípussal számolunk minden holdfúrónál. A kézi ár felülírja a Fuel Block Jita-árát; a Magmatic Gas továbbra is a választott Jita-árral számít. Az üres mező visszaállítja a piaci árazást.</p></form>`;
+}
+function bindMoonFuelSettings(){
+    const form=$('#moon-fuel-settings');form.oninput=()=>{dirty.moon_fuel=true;};
+    form.onsubmit=async e=>{e.preventDefault();try{const f=new FormData(form),price=String(f.get('fuel_block_price')).replace(/\s/g,'').replace(',','.');await api('/api/moons/settings',{fuel_block_id:Number(f.get('fuel_block_id')),fuel_block_price:price||null});delete dirty.moon_fuel;await refreshMoons(true);toast('Üzemanyagár mentve.');}catch(e){error(e.message);}};
+}

@@ -182,12 +182,13 @@ function scheduleTaskPoll() {
       await reloadState();
       if(!state.task.running && state.task.finished!==lastTaskFinished) {
         lastTaskFinished=state.task.finished; toast(state.task.message);
+        if(view==='settings'&&settingsTab==='access')void loadSettingsAccess();
         if(!['skills','pi'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
-        if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else await calculate(false);}
+        if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else if(view==='settings')render();else await calculate(false);}
         else if(state.task.kind==='skills') await refreshSkills();
         else if(state.task.kind==='pi')await refreshPI();
       else if(['moons','extractions'].includes(state.task.kind))await refreshMoons();
-        else {skillData=null;piData=null;moonData=null;await calculate(false);}
+        else {skillData=null;piData=null;moonData=null;if(view==='settings')render();else await calculate(false);}
       }
     } catch(e) { error(e.message); }
   },1200);
@@ -228,25 +229,29 @@ async function calculate(refreshState=true) {
   } finally { if(generation===planGeneration) $('#calculate').disabled=false; }
 }
 function navigate(next) {
+  if(next==='connection')return openSettingsTab('connection');
   if(Object.keys(dirty).length && !confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?')) return false;
   if(view==='moons'){moonEditing=false;moonSystemGeneration++;moonSearchGeneration++;clearTimeout(moonSearchTimer);}
   view=next; dirty={};
   if(next==='moons')setMoonMenu(true);
+  if(next==='settings')setSettingsMenu(true);
+  syncSettingsNavigation();
   syncMoonNavigation();
   clearTimeout(skillTimer);
   clearTimeout(piTimer);
   if(['skills','pi'].includes(next))error('');
   $$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
-  const names={queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Struktúrák és bónuszok',connection:'EVE-kapcsolat',saved:'Mentett tervek'};
+  const names={queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek'};
   $('#breadcrumb').textContent='Műhely / '+names[view]; render();return true;
 }
 function render() {
   if(!state) return;
   syncMoonNavigation();
-  if(view==='settings'&&dirty.facilities&&$('#settings-form'))return;
+  syncSettingsNavigation();
+  if(view==='settings'&&Object.keys(dirty).length&&$('#settings-content'))return;
   if(view==='moons'&&(moonEditing&&$('#moon-form')||dirty.moon_settings&&$('#moon-settings')||dirty.moon_fuel&&$('#moon-fuel-settings')||dirty.moon_crystals&&$('#crystal-settings')))return;
   const content=$('#view-content'); actions();
-  $('.plan-selector').hidden=['skills','pi','corporations','moons'].includes(view);
+  $('.plan-selector').hidden=['skills','pi','corporations','moons'].includes(view)||(view==='settings'&&settingsTab!=='structures');
   $('#plan-status').hidden=!plan?.stale_characters.length;
   if(view==='skills') return renderSkills(content);
   if(view==='pi') return renderPI(content);
@@ -548,7 +553,7 @@ function renderJobs(content) {
   content.innerHTML=readyBanner+panel('Aktív és át nem vett jobok',`${fmt(rows.length)} job`,rows.length?table(['Termék','Állapot','Run','Beszámítható kimenet','Karakter','Kimeneti Hely-ID','Befejezés'],rows):empty('Nincs betöltött aktív job','Adj hozzá karaktert az EVE-kapcsolat oldalon, majd indíts EVE-frissítést.'));
   content.innerHTML+='<p class="footnote">A kimenet csak gyártási és reakciós jobnál, a kiválasztott helyszíneken számít. A delivered, cancelled és reverted jobokat nem adja a folyamatban készlethez. Kutatás, invention és másolás kimenete itt 0. Kézi készletmódban a terv a Készlet oldalon megadott kézi folyamatban mennyiségekkel számol.</p>';
 }
-function renderSettings(content) {
+function renderStructureSettings(content) {
   setHead('GYÁRTÁSI KÖRNYEZET','Struktúrák és bónuszok','A közös beállítások a terv minden megfelelő gyártási lépésére érvényesek.');
   const group=(key,title)=>{
     const s=state.settings[key];
@@ -559,9 +564,11 @@ function renderSettings(content) {
   content.innerHTML+=panel('Készletforrás és helyszín','A karakterek kiválasztása az EVE-kapcsolat oldalon',`<div class="panel-body"><div class="source-choices"><label><input type="radio" name="stock-source" value="manual" ${state.settings.source==='manual'?'checked':''}>Kézi készlet</label><label><input type="radio" name="stock-source" value="eve" ${state.settings.source==='eve'?'checked':''}>Személyes EVE-készlet</label></div><label for="location-ids">Hely-ID-k, vesszővel elválasztva</label><input id="location-ids" class="connection-input" value="${state.settings.location_ids.join(', ')}" placeholder="Üresen minden hely"><p class="footnote">Állomás vagy struktúra ID-t adj meg. A benne lévő konténerek készletét is számolja. A jobok kimeneti helyére ugyanez a szűrés érvényes.</p><div class="chip-list">${state.locations.slice(0,20).map(id=>`<span class="chip">${id}</span>`).join('')}</div><div class="section-actions"><button id="save-source" class="button compact">Készletforrás mentése</button></div></div>`);
   content.innerHTML+=panel('Receptadatbázis',`SDE ${state.sde.buildNumber}`,`<div class="panel-body"><p>${fmt(state.recipe_count)} választható gyártható termék. Adatcsomag kiadása: ${esc(state.sde.releaseDate)}. Az anyag-, idő- és becsült jobköltséget számolja; ütemezett slotkiosztást nem készít.</p><button id="update-sde" class="button compact">Receptadatok frissítése</button></div>`);
   $('#settings-form').oninput=()=>{dirty.facilities=true;};
-  $('#settings-form').onsubmit=async event=>{event.preventDefault();try{const body={manufacturing:{},reaction:{}};$$('[data-facility]').forEach(el=>body[el.dataset.facility][el.dataset.field]=Number(el.value));$$('[data-facility-system]').forEach(el=>{if(el.value.trim()&&!el.dataset.systemId)throw new Error('Válassz rendszert a találati listából.');body[el.dataset.facilitySystem].system_id=el.dataset.systemId?Number(el.dataset.systemId):null;});await api('/api/settings',body);dirty={};await reloadState();if(productId)await calculate(false);else render();toast('Bónuszok mentve.');}catch(e){error(e.message);}};
+  $('#settings-form').onsubmit=async event=>{event.preventDefault();try{const body={manufacturing:{},reaction:{}};$$('[data-facility]').forEach(el=>body[el.dataset.facility][el.dataset.field]=Number(el.value));$$('[data-facility-system]').forEach(el=>{if(el.value.trim()&&!el.dataset.systemId)throw new Error('Válassz rendszert a találati listából.');body[el.dataset.facilitySystem].system_id=el.dataset.systemId?Number(el.dataset.systemId):null;});await api('/api/settings',body);delete dirty.facilities;await reloadState();if(productId&&!Object.keys(dirty).length)await calculate(false);else render();toast('Bónuszok mentve.');}catch(e){error(e.message);}};
   bindFacilitySystems();
-  $('#save-source').onclick=async()=>{try{const raw=$('#location-ids').value.trim();const ids=raw?raw.split(/[,;\s]+/).filter(Boolean).map(Number):[];await api(scoped('/api/settings'),{source:$('input[name="stock-source"]:checked').value,location_ids:ids});await calculate();toast('Készletforrás mentve.');}catch(e){error(e.message);}};
+  $('#location-ids').oninput=()=>dirty.stock_source=true;
+  $$('input[name=stock-source]').forEach(input=>input.onchange=()=>dirty.stock_source=true);
+  $('#save-source').onclick=async()=>{try{const raw=$('#location-ids').value.trim();const ids=raw?raw.split(/[,;\s]+/).filter(Boolean).map(Number):[];await api(scoped('/api/settings'),{source:$('input[name="stock-source"]:checked').value,location_ids:ids});delete dirty.stock_source;await reloadState();if(productId&&!Object.keys(dirty).length)await calculate(false);else render();toast('Készletforrás mentve.');}catch(e){error(e.message);}};
   if(corporationId){$('input[name="stock-source"][value="manual"]').disabled=true;$('.source-choices').insertAdjacentHTML('afterend','<p>Corp módban kizárólag a kiválasztott corporation EVE-készlete számít; a helyszűrés corporationönként külön mentődik.</p>');}
   $('#update-sde').onclick=()=>startTask('/api/sde/update');
 }
@@ -571,10 +578,12 @@ function renderConnection(content) {
   content.innerHTML=`<div class="grid-two">${panel('Hozzáadott karakterek',`${state.characters.length} karakter`, `<div class="panel-body">${characters||'<p>Még nincs hozzáadott karakter. A Bejelentkezés EVE Online-nal gombbal add hozzá a saját karaktereidet.</p>'}<div class="section-actions"><button id="add-character" class="button primary">Bejelentkezés EVE Online-nal</button></div>${characters?'<div class="section-actions"><button id="save-characters" class="button compact">Karakterválasztás mentése</button></div>':''}<p class="footnote">Üres karakterlista a beállításokban: minden hozzáadott karakter. A belépés az EVE hivatalos oldalán történik. A jelszavad nem kerül ebbe az alkalmazásba.</p></div>`)}${panel('Alkalmazásazonosító',state.settings.client_id?'Azonosító megadva':'Egyszeri beállítás',`<div class="panel-body"><p>${state.settings.client_id?'A nyilvános Client ID már meg van adva. A Bejelentkezés EVE Online-nal gombbal engedélyezd a saját karaktereidet; új EVE Developer alkalmazást nem kell létrehoznod.':'Az EVE Developer alkalmazásod nyilvános Client ID-ja szükséges.'} Client Secretet nem kell megadni.</p><label for="client-id">Client ID</label><div class="connection-input"><input id="client-id" autocomplete="off" spellcheck="false" value="${esc(state.settings.client_id)}" placeholder="Az EVE Developer oldalon kapott azonosító"><button id="save-client" class="button compact">Mentés</button></div>${!state.crypto_available?'<p class="danger">A belépéshez futtasd az egyszeri telepítőt: hiányzik a cryptography csomag.</p>':''}</div>`)}</div>`;
   const setupHelp=panel('Így hozd létre a saját EVE-alkalmazásodat','Ezt egyszer kell elvégezni',`<div class="panel-body"><ol class="steps"><li>Nyisd meg az <a href="https://developers.eveonline.com/applications" target="_blank" rel="noopener noreferrer">EVE Developer alkalmazásoldalát</a>, jelentkezz be, és válaszd a <strong>Create New Application</strong> lehetőséget.</li><li>Névnek megadhatod: <strong>EVE Muhely</strong>. Válaszd az ESI-t használó alkalmazást, és ha van választás, a helyi / native / PKCE típust. Nevet és leírást a portál kérésének megfelelően adj meg.</li><li>A <strong>Callback URL</strong> pontosan ez legyen:<code>${esc(state.callback)}</code></li><li>Válaszd ki ezeket az olvasási jogosultságokat:<code>${state.scopes.map(esc).join('\n')}</code></li><li>Mentsd az alkalmazást. A kapott <strong>Client ID</strong>-t másold a fenti mezőbe, és nyomd meg a Mentést. Az esetleg megjelenő Client Secretet nem használjuk.</li><li>A <strong>Bejelentkezés EVE Online-nal</strong> gombbal add hozzá egyenként a karaktereket. Ezután indíts <strong>EVE-frissítést</strong>, és a Struktúrák és bónuszok oldalon válaszd az EVE-készletet.</li></ol><p class="footnote">A belépési adatokat titkosítva, a Maceden tároljuk; a titkosítókulcs a macOS Kulcskarikába kerül. A hozzáférés az EVE fiókodban visszavonható. A CCP gyorsítótárazása miatt az ismételt frissítés nem mindig ad újabb adatot.</p></div>`);
   content.innerHTML+=state.settings.client_id?`<details class="panel skill-permissions"><summary>Másik Client ID beállítása – választható</summary>${setupHelp}</details>`:setupHelp;
-  $('#save-client').onclick=async()=>{try{await api('/api/settings',{client_id:$('#client-id').value.trim()});await reloadState();toast('Client ID mentve.');render();}catch(e){error(e.message);}};
-  $('#add-character').onclick=async()=>{try{error('');const result=await api('/api/auth/start',{});window.location.assign(result.url);}catch(e){error(e.message);}};
+  $('#client-id').oninput=()=>dirty.client_id=true;
+  $$('[data-char]').forEach(input=>input.onchange=()=>dirty.character_selection=true);
+  $('#save-client').onclick=async()=>{try{await api('/api/settings',{client_id:$('#client-id').value.trim()});delete dirty.client_id;await reloadState();toast('Client ID mentve.');render();}catch(e){error(e.message);}};
+  $('#add-character').onclick=async()=>{try{error('');const result=await api('/api/auth/start',{});sessionStorage.setItem('eve-muhely-auth-return','settings:connection');window.location.assign(result.url);}catch(e){error(e.message);}};
   $$('[data-remove-character]').forEach(el=>el.onclick=async()=>{if(!confirmUI('Eltávolítod ezt a karaktert és a helyben mentett adatait?'))return;try{await api('/api/characters/remove',{id:Number(el.dataset.removeCharacter)});await reloadState();render();}catch(e){error(e.message);}});
-  if($('#save-characters')) $('#save-characters').onclick=async()=>{try{const checked=$$('[data-char]:checked').map(el=>Number(el.dataset.char));if(!checked.length)throw new Error('Válassz legalább egy karaktert.');await api('/api/settings',{character_ids:checked.length===state.characters.length?[]:checked});await calculate();toast('Karakterválasztás mentve.');}catch(e){error(e.message);}};
+  if($('#save-characters')) $('#save-characters').onclick=async()=>{try{const checked=$$('[data-char]:checked').map(el=>Number(el.dataset.char));if(!checked.length)throw new Error('Válassz legalább egy karaktert.');await api('/api/settings',{character_ids:checked.length===state.characters.length?[]:checked});delete dirty.character_selection;await reloadState();if(productId&&!Object.keys(dirty).length)await calculate(false);else render();toast('Karakterválasztás mentve.');}catch(e){error(e.message);}};
 }
 function renderSaved(content) {
   const plans=scopedPlans(),scopes=[{id:null,name:'Személyes'},...state.corporations.map(c=>({id:c.id,name:'Corp · '+c.name}))];
@@ -621,15 +630,16 @@ async function startTask(path) {
     error('');
     if(Object.keys(dirty).length) throw new Error('A frissítés előtt alkalmazd a megadott módosításokat.');
     await api(path,{}); await reloadState();
-    if(['skills','pi','corporations','moons'].includes(view))render();
+    if(['skills','pi','corporations','moons','settings'].includes(view))render();
     if(!state.task.running) {
       toast(state.task.message);
+      if(view==='settings'&&settingsTab==='access')void loadSettingsAccess();
       if(!['skills','pi'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
-      if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else await calculate(false);}
+      if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else if(view==='settings')render();else await calculate(false);}
       else if(state.task.kind==='skills')await refreshSkills();
       else if(state.task.kind==='pi')await refreshPI();
       else if(['moons','extractions'].includes(state.task.kind))await refreshMoons();
-      else if(state.task.kind!=='skills'){skillData=null;piData=null;await calculate(false);}
+      else if(state.task.kind!=='skills'){skillData=null;piData=null;if(view==='settings')render();else await calculate(false);}
     }
   } catch(e){error(e.message);}
 }
@@ -643,9 +653,12 @@ function csv(rows, headers, name) {
 $('#plan-form').onsubmit=event=>{event.preventDefault();if(!productId)return error('Előbb válassz egy terméket a találatok közül.');calculate();};
 $$('.nav').forEach(el=>el.onclick=()=>{
   if(el.dataset.view==='moons'&&view==='moons'){setMoonMenu($('#moon-submenu').hidden);return;}
+  if(el.dataset.view==='settings'&&view==='settings'){setSettingsMenu($('#settings-submenu').hidden);return;}
   navigate(el.dataset.view);
 });
 $$('[data-moon-nav]').forEach(el=>el.onclick=()=>selectMoonTab(el.dataset.moonNav));
+$$('[data-settings-nav]').forEach(el=>el.onclick=()=>openSettingsTab(el.dataset.settingsNav));
+document.addEventListener('click',event=>{const link=event.target.closest('[data-open-settings]');if(link)openSettingsTab(link.dataset.openSettings);});
 
 $('#sync').onclick=()=>startTask('/api/sync');
 $('#production-scope').onchange=event=>setProductionScope(Number(event.target.value)||null);
@@ -689,6 +702,6 @@ document.addEventListener('click',event=>{if(!event.target.closest('.search-wrap
     if(saved?.id && saved?.quantity){productId=saved.id;productName=saved.name;activePlanId=saved.saved_plan_id||null;EveNumbers.set($('#target-quantity'),saved.quantity);}
   }catch{}
   $('#product-search').value=productName;
-  try {await reloadState();if(productId)await calculate(false);else render();if(new URLSearchParams(location.search).has('connected')){history.replaceState(null,'','/');const back=sessionStorage.getItem('eve-muhely-auth-return');sessionStorage.removeItem('eve-muhely-auth-return');navigate(['skills','pi','corporations','moons'].includes(back)?back:'connection');if(back==='corporations')void startTask('/api/corporations/sync');toast(back==='moons'?'Holdadatok engedélyezve. A betöltés automatikusan elindult.':'Karakter engedélyezve. Frissítsd az EVE-adatokat.');}}
+  try {await reloadState();if(productId)await calculate(false);else render();if(new URLSearchParams(location.search).has('connected')){history.replaceState(null,'','/');const back=sessionStorage.getItem('eve-muhely-auth-return');sessionStorage.removeItem('eve-muhely-auth-return');if(back?.startsWith('settings:'))openSettingsTab(back.split(':')[1]);else navigate(['skills','pi','corporations','moons'].includes(back)?back:'connection');if(back==='corporations')void startTask('/api/corporations/sync');toast(back==='moons'?'Holdadatok engedélyezve. A betöltés automatikusan elindult.':'Karakter engedélyezve. Frissítsd az EVE-adatokat.');}}
   catch(e){error(e.message);}
 })();
