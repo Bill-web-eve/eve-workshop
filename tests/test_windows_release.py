@@ -116,6 +116,8 @@ class WindowsDistributionTests(unittest.TestCase):
     def test_portable_stage_only_contains_allowlisted_app_and_public_defaults(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);stage(root,{'client_id':'public-only'});audit_bundle(root)
+            for name in ['Hasznalat.md','UserGuide.en.md']:
+                self.assertEqual((root/'app'/name).read_bytes(),(ROOT/name).read_bytes())
             self.assertEqual(json.loads((root/'app/data/defaults.json').read_text()),{'client_id':'public-only'})
             self.assertTrue((root/'app/windows_smoke_test.py').exists())
             self.assertFalse((root/'app/tests').exists())

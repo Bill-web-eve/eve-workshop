@@ -1,6 +1,23 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Dokumentáció": "Documentation",
+  "SEGÍTSÉG": "HELP",
+  "Súgó": "Help",
+  "Teljes felhasználói kézikönyv · keresés és tartalomjegyzék.": "Complete user guide · search and table of contents.",
+  "Kézikönyv letöltése": "Download user guide",
+  "Nyomtatás / PDF": "Print / PDF",
+  "Kézikönyv betöltése…": "Loading user guide…",
+  "Keresés a kézikönyvben": "Search the user guide",
+  "Funkció, beállítás vagy hibaüzenet…": "Feature, setting or error message…",
+  "Keresés törlése": "Clear search",
+  "Tartalomjegyzék": "Table of contents",
+  "Kézikönyv fejezetei": "User guide chapters",
+  "Nincs találat. Próbálj másik keresőkifejezést.": "No results. Try another search term.",
+  "{0} / {1} fejezet": "{0} / {1} chapters",
+  "A kézikönyv nem tölthető be.": "The user guide could not be loaded.",
+  "Ismeretlen kézikönyvnyelv.": "Unknown user guide language.",
+
   "Minimum jobhossz (óra)": "Minimum job duration (hours)",
   "A minimum a Run/job felosztást is növelheti. A hiányzó mennyiség vagy a blueprint korlátja miatt rövidebb job megmaradhat; nem gyártunk többletet. A jobok közé nem kerül várakozás. 0: nincs minimum.": "The minimum may increase the Runs/job split. A small remaining quantity or blueprint limit may require a shorter job; no extra output is added. No waiting time is inserted between jobs. 0: no minimum.",
   "A minimum jobhossz 0 és 720 óra közötti szám lehet.": "Minimum job duration must be a number between 0 and 720 hours.",

@@ -69,6 +69,7 @@ def stage(root,config):
     for file in (SOURCE/'muhely').glob('*.py'):shutil.copy2(file,app/'muhely'/file.name)
     for name in ['desktop.py','windows_desktop.py','windows_smoke_test.py']:shutil.copy2(SOURCE/name,app/name)
     shutil.copytree(SOURCE/'static',app/'static',ignore=shutil.ignore_patterns('.DS_Store','__pycache__'))
+    for name in ['Hasznalat.md','UserGuide.en.md']:shutil.copy2(SOURCE/name,app/name)
     shutil.copy2(SOURCE/'data/catalog.sqlite3',app/'data/catalog.sqlite3')
     (app/'data/defaults.json').write_text(json.dumps(config)+'\n',encoding='utf-8')
 

@@ -58,6 +58,17 @@ class ServerTests(unittest.TestCase):
         status,body,_=self.request('/callback?error=invalid_scope')
         self.assertEqual(status,400);self.assertIn(b'Developer',body)
 
+    def test_bundled_user_guides_are_available_without_characters_but_require_a_local_session(self):
+        for language,title in [('hu','teljes felhasználói kézikönyv'),('en','complete user guide')]:
+            status,data,headers=self.request('/api/documentation?lang='+language)
+            self.assertEqual(status,200);self.assertEqual(data['language'],language)
+            self.assertIn(title,data['markdown']);self.assertGreater(len(data['markdown']),30000)
+            self.assertIn('no-store',headers['Cache-Control'])
+        self.assertEqual(self.app.store.characters(),[])
+        self.assertEqual(self.request('/api/documentation?lang=en',Cookie='')[0],403)
+        self.assertEqual(self.request('/api/documentation?lang=../../characters.enc')[0],400)
+        self.assertEqual(self.request('/api/documentation?lang=hu',Host='evil.invalid')[0],403)
+
     def test_manual_plan_and_search_work_without_any_eve_account(self):
         status,plan,_=self.request('/api/plan?product_id=22428&quantity=1')
         self.assertEqual(status,200);self.assertTrue(plan['queue'])
@@ -67,7 +78,7 @@ class ServerTests(unittest.TestCase):
         status,_,headers=self.request('/')
         self.assertIn('HttpOnly',headers['Set-Cookie'])
         self.assertIn("frame-ancestors 'none'",headers['Content-Security-Policy'])
-        for path in ['/graph.js','/graph.css','/skills.js','/pi.js','/numbers.js','/i18n.js','/i18n-en.js','/settings.js','/accounts.js','/schedule.js','/schedule-graph.js','/multibuy.js']:
+        for path in ['/graph.js','/graph.css','/skills.js','/pi.js','/numbers.js','/i18n.js','/i18n-en.js','/settings.js','/accounts.js','/schedule.js','/schedule-graph.js','/multibuy.js','/documentation.js']:
             status,content,headers=self.request(path)
             self.assertEqual(status,200)
             self.assertTrue(content)

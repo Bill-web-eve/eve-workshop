@@ -31,6 +31,7 @@ def stage_source(target,config):
     for path in (SOURCE/'muhely').glob('*.py'):shutil.copy2(path,target/'muhely'/path.name)
     shutil.copy2(SOURCE/'desktop.py',target/'desktop.py')
     shutil.copytree(SOURCE/'static',target/'static',ignore=shutil.ignore_patterns('.DS_Store','__pycache__'))
+    for name in ['Hasznalat.md','UserGuide.en.md']:shutil.copy2(SOURCE/name,target/name)
     shutil.copy2(SOURCE/'data/catalog.sqlite3',target/'data/catalog.sqlite3')
     (target/'data/defaults.json').write_text(json.dumps({'client_id':config['client_id']})+'\n',encoding='utf-8')
     licenses=target/'licenses';licenses.mkdir()
@@ -73,7 +74,7 @@ def build(config_file,work,output):
 import os
 os.environ['MACOSX_DEPLOYMENT_TARGET']='11.0'
 a=Analysis([{str(staging/'desktop.py')!r}],pathex=[{str(staging)!r}],
-    binaries=[],datas=[({str(staging/'static')!r},'static'),({str(staging/'data')!r},'data'),({str(staging/'licenses')!r},'licenses')],
+    binaries=[],datas=[({str(staging/'static')!r},'static'),({str(staging/'data')!r},'data'),({str(staging/'licenses')!r},'licenses'),({str(staging/'Hasznalat.md')!r},'.'),({str(staging/'UserGuide.en.md')!r},'.')],
     hiddenimports=['cryptography.hazmat.bindings._rust','certifi'],
     excludes=['tkinter','unittest','PIL','numpy','pandas','pytest','IPython'],noarchive=False)
 pyz=PYZ(a.pure)

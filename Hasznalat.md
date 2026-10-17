@@ -1,13 +1,17 @@
-# EVE Műhely – használati útmutató
+# EVE Műhely – teljes felhasználói kézikönyv
+
+## A dokumentáció használata
+
+A bal oldali menü alján található **Dokumentáció** a teljes kézikönyvet az alkalmazáson belül nyitja meg. A kézikönyv EVE-belépés és kiválasztott terv nélkül, internet nélkül is olvasható, ha a helyi app fut. A nyelve követi a Magyar / English választást, megjelenése a világos vagy sötét módot.
+
+A **Tartalomjegyzékben** kattints a kívánt fejezetre. A **Keresés a kézikönyvben** a fejezetcímekben és a teljes szövegben keres; több szó együtt szűr, az ékezetek nem kötelezők. A **Keresés törlése** visszahoz minden fejezetet. A **Kézikönyv letöltése** az aktuális nyelvű teljes útmutatót Markdown-fájlként menti. A **Nyomtatás / PDF** a teljes kézikönyvet nyomtatja, a keresés miatt elrejtett fejezetekkel együtt; a böngésző nyomtatási ablakában PDF-be is mentheted.
 
 ## Felület nyelve / Interface language
 
 Az oldalsávban a sötét mód kapcsolója alatt válassz a **Magyar** és **English** gombokkal. A váltás azonnali, és a böngésző megjegyzi. A beírt mezők, szűrők és még nem mentett módosítások megmaradnak. A nevek és EVE-adatok változatlanok.
 
-Use **Magyar / English** in the sidebar, below the dark-mode switch. Your browser remembers the language. Switching keeps your current view, inputs and filters. Character, corporation, saved-plan and EVE item names remain unchanged.
 
-
-Helyben futó, magyar nyelvű gyártástervező macOS-re. Excel és OpenAI API-előfizetés nem szükséges hozzá. A böngészős felület kizárólag a saját gépeden futó alkalmazáshoz kapcsolódik.
+Az EVE Műhely helyben futó, magyar és angol nyelvű gyártástervező macOS-re és Windows 11 64 bitre. Excel és OpenAI API-előfizetés nem szükséges hozzá. A böngészős felület a saját gépeden futó alkalmazáshoz kapcsolódik.
 
 ## Indítás
 
@@ -15,11 +19,11 @@ Az Asztalon nyisd meg az **EVE Műhely** parancsikont. Ez a helyi **~/Applicatio
 
 Az indító már futó példány esetén ugyanazt az alkalmazást nyitja meg. A böngészőlap bezárása nem állítja le a műhelyt; erre a bal alsó sarokban lévő **Alkalmazás leállítása** gomb szolgál. A mentett adatok megmaradnak.
 
-Ezen a Macen a meglévő Python-környezet elegendő, külön telepítés most nem szükséges. Másik gépen Python 3.9 vagy újabb kell; célszerű a [python.org hivatalos macOS-telepítőjét](https://www.python.org/downloads/macos/) használni. A belépéshez szükséges `cryptography` csomagot az indító szükség esetén saját környezetbe telepíti a PyPI-ról. Ez az első alkalommal internetet igényel. Külön szerver, Docker, Node.js vagy adatbázis-telepítés nem kell.
+A csomagolt Mac- és Windows-kiadás tartalmazza a futtatókörnyezetet. Forrásból indításkor Python és a `cryptography` csomag szükséges; az indító ehhez saját környezetet hozhat létre, és első alkalommal interneten letöltheti a függőségeket. Külön szerver, Docker, Node.js vagy adatbázis-telepítés a normál használathoz nem kell.
 
 ## Tervezés EVE-belépés nélkül
 
-1. Írd be a termék angol játékbeli nevét a **Termék** mezőbe, és válassz a találatok közül. A Salvation és Redeemer gyorsgombbal is elérhető.
+1. Írd be a termék angol játékbeli nevét a **Termék** mezőbe, és válassz a találatok közül. A termékmező alatti gyorsválasztóban a saját mentett terveid látszanak.
 2. Add meg a célmennyiséget **darabban**, majd kattints a **Terv kiszámítása** gombra.
 3. A **Blueprint** oldalon állítsd a paraméterforrást Kézire, és add meg az ME-t, TE-t, a jobonkénti runszámot, illetve ha ismert, az összes rendelkezésre álló BPC-runt. Alkalmazd a módosításokat.
 4. A **Készlet** oldalon megadhatod a meglévő darabszámokat és a már folyamatban lévő jobok várható kimenetét. A folyamatban mező **darabszám**, nem run.
@@ -48,7 +52,7 @@ A corp módban megnyomott **EVE-frissítés** a corporation adatokat frissíti. 
 
 Minden táblázat fejlécére kattintva rendezhetsz: az első kattintás növekvő, a második csökkenő, a harmadik az eredeti sorrendet állítja vissza. A számok mennyiség szerint, az időpontok időrendben rendeződnek. A Gyártási terv eredeti sorrendje a gyártási függőségeket követi.
 
-A szűrősor alapértelmezetten csukva van. A táblázat fölötti **Szűrők megnyitása** gombbal nyithatod ki, a **Szűrők bezárása** gombbal csukhatod vissza. A becsukás nem törli a szűrést; a gomb jelzi az aktív szűrők számát. A **Karakter** oszlopban legördülő listából válassz; minden más oszlopban szabad szöveget írhatsz. A szűrők együtt érvényesülnek, a számok ezreselválasztó nélkül is kereshetők. A **Rendezés és oszlopszűrők törlése** gomb visszaállítja az oszlopokat. A táblázat fölött látszik a megjelenített és az összes sor száma.
+A szűrősor alapértelmezetten csukva van. A táblázat fölötti **Szűrők megnyitása** gombbal nyithatod ki, a **Szűrők bezárása** gombbal csukhatod vissza. A becsukás nem törli a szűrést; a gomb jelzi az aktív szűrők számát. A **Karakter** oszlopban legördülő listából válassz; a holdtermelés és érctérfogat nézetek Hold oszlopában szintén listából választhatsz. A többi oszlopban szabad szöveget írhatsz. A szűrők együtt érvényesülnek, a számok ezreselválasztó nélkül is kereshetők. A **Rendezés és oszlopszűrők törlése** gomb visszaállítja az oszlopokat. A táblázat fölött látszik a megjelenített és az összes sor száma.
 
 Az oszlopbeállítások nézetenként megmaradnak adatfrissítés és menüváltás közben; a böngészőlap újratöltése alaphelyzetbe állítja őket. A táblázat fölötti korábbi kereső az oszlopszűrőkkel együtt működik. A rendezés és szűrés a megjelenítést változtatja, a gyártási számítást és a foglalásokat nem.
 
@@ -64,7 +68,7 @@ A funkció a gyártási tervben, az alapanyaghiányban és az összesített hiá
 
 ## EVE-kapcsolat: egyszeri beállítás
 
-Az EVE-kapcsolathoz saját Client ID és karakterenkénti bejelentkezés szükséges. Ezek beállításáig kézi készlettel használható a műhely.
+Az EVE-kapcsolathoz Client ID és karakterenkénti bejelentkezés szükséges. A kiadásban a nyilvános Client ID már szerepelhet; ilyenkor rögtön hozzáadhatod a karaktereidet. Saját EVE Developer alkalmazáshoz az alábbi lépéseket kövesd. EVE-belépés nélkül kézi készlettel tervezhetsz.
 
 1. Nyisd meg az [EVE Developer alkalmazásoldalát](https://developers.eveonline.com/applications), jelentkezz be, és hozz létre egy saját alkalmazást.
 2. Az alkalmazás lehet például **EVE Muhely**. Az ESI-adatokat használó, helyi/native/PKCE alkalmazástípust válaszd, ha a portál típust kér. A portál további kötelező név- és leírásmezőit töltsd ki.
@@ -83,7 +87,7 @@ Az EVE-kapcsolathoz saját Client ID és karakterenkénti bejelentkezés szüks�
 
 5. Mentsd az alkalmazást. A kapott nyilvános **Client ID**-t másold a műhely **EVE-kapcsolat** oldalára, és mentsd. Client Secretet nem használunk, azt ne másold be.
 6. A **Bejelentkezés EVE Online-nal** gombbal add hozzá egyenként a karaktereidet. A jelszavadat kizárólag a CCP hivatalos bejelentkezőoldalán add meg.
-7. Indíts **EVE-frissítést**. Ez a személyes asseteket, blueprinteket, ipari jobokat, valamint az engedélyezett skilladatokat, tanulási sort és PI-kolóniákat tölti le. Corporation hangárt nem kér le.
+7. Indíts **EVE-frissítést**. Ez a személyes asseteket, blueprinteket, ipari jobokat, valamint az engedélyezett skilladatokat, tanulási sort és PI-kolóniákat tölti le. A corporation készlethez külön corp-hozzáférést kell engedélyezni a Corporationok vagy az Adathozzáférések oldalon.
 8. Az első sikeres frissítés automatikusan bekapcsolja a **Személyes EVE-készlet** forrást, ha korábban nem választottál külön készletmódot. Így a terv rögtön levonja az asseteket és jobkimeneteket. Később a **Struktúrák és bónuszok** oldalon bármikor válthatsz; a külön kiválasztott kézi módot a frissítés megőrzi. Az EVE-kapcsolat oldalon kiválaszthatod a beszámított karaktereket.
 
 A Mac a Kulcskarikához hozzáférést kérhet a titkosított belépés mentésekor. A hozzáférést az EVE fiókod oldalán később visszavonhatod.
@@ -107,6 +111,8 @@ Az EVE néha még a sorban jelzi az időközben befejezett szintet, amíg a kara
 
 Az **EVE-frissítés** újra lekéri a szerver által már frissíthető adatokat, majd újraszámolja a tervet. A CCP gyorsítótárazása miatt a többszöri kattintás nem feltétlenül hoz frissebb készletet. Az asset-, blueprint- és jobpillanatkép idejét karakterenként láthatod az EVE-kapcsolat oldalon. A lejárt pillanatképből végzett számítást figyelmeztetés jelzi; sikertelen karakterfrissítéskor az EVE-mód új tervét a program megállítja, a régi adatokat megőrzi.
 
+A **Folyamatban** menü figyelmeztet, ha van átvehető, elkészült job. Az oldalsávban számláló is jelzi. A jobot az EVE-ben kell átvenni, majd az app adatait frissíteni.
+
 A **Folyamatban** mennyiség a gyártási és reakciós, `active`, `paused` vagy `ready` állapotú jobok **run × kimenet/run** értéke. A kutatás, másolás, invention, delivered, cancelled és reverted nem adódik hozzá. Az átvehető, még át nem vett job kimenetét továbbra is beszámítja.
 
 Átvétel után frissíts. Az asset és job gyorsítótára eltérő időben frissülhet. Ha a program frissen átvett jobot lát egy korábbi assetpillanatkép mellett, az érintett tervvel megvárja a frissebb assetadatot. Addig ellenőrzött kézi készletértékkel folytathatod. A korábbi kézi felülírások EVE-frissítéskor is megmaradnak; a mező kiürítésével állhatsz vissza automatikus adatra.
@@ -115,7 +121,7 @@ Helyszűréshez a Struktúrák oldalon állomás- vagy struktúra-ID-ket adhatsz
 
 ## Blueprintek és bónuszok
 
-Automatikus módban a személyes blueprintekből olvassa az ME/TE-t és a BPC-k hátralévő runjait, **kézi készletmódban is**. A készletforrás csak az anyagok és jobkimenetek elszámolását kapcsolja. Külön oszlopban látható az összes szűrésbe tartozó **BPO- és BPC-darabszám**, a BPC-k összes runja, valamint az ME/TE-hez kiválasztott csoport **felhasználható runkerete**. A **Példányok megtekintése** gomb minden blueprint saját ME/TE-jét, hátralévő runját, helyét, karakterét, egyedi Item ID-ját és kiválasztási állapotát megmutatja. Kézi ME/TE-felülírás mellett is láthatók az eredeti EVE-példányok.
+Automatikus módban az aktuális gyártási kör személyes vagy corporation blueprintjeiből olvassa az ME/TE-t és a BPC-k hátralévő runjait, **kézi készletmódban is**. A készletforrás csak az anyagok és jobkimenetek elszámolását kapcsolja. Külön oszlopban látható az összes szűrésbe tartozó **BPO- és BPC-darabszám**, a BPC-k összes runja, valamint az ME/TE-hez kiválasztott csoport **felhasználható runkerete**. A **Példányok megtekintése** gomb minden blueprint saját ME/TE-jét, hátralévő runját, helyét, karakterét, egyedi Item ID-ját és kiválasztási állapotát megmutatja. Kézi ME/TE-felülírás mellett is láthatók az eredeti EVE-példányok.
 
 A BPO elsőbbséget kap; azon belül, illetve BPC-nél a legjobb ME, majd TE számít. Csak azonos ME/TE-jű BPC-k runjait vonja össze. BPC-példány határán új jobot kezd, így az anyagkerekítés is külön történik. Eltérő paraméterű vagy foglalt példányokra figyelmeztet. Konkrét blueprintet az egyedi Item ID-val lehet kiválasztani. Példa: két, egyenként ME 3 / TE 2 / 2 runos Salvation BPC esetén 2 BPC-t és 4 felhasználható runt mutat.
 
@@ -123,18 +129,18 @@ Hiányzó blueprintnél kézi, alapból ME 0 / TE 0 számítást készít, és e
 
 A **Run/job** szerkeszthető munkafeltételezés. Automatikus BPC-nél alapértéke legfeljebb 100 és a kiválasztott csoport leghosszabb másolatának hátralévő runja; BPO-nál vagy hiányzó blueprintnél legfeljebb 100, az SDE másolati runhatáráig. Ez nem azonos a karaktered és a játék által ténylegesen engedett jobmérettel. A kézzel mentett Run/job beállítás elsőbbséget kap. Állítsd a valóban használt jobméretre, mert az anyagkerekítés függ a felosztástól. Reakciónál az ME/TE mindig 0.
 
-A kapott képek szerinti közös alapértékek:
+A gyártási és reakciós bónuszok a **Beállítások → Struktúrák és bónuszok** alatt szerkeszthetők. A kezdeti közös értékek:
 
 | Tevékenység | Struktúra anyag | Rig anyag | Struktúra idő | Rig idő |
 |---|---:|---:|---:|---:|
 | Manufacturing | 1% | 4,2% | 30% | 42% |
 | Reakció | 0% | 2,6% | 25% | 26,4% |
 
-A bónuszok szorzódnak. A skill időszorzó alapból 1,00; állítsd át, ha a saját skilljeid gyorsítását is figyelembe akarod venni. A megadott rigbónuszok a kérésed szerint minden megfelelő gyártási, illetve reakciós lépésre érvényesek.
+A bónuszok szorzódnak, és az adott tevékenység minden lépésére vonatkoznak. A kézi skill időszorzó alapból 1,00; csak kézi időbecsléshez használd. Kiválasztott, friss skilladatú karakter esetén az app az aktív skillekből számolja az időt, és nem alkalmazza újra a kézi szorzót.
 
 ## Vétel, mentés, adatok
 
-- Bármely recepttel rendelkező köztes termék **Vételre** állítható a Blueprintok oldalon. Ekkor annak saját alapanyagai eltűnnek, és maga a köztes termék kerül a beszerzési listára.
+- Bármely recepttel rendelkező köztes termék **Vételre** állítható a Blueprint oldalon. Ekkor annak saját alapanyagai eltűnnek, és maga a köztes termék kerül a beszerzési listára.
 - Fuel block bemenetet alapból vásároltnak tekint, ahogy a korábbi táblázatok. Külön célterméknek kiválasztva gyártható, vagy a tervben Gyártásra állítható.
 - A PI-termékek beszerzendő levelek. A PI-kolóniák külön menüben követhetők; invention és BPC-másolás külön jobjait nem tervezi. A karakterek közötti slotkiosztáshoz a külön Gyártásütemező használható. Az ISK-költségek és a jobdíjak külön becslésként jelennek meg. Az összes munkaóra a jobidők összege, nem a párhuzamos gyártás átfutási ideje.
 - A **Terv mentése és foglalás** a célterméket és darabszámot tárolja, valamint aktív készletfoglalást indít. A készlet és a blueprintparaméterek közösek. A foglalások kezelését az alábbi rész írja le.
@@ -178,7 +184,7 @@ A személyes készlet, beállítások, mentett tervek és titkosított belépés
 
 Ezeket nem mentjük a ProtonDrive-ba. A `muhely.sqlite3` tartalmazza a beállításokat és készletpillanatképeket; biztonsági másolatot leállított alkalmazás mellett készíts. A `characters.enc` titkosított tokenfájl kulcsa a Mac Kulcskarikájában van, ezért egyszerű fájlmásolással másik gépen nem áll helyre a belépés: ott add hozzá újra a karaktereket. Indítási hiba esetén a `server.log` és `launcher.log` segít; a program nem naplózza a hozzáférési tokeneket.
 
-A **0.6.2-s változat 115 Python- és 7 gráfellenőrzést** tartalmaz, köztük a Salvation és Redeemer korábban ellenőrzött számításaival **2367 számérték összehasonlítását**, a készlet- és jobelszámolást, BPC-felosztást, SSO-t, helyi adatvédelmet és a több terv közötti foglalást. Ellenőrzött a saját foglalás felhasználása, feloldás/törlés, párhuzamos mentés, újraindítás, régi mentések megőrzése, valamint a kész komponensek alapanyagainak felszabadítása. A gráftesztek a közös anyagokat, a fedezett ágak levágását, a beszerzést, a kijelölést és az elrendezést ellenőrzik. A skilltesztek az ötnapos határt, üres/szünetelő sort, megszakadást, elavult adatokat, befejezéseket, új engedélyeket és a régi ipari tokenek megőrzését is ellenőrzik. A Salvation, Redeemer és Purifier gráfját, valamint a skillnézetet mintakarakterekkel böngészőben is kipróbáltuk. A valódi skilladatokhoz karakterenként külön EVE-engedélyezés szükséges.
+Az alkalmazás frissítése előtt állítsd le a futó példányt. A külön tárolt saját adatokat ne töröld az alkalmazás mappájának cseréjekor. A vágólapra másolt listák és a CSV-exportok csak az adott pillanat számítását tartalmazzák; új gyártás vagy frissítés után készíts új exportot.
 
 Hivatalos háttér: [EVE SSO](https://developers.eveonline.com/docs/services/sso/), [ESI lekérdezések](https://developers.eveonline.com/docs/services/esi/best-practices/), [SDE](https://developers.eveonline.com/docs/services/static-data/).
 
@@ -225,7 +231,7 @@ Reakciónál legfeljebb **100 000 000 db** célmennyiség adható meg; gyártás
 
 Az **Alapanyaghiány** a még elvégzendő gyártás hiányzó BPC-runjait is tartalmazza. BPO esetén a runkeret korlátlan. BPC esetén a kiválasztott ME/TE-csoport felhasználható runjait vonjuk le. Például 5 szükséges run és egy 2 runos BPC mellett **3 run** hiányzik. A darabos becslés a mellette feltüntetett run/BPC feltételezéssel értendő; eltérő másolati runméretnél változik a darabszám. BPC másolással, inventionnel vagy beszerzéssel pótolható; ezek külön jobjait, idejét és anyagait ez a lista nem tervezi. A reakcióformula nem másolható: ebből hiány esetén 1 db beszerzést jelez. Az összesített hiány készlettulajdonosonként egyszer számolja a közösen használható formulát.
 
-A meglévő készterméket, kész komponenst és aktív gyártási job kimenetét előbb levonjuk; ezekhez nem kérünk új BPC-t. A mentett terv a ténylegesen meglévő BPC-runokat is lefoglalja. A saját terv felhasználhatja saját foglalását, más terv csak a maradékot. Feloldás vagy törlés a BPC-runkeretet is felszabadítja. A **Lefoglalt tételek** részben a másolat Item ID-ja és a lefoglalt run is látszik. Személyes és corp másolatok nem keverednek. A beszerzési CSV és a másolt lista külön jelzi a **db/run** egységet, így BPC-run nem értelmezhető nyersanyagdarabként.
+A meglévő készterméket, kész komponenst és aktív gyártási job kimenetét előbb levonjuk; ezekhez nem kérünk új BPC-t. A mentett terv a ténylegesen meglévő BPC-runokat is lefoglalja. A saját terv felhasználhatja saját foglalását, más terv csak a maradékot. Feloldás vagy törlés a BPC-runkeretet is felszabadítja. A **Lefoglalt tételek** részben a másolat Item ID-ja és a lefoglalt run is látszik. Személyes és corp másolatok nem keverednek. A felület és a beszerzési CSV külön jelzi a **db/run** egységet, így BPC-run nem értelmezhető nyersanyagdarabként. Az EVE Multibuy vágólaplistából a blueprintek kimaradnak.
 
 A **Gyártó karakter** mező a tervvel együtt mentődik. Tervenként egy konkrét gyártó karaktert válassz: a terv minden gyártási és reakciós lépésének idejét az ő aktív skilljeivel számoljuk. Amíg nincs karakter kiválasztva, jelzett kézi becslés látszik; nem választunk helyetted automatikusan másik karaktert. Személyes gyártásnál a hozzáadott karakterek, corp gyártásnál az adott corporationhöz tartozó hozzáadott karakterek választhatók. Ez a választás az időbecslést befolyásolja; a készlet gyártási körét nem változtatja. A foglalás és a gyártási idő nem oszt ki karakteres jobslotokat, és nem ellenőrzi a karakter helyzetét vagy corp hangárjogosultságait.
 
@@ -242,7 +248,7 @@ A kiadásban nincs karakter, mentett terv, saját készlet vagy belépés. Csak 
 Az **Ellenorzes.cmd** külön ideiglenes tesztprofillal ellenőrzi a Windows-titkosítást, a helyi API-t, a tervmentést és az EVE HTTPS-kapcsolatot. Saját karaktert nem ad hozzá és saját tervet nem módosít. Az összeállítás ezen a Macen történt; natív Windows 11 futtatási próba itt nem volt elérhető. A Windows-csomag nincs kiadói tanúsítvánnyal aláírva. A vírusvédelmet és a SmartScreent nem kell kikapcsolni.
 
 
-### Jita-árak és anyagköltség (helyi tesztváltozat)
+## Jita-árak és anyagköltség
 
 A holdtermelés, a gyártási terv és az alapanyaghiány oldalán az **Árazás** mezőben választható a Jita sell, buy vagy split érték. A split a vételi és eladási ár átlaga. A választás minden költségnézetre érvényes és megmarad a böngészőben.
 
@@ -252,17 +258,52 @@ Az árak Jita 4-4 nyilvános piaci ajánlataiból származnak, háttérben tölt
 
 A **Holdak és kitermelés → Fogyasztás** oldalon a **Fuel Block típusa** legördülőben válassz a négy blokk közül. A választás minden holdfúró költségére érvényes. A **Kézi Fuel Block egységár (ISK)** mezővel felülírhatod a blokk piaci árát; üresen visszaáll a kiválasztott Jita-árazás. Az **Üzemanyagár alkalmazása** menti a beállításokat. A Magmatic Gas továbbra is a Jita buy/sell/split választással számít. A 30 napos összeg holdanként, struktúratípusonként és összesen is látható, és a megadott bekapcsolásokat is tartalmazza.
 
-### Job cost és késztermék-eladási érték
+## Job cost és késztermék-eladási érték
 
 A **Struktúrák és bónuszok** alatt válassz gyártási rendszert a kereső találatai közül, külön a manufacturing és a reakció mezőben. Az indexet az ESI tölti be. Add meg a **Facility tax** értékét; a struktúra job cost kedvezménye, SCC és az esetleges Alpha-pótdíj is ugyanitt állítható. A **Bónuszok mentése** után a terv anyagköltségénél látható a job cost, a teljes hátralévő gyártási költség és a részletes díjbontás. Az indexek és a díjalaphoz használt adjusted price háttérben frissül, a CCP gyorsítótárát betartva.
 
 A terv késztermékének **Jita buy** és **Jita sell** eladási értéke egyszerre látható, a teljes célmennyiségre, bruttó összegként. A megadott termékre hiányzó Jita-ajánlat `–` értéket ad. A már meglévő késztermékek miatt a hátralévő gyártás költsége és a célmennyiség teljes eladási értéke eltérő mennyiségi alapot is jelenthet.
 
-### A holdtermelés profitja
+## A holdtermelés profitja
 
 A **Termelés Jita-értéke** panel tartalmazza az üzemanyagot és Magmatic Gas-t, a megadott bérletet és egyéb költséget, az eladási díjakat, a teljes költséget és a **Profit / 30 nap** sort. Holdanként a **Szerkesztés** alatt add meg a havi bérletet és a további költségeket; ide írható például a külön Tatara üzemanyaga, a finomítás, bányászat és szállítás költsége. Ezek nem kerülnek automatikusan becslésre.
 
 Az eladási adót és a broker fee-t a holdak **Számítási beállítások** lapján adhatod meg. Kezdetben mindkettő 0%. Buy áron történő eladásnál nincs új eladási megbízás broker fee-je; sell és split esetén a megadott broker fee is számít. A struktúraszűrő a költséget és a profitot is szűri. A kézi Fuel Block ár mező az ezreseket automatikusan tagolja, a tizedesrészt megtartja.
+
+## Holdnyilvántartás és 30 napos termelés
+
+Nyisd le a **Moon management / Holdak és kitermelés** menüt. A **Holdnyilvántartás** alatt új holdat vihetsz fel, a meglévőket szerkesztheted vagy törölheted.
+
+1. A rendszermezőbe gépelj nevet, és válassz a szűkülő találati listából. Az app a rendszerhez tartozó constellationt és alapadatokat ESI-ből rendeli hozzá és gyorsítótárazza.
+2. Válaszd ki a holdat és a fúrót: **Athanor** vagy **Metenox**. Holdanként legfeljebb négy különböző ércet választhatsz a listából; kevesebb érc is megadható. Minden érc mellé adj százalékos arányt.
+3. A százalékok összegét ellenőrizd. A 100% fölötti összetétel hibás, nem kerül a termelésbe. A 100% alatti adat részleges: csak a megadott ércek mennyiségét számítja, a hiányzó részt nem osztja szét. Az app nem javítja ki automatikusan a kézzel beírt arányokat.
+4. A működést, a bekapcsolások számát, az ércmező becsült élettartamát, a 30 napos bérletet és egyéb költségeket is megadhatod. A kikapcsolt hold termelése és folyamatos fogyasztása kimarad. Mentés után az összesítések frissülnek.
+
+A **30 napos termelés** 720 órára becsül érctérfogatot és feldolgozott alapanyagokat. Holdanként és összesítve is megmutatja az eredményt; választhatsz összes, Athanor vagy Metenox bontást. A **Production by moon** és **Ore volume and processing** Hold oszlopa választható listával szűrhető. Az anyagtáblázat sorvégi értéke a kiválasztott Jita buy, sell vagy split árral számol.
+
+Athanornál az app nullsec Tatarával, T2 moon-ore riggel és maximális finomítási skillekkel számol. Az implant a **Beállítások → Holdak számítási beállításai** alatt változtatható, alapból 4%; ugyanitt a bányászati visszanyerési arány is megadható. A kijelzett Tatara-kihozatal a feldolgozási szorzó. Metenoxnál saját kitermelési hatásfok és ciklusonkénti lefelé kerekítés érvényesül; csak a holdanyagokat adja hozzá, a normál ásványokat nem. Az ércreceptek és a gépi paraméterek a mellékelt katalógusból származnak.
+
+A 30 napos adat becslés, nem a bányászott és elszállított tényleges készlet. Az ESI-ből érkező friss, azonosítható összetétel módosíthatja az Athanor számításban használt arányokat; az eredeti kézi értékek megmaradnak. Az adatok forrása mindenhol jelölt.
+
+## Holdak fogyasztása
+
+A **Fogyasztás** az Athanorok és Metenoxok 30 napos Fuel Block-igényét, a Metenox Magmatic Gas-fogyasztását és a megadott bekapcsolások egyszeri üzemanyagát mutatja. Holdanként, fúrótípusonként és együtt is láthatók a mennyiségek és ISK-értékek. A Fuel Block típusa választható, egységára kézzel felülírható; üres felülírásnál a Jita-árazás érvényesül. A külön Tatara és más szolgáltatások üzemanyaga nem része ennek a fúrófogyasztásnak; saját költségként adhatod meg.
+
+## Kitermelési naptár és ESI-ércmennyiségek
+
+A **Kitermelési naptár** az azonosított holdak kitermelési időpontjait mutatja. A naptár fölötti **Kitermelések és várható ércek** listából vagy egy naptáreseményből megnyithatók a részletek: hold, megérkezés, automatikus széttörés, összes és ércenkénti m³, forrás, frissesség és becsült eltűnés. Ha egy működő Athanorhoz nincs hozzáférhető kitermelés, figyelmeztetés jelenik meg; ez azt jelenti, hogy az appban nincs adat róla, nem bizonyítja, hogy a játékban sincs fúrás.
+
+A **Beállítások → Adathozzáférések → Holdadatok hozzáférése** alatt engedélyezd a megfelelő karaktereket, majd frissíts holdadatot. Szükséges scope-ok: **esi-calendar.read_calendar_events.v1**, **esi-industry.read_corporation_mining.v1**, **esi-characters.read_notifications.v1**. Ezeket saját Client ID használatakor az EVE Developer alkalmazásban is engedélyezni kell. Az értesítésekhez olyan karaktert válassz, aki az EVE-ben megkapja a holdkitermelési értesítéseket. A corporation időzítőkhöz a fúró tulajdonos corporationjében megfelelő, Station Manager szerepkör kell. Más corporationtől bérelt fúró időzítője ettől még nem feltétlenül látszik.
+
+A karakter **holdkitermelési értesítése** az ércadatok elsődleges forrása. Ha friss és azonosítható ércenkénti térfogatot tartalmaz, az app ebből számolja az arányokat, és **ESI-értesítés** forrást jelez. Egyértelmű naptárszöveg is lehet forrás. A corporation időzítő önmagában nem tartalmaz ércösszetételt: időtartamából becsült térfogat kézi arányokkal szerepel. Hiányos, régi vagy nem értelmezhető ércadat nem írja felül a kézi összetételt.
+
+Az eltűnés becslés: a megfigyelt széttöréshez vagy a lehetséges széttörési időkhöz adja a holdnál megadott élettartamot. Ismeretlen széttörésnél tartomány vagy ismeretlen érték látható. Ez nem garantált ESI-lejárati adat. A naptár táblázatai UTC-t jelölnek; a helyi naptárfeliratkozás a naptáralkalmazás időzónáját használja.
+
+## Bányászkristályok
+
+A **Bányászkristályok** nézetben válassz holdat. Az app az adott kitermelés ércmennyiségeit használja, ha van hozzá használható adat; máskülönben a 30 napos holdbecslést. Az azonos kristályt használó érceket összevonja, majd a térfogatokból arányt készít. A kristályváltozat a holdszámítási beállításokban váltható. Metenoxhoz nem kell kristály.
+
+Az arány minden tagja **1–9 közötti egész**, felfelé kerekített közelítés. A 75% és 25% megoszlás például **3 : 1**. A tábla megmutatja a kristály nevét, az érceket, térfogatukat és részesedésüket. Ez az összetételhez arányos készletjavaslat; nem veszi figyelembe a kopást, a lézerek számát vagy kihozatalát, és nem a teljes bányászathoz elfogyó darabszámot jelenti.
 
 ## Holdkitermelések a helyi naptárban
 
@@ -285,6 +326,7 @@ A bal oldali **Settings / Beállítások** menü lenyitható, és az alábbi ré
 - **Data access / Adathozzáférések:** karakterenkénti skill-, PI-, corporation- és holdadatengedélyek, scope-ok, frissítési lehetőségek.
 - **Moon calculation settings / Holdak számítási beállításai:** finomítás, implant, kristályváltozat, üzemanyagtípus, kézi üzemanyagár és gazdasági paraméterek.
 - **Calendar sync / Naptárszinkron:** helyi naptárfeliratkozás és ICS-letöltés. A meglévő feliratkozások változatlanul működnek.
+- **Accounts and training / Accountok és tanulás:** accountcsoportok, Omega- és MCT-lejáratok, tanulási helyek.
 
 A műveleti nézeteken a hozzáférési és beállítási panelek helyett rövid hivatkozások mutatnak az új helyre. Az EVE-engedélyezés után a megfelelő Beállítások lap nyílik meg. A még nem mentett értékekre lapváltáskor figyelmeztetünk.
 
@@ -335,3 +377,13 @@ Az ütemező összevonja az azonos karakteren, sloton és ugyanazzal a formuláv
 A **Minimum job duration (hours) / Minimum jobhossz (óra)** alapértéke 12 óra, és a böngésző megjegyzi a beállítást. A minimum a gyártásra és a reakciókra is vonatkozik, a karakter skilljeivel, TE-vel és struktúrabónuszokkal számolt tényleges futásidő alapján. Szükség esetén növeli a szokásos Run/job felosztást, és kiegyenlíti a jobméreteket a rövid maradékok elkerülésére. A 0 érték kikapcsolja a minimumot.
 
 Két job közé nem kerül kötelező várakozás: amint az anyagok, a slot és a blueprint elérhetők, a következő indulhat. A hiányzó mennyiségen felül nem gyártunk csak a minimum eléréséért. A BPC-runok, a recept runkorlátja és a maximális jobidő továbbra is korlátoz; az elkerülhetetlenül rövidebb jobok külön jelölést kapnak.
+
+
+## Gyakori helyzetek és hibaelhárítás
+
+- **Üres gyártási lista:** nézd meg a késztermék-összesítést: a készlet vagy a folyamatban lévő jobok teljesen fedezhetik a célt. Ellenőrizd a kiválasztott gyártási kört, a saját és más tervek foglalását, illetve a kézi felülírásokat. További új késztermék gyártásához a megtartandó meglévő darabokat a Másra foglalva mezővel tedd félre.
+- **Kész komponens alapanyaga újra hiányzik:** ellenőrizd a készletforrást, a karakter- és helyszűrést, a corp/személyes kört, a más tervhez foglalást és az asset időpontját. A terv a ténylegesen felhasználható komponenst vonja le, a más célhoz félretettet nem.
+- **Ismételt frissítés után is régi adatok:** a CCP gyorsítótárának lejáratáig azonos pillanatkép érkezhet. Átvett jobnál várd meg a kijelzett új készletet, vagy használj ellenőrzött kézi felülírást. A foglalást nem szükséges törölni.
+- **invalid_scope vagy nincs jogosultság:** a kért scope legyen engedélyezve az EVE Developer alkalmazásban is, majd a megfelelő karaktert az Adathozzáférések alatt engedélyezd újra. Corporationadatokhoz a játékbeli szerepkör is kell. Jelszót és Client Secretet ne írj a Műhelybe.
+- **Nem készül teljes ütemterv:** nézd meg a Nem ütemezhető tételek és a Karakterek ipari kapacitása táblát. Ellenőrizd az aktív skilleket, a friss jobadatot, a fizikai blueprinteket, az Omega dátumát és az anyagok érkezését. A részleges ütemterv nem jelenti azt, hogy a teljes cél fedezett.
+- **Felületi frissítés:** helyi programfrissítés után töltsd újra a lapot (Mac: ⌘R, Windows: Ctrl+R), majd számold újra a tervet vagy ütemezést. Az app leállításához az oldalsáv alján lévő gombot használd; a böngészőlap bezárása nem elegendő.

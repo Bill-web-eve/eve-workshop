@@ -242,7 +242,7 @@ function navigate(next) {
   clearTimeout(piTimer);
   if(['skills','pi'].includes(next))error('');
   $$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
-  const names={schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek'};
+  const names={schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
   $('#breadcrumb').textContent='Műhely / '+names[view]; render();return true;
 }
 function render() {
@@ -252,8 +252,10 @@ function render() {
   if(view==='settings'&&Object.keys(dirty).length&&$('#settings-content'))return;
   if(view==='moons'&&(moonEditing&&$('#moon-form')||dirty.moon_settings&&$('#moon-settings')||dirty.moon_fuel&&$('#moon-fuel-settings')||dirty.moon_crystals&&$('#crystal-settings')))return;
   const content=$('#view-content'); actions();
-  $('.plan-selector').hidden=['skills','pi','corporations','moons'].includes(view)||(view==='settings'&&settingsTab!=='structures');
+  document.body.classList.toggle('manual-view',view==='documentation');
+  $('.plan-selector').hidden=['skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures');
   $('#plan-status').hidden=!plan?.stale_characters.length;
+  if(view==='documentation')return void renderDocumentation(content);
   if(view==='skills') return renderSkills(content);
   if(view==='pi') return renderPI(content);
   if(view==='moons')return renderMoons(content);
