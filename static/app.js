@@ -167,6 +167,7 @@ function updatePlanControls() {
     $('#target-quantity').dataset.numberMax=productActivity==='manufacturing'?'1000000':'100000000';EveNumbers.validate($('#target-quantity'));
     $('#scope-hint').textContent=corporationId?'Csak '+state.scope_label+' készlete és jobjai.':'Csak személyes készlet és jobok; corp készlet nélkül.';
   }
+  updateReadyJobs();
   const target=$('#product-search');
   if(productId&&productName&&target.value===productName){target.dataset.copyItem=productName;target.title='Kattintás: terméknév másolása';}
   else{delete target.dataset.copyItem;target.removeAttribute('title');}
@@ -185,7 +186,7 @@ function scheduleTaskPoll() {
         if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else await calculate(false);}
         else if(state.task.kind==='skills') await refreshSkills();
         else if(state.task.kind==='pi')await refreshPI();
-      else if(state.task.kind==='moons')await refreshMoons();
+      else if(['moons','extractions'].includes(state.task.kind))await refreshMoons();
         else {skillData=null;piData=null;moonData=null;await calculate(false);}
       }
     } catch(e) { error(e.message); }
@@ -240,7 +241,7 @@ function navigate(next) {
 function render() {
   if(!state) return;
   if(view==='settings'&&dirty.facilities&&$('#settings-form'))return;
-  if(view==='moons'&&(moonEditing&&$('#moon-form')||dirty.moon_settings&&$('#moon-settings')||dirty.moon_fuel&&$('#moon-fuel-settings')))return;
+  if(view==='moons'&&(moonEditing&&$('#moon-form')||dirty.moon_settings&&$('#moon-settings')||dirty.moon_fuel&&$('#moon-fuel-settings')||dirty.moon_crystals&&$('#crystal-settings')))return;
   const content=$('#view-content'); actions();
   $('.plan-selector').hidden=['skills','pi','corporations','moons'].includes(view);
   $('#plan-status').hidden=!plan?.stale_characters.length;
@@ -531,11 +532,17 @@ async function applyMapping(kind) {
     await api(scoped('/api/'+kind),dirty); dirty={}; await calculate(); toast('Módosítások alkalmazva. A gyártási terv frissült.');
   } catch(e) {error(e.message); button.disabled=false;}
 }
+function jobReady(j){return j.status==='ready'||j.status==='active'&&Number.isFinite(Date.parse(j.end_date))&&Date.parse(j.end_date)<=Date.now();}
+function updateReadyJobs(){const badge=$('#jobs-ready-count');if(!badge||!state)return;const count=state.jobs.filter(jobReady).length;badge.hidden=!count;badge.textContent=count?String(count):'';badge.title=EveI18n.t('Átvehető vagy várhatóan elkészült jobok');}
+setInterval(()=>{updateReadyJobs();if(view==='jobs'&&state)render();},30000);
 function renderJobs(content) {
+  updateReadyJobs();
   setHead('IPARI JOBOK','Ami már folyamatban van',corporationId?'A kiválasztott corporation saját ipari jobjai.':'Személyes gyártási, reakciós és egyéb aktív jobok a legutóbbi EVE-frissítésből.');
   const labels={active:'Fut',paused:'Szünetel',ready:'Átvehető'};
-  const rows=state.jobs.map(j=>`<tr><td>${item({name:j.name,id:j.product_type_id||0})}</td><td><span class="badge ${j.status==='ready'?'good':'reaction'}">${esc(labels[j.status]||j.status)}</span></td><td class="num">${fmt(j.runs)}</td><td class="num"><strong>${fmt(j.expected_output)}</strong></td>${characterCell(j.character_id)}<td class="num">${j.output_location_id||'–'}</td><td data-sort-value="${j.end_date?Date.parse(j.end_date):''}">${j.end_date?esc(EveI18n.date(new Date(j.end_date))):'–'}</td></tr>`);
-  content.innerHTML=panel('Aktív és át nem vett jobok',`${fmt(rows.length)} job`,rows.length?table(['Termék','Állapot','Run','Beszámítható kimenet','Karakter','Kimeneti Hely-ID','Befejezés'],rows):empty('Nincs betöltött aktív job','Adj hozzá karaktert az EVE-kapcsolat oldalon, majd indíts EVE-frissítést.'));
+  const ready=state.jobs.filter(jobReady);
+  const readyBanner=ready.length?`<div class="banner warn" role="alert"><strong>Van kész vagy várhatóan elkészült job.</strong> <span>${fmt(ready.length)}</span> <span>job átvehető vagy lejárt a befejezési ideje. Vedd át az EVE-ben, majd frissítsd az adatokat.</span></div>`:'';
+  const rows=state.jobs.map(j=>`<tr class="${jobReady(j)?'ready-job':''}"><td>${item({name:j.name,id:j.product_type_id||0})}</td><td><span class="badge ${j.status==='ready'?'good':'reaction'}">${esc(j.status==='active'&&jobReady(j)?'Várhatóan elkészült · frissíts':labels[j.status]||j.status)}</span></td><td class="num">${fmt(j.runs)}</td><td class="num"><strong>${fmt(j.expected_output)}</strong></td>${characterCell(j.character_id)}<td class="num">${j.output_location_id||'–'}</td><td data-sort-value="${j.end_date?Date.parse(j.end_date):''}">${j.end_date?esc(EveI18n.date(new Date(j.end_date))):'–'}</td></tr>`);
+  content.innerHTML=readyBanner+panel('Aktív és át nem vett jobok',`${fmt(rows.length)} job`,rows.length?table(['Termék','Állapot','Run','Beszámítható kimenet','Karakter','Kimeneti Hely-ID','Befejezés'],rows):empty('Nincs betöltött aktív job','Adj hozzá karaktert az EVE-kapcsolat oldalon, majd indíts EVE-frissítést.'));
   content.innerHTML+='<p class="footnote">A kimenet csak gyártási és reakciós jobnál, a kiválasztott helyszíneken számít. A delivered, cancelled és reverted jobokat nem adja a folyamatban készlethez. Kutatás, invention és másolás kimenete itt 0. Kézi készletmódban a terv a Készlet oldalon megadott kézi folyamatban mennyiségekkel számol.</p>';
 }
 function renderSettings(content) {
@@ -618,7 +625,7 @@ async function startTask(path) {
       if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else await calculate(false);}
       else if(state.task.kind==='skills')await refreshSkills();
       else if(state.task.kind==='pi')await refreshPI();
-      else if(state.task.kind==='moons')await refreshMoons();
+      else if(['moons','extractions'].includes(state.task.kind))await refreshMoons();
       else if(state.task.kind!=='skills'){skillData=null;piData=null;await calculate(false);}
     }
   } catch(e){error(e.message);}

@@ -21,7 +21,7 @@ import uuid
 import webbrowser
 
 from . import __version__
-from . import moons
+from . import moons, extractions
 from .market import Market,validate_ids as market_ids
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
@@ -79,6 +79,9 @@ class App:
                     if any(c['synced_at'] for c in self.store.corporations()):
                         corp_results=self.eve.sync_corporations()
                         message+=f" Corp-adatok: {sum(r['ok'] for r in corp_results)} sikeres lekérés; részletek a Corporationok oldalon."
+                    if any(self.store.snapshot(c['id'],'moon_calendar') or self.store.snapshot(c['id'],'moon_timers') for c in self.store.characters()):
+                        moon_results=extractions.sync(self.eve)
+                        if any(not r['ok'] for r in moon_results):message+=' Néhány holdadat nem frissült; ellenőrizd a Kitermelési naptár hozzáféréseit.'
                 elif kind == 'skills':
                     if not self.store.characters():
                         raise PlanningError('Előbb adj hozzá karaktert az EVE-kapcsolat oldalon.')
@@ -92,6 +95,9 @@ class App:
                 elif kind == 'moons':
                     result=moons.refresh_universe(self.store,self.catalog,self.eve.http)
                     message='A holdak rendszeradatai frissítve.' if all(r['ok'] for r in result) else 'Néhány rendszer ESI-adata nem frissült. A korábbi adatok megmaradtak.'
+                elif kind == 'extractions':
+                    result=extractions.sync(self.eve)
+                    message='A holdnaptár és a kitermelési időzítők ellenőrizve.'
                 elif kind == 'corporations':
                     if not self.store.characters():raise PlanningError('Előbb adj hozzá egy corp-hozzáférésre jogosult karaktert.')
                     result=self.eve.sync_corporations();ok_count=sum(r['ok'] for r in result)
@@ -517,7 +523,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/icon.svg']:
+            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if not self.authorized():
@@ -542,6 +548,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200,self.app.market.snapshot(ids))
             if path == '/api/moons':
                 with self.app.catalog.lock:return self.send(200,moons.dashboard(self.app.store,self.app.catalog))
+            if path == '/api/moons/crystals':
+                with self.app.catalog.lock:return self.send(200,extractions.crystal_plan(self.app.store,self.app.catalog,query.get('moon_id',[''])[0],query.get('event_id',[None])[0]))
             if path == '/api/moons/systems':
                 with self.app.catalog.lock:return self.send(200,moons.system_search(self.app.catalog,query.get('q',[''])[0]))
             if path == '/api/moons/system':
@@ -602,6 +610,8 @@ class Handler(BaseHTTPRequestHandler):
             elif path == '/api/moons/remove':
                 if not isinstance(data.get('id'),str):raise PlanningError('Ismeretlen hold.')
                 self.app.store.remove_moon(data['id'])
+            elif path == '/api/moons/extractions/sync':
+                self.app.start_task('extractions')
             elif path == '/api/moons/settings':
                 self.app.store.save_moon_preferences(moons.validate_preferences(data))
             elif path == '/api/moons/sync':
@@ -654,7 +664,7 @@ class Handler(BaseHTTPRequestHandler):
                     if char_id not in {c['id'] for c in self.app.store.characters()}:
                         raise PlanningError('A karakter már nincs hozzáadva.')
                 feature=data.get('feature')
-                if feature not in [None,'skills','pi','corporations']:raise PlanningError('Ismeretlen engedélyezési cél.')
+                if feature not in [None,'skills','pi','corporations','moons']:raise PlanningError('Ismeretlen engedélyezési cél.')
                 return self.send(200, {'url': self.app.eve.start(self.app.cookie, self.app.origin+'/callback',char_id,feature)})
             elif path == '/api/characters/remove':
                 self.app.eve.forget(integer(data.get('id'), 'Karakter', 2**53-1, 1))

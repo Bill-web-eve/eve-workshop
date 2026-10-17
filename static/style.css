@@ -59,3 +59,12 @@ html[data-theme=dark] .skill-tabs [aria-pressed=true],html[data-theme=dark] .sho
 
 .cost-summary{margin-bottom:22px}.jita-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}.jita-controls label{display:flex;align-items:center;gap:10px}.jita-controls select{min-width:130px}.jita-controls small{color:var(--muted)}.cost-grand{font-size:26px;letter-spacing:-.5px;display:block}.cost-summary details{margin-top:14px}.cost-summary summary{cursor:pointer;padding:10px 0}.cost-summary p:empty{display:none}
 .facility-index{flex-wrap:wrap;gap:8px}.facility-index small{flex-basis:100%;color:var(--muted);font-size:11px}.economic-table [data-economic-value=total],.economic-table [data-economic-value=profit]{font-weight:750}.economic-table [data-economic-value=profit]{font-size:15px}
+
+/* Moon extraction calendar, shared light/dark palette. */
+.moon-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:16px 0}
+.moon-calendar-day{min-height:115px;background:var(--paper);padding:8px;min-width:0}
+.moon-calendar-day.outside{opacity:.55}.moon-calendar-day time{display:block;font-weight:600;margin-bottom:6px}
+.moon-calendar-weekday{text-align:center;padding:10px;background:var(--paper);font-weight:600}
+.moon-calendar-event{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);font:inherit;font-size:11px;padding:5px;margin:4px 0;cursor:pointer;overflow-wrap:anywhere}
+.moon-calendar-event small{display:block;margin-top:3px}.moon-calendar-event.stale{border-style:dashed}.moon-access{margin:10px 0;line-height:1.8}.ready-job td{background:rgba(211,154,58,.08)}
+@media(max-width:800px){.moon-calendar{overflow:auto;grid-template-columns:repeat(7,minmax(95px,1fr))}.moon-calendar-day{min-height:85px}}

@@ -51,7 +51,7 @@ def validate_preferences(data):
 
 
 def validate_moon(data,catalog,existing):
-    if not isinstance(data,dict) or set(data)-{'id','system_id','moon_id','structure','ores','notes','enabled','online_starts','rent_isk','other_cost_isk'}:
+    if not isinstance(data,dict) or set(data)-{'id','system_id','moon_id','structure','ores','notes','enabled','online_starts','rent_isk','other_cost_isk','belt_lifetime_hours'}:
         raise PlanningError('Ismeretlen holdmező.')
     mid=integer(data.get('moon_id'),'Hold',2**53-1,1)
     sid=integer(data.get('system_id'),'Rendszer',2**53-1,1)
@@ -80,7 +80,7 @@ def validate_moon(data,catalog,existing):
     if identifier is not None and identifier not in {r['id'] for r in existing}:raise PlanningError('A szerkesztett hold már nem található.')
     previous=next((r for r in existing if r['id']==identifier),{})
     costs={key:format(decimal_number(data.get(key,previous.get(key,'0')),'Bérlet' if key=='rent_isk' else 'Egyéb holdköltség',0,10**15).quantize(Decimal('.01'),rounding=ROUND_HALF_UP),'f') for key in ['rent_isk','other_cost_isk']}
-    return {**costs,'id':identifier or str(uuid.uuid4()),'system_id':sid,'moon_id':mid,'structure':structure,
+    return {**costs,'belt_lifetime_hours':float(decimal_number(data.get('belt_lifetime_hours',previous.get('belt_lifetime_hours',48)),'Ércmező élettartama',1,720)),'id':identifier or str(uuid.uuid4()),'system_id':sid,'moon_id':mid,'structure':structure,
             'ores':items,'notes':notes.strip(),'enabled':enabled,
             'online_starts':integer(data.get('online_starts',0),'Bekapcsolások',1000,0)}
 
@@ -151,6 +151,8 @@ def composition_state(ores):
 
 
 def dashboard(store,catalog):
+    from .extractions import report
+    extraction=report(store,catalog)
     prefs=preferences(store);rules=catalog.moon_rules
     if not rules:raise PlanningError('A holdadatokhoz frissítsd az EVE-receptadatbázist.')
     refining=reprocessing_yield(rules,prefs)
@@ -162,10 +164,12 @@ def dashboard(store,catalog):
         if cache:const=store.universe_cached('constellations',cache['data'].get('constellation_id'))
         if cache and const:s.update(constellation=const['data']['name'],constellation_id=const['id'])
         name=next((m['name'] for m in catalog.moon_locations(s['id']) if m['id']==record['moon_id']),str(record['moon_id']))
-        total,status=composition_state(record['ores']);valid=status!='invalid';active=record['enabled'];structure=record['structure']
+        observation=extraction['moons'].get(record['id'],{})
+        effective=observation.get('composition') or record['ores']
+        total,status=composition_state(effective);valid=status!='invalid';active=record['enabled'];structure=record['structure']
         factor=refining*D(prefs['mining_recovery'])/100 if structure=='Athanor' else D(rules['metenox']['miningEfficiency'])
         ores=[];outputs=defaultdict(int);crystals={}
-        for o in record['ores']:
+        for o in effective:
             ore=catalog.moon_ores[o['id']];volume=D(rules['extraction_m3_hour'])*720*D(o['percent'])/100
             # Athanor projection: collect all listed ore (or the configured recovery),
             # then reprocess each full portion, floor each material, carry no leftovers
@@ -213,11 +217,11 @@ def dashboard(store,catalog):
         for group in [structure,'all']:
             fuel_totals[group]['fuel']+=fuel;fuel_totals[group]['gas']+=gas;fuel_totals[group]['online_fuel']+=online;fuel_totals[group]['count']+=int(active)
         moons.append({**record,'name':name,'system':s,'esi_checked':min(cache['fetched'],const['fetched']) if cache and const else None,
-                      'percent_total':float(total),'status':status,'included':valid and active,'ores':ores,'outputs':out,'crystals':crystal_rows,
+                      'manual_ores':record['ores'],'composition_source':'esi_calendar' if observation.get('composition') else 'manual','extraction_status':observation.get('status','unknown'),'percent_total':float(total),'status':status,'included':valid and active,'ores':ores,'outputs':out,'crystals':crystal_rows,
                       'fuel':fuel,'gas':gas,'online_fuel':online,'refining_yield':float(factor)})
     total_volume=sum(c['volume'] for c in crystal_totals.values())
     for c in crystal_totals.values():c['share']=c['volume']/total_volume*100 if total_volume else 0
-    return {'moons':moons,'settings':prefs,'rules':rules,'refining_yield':float(refining),
+    return {'extractions':extraction,'moons':moons,'settings':prefs,'rules':rules,'refining_yield':float(refining),
             'ores':sorted(catalog.moon_ores.values(),key=lambda o:(o['rarity'],o['name'])),
             'fuel_blocks':[{'id':tid,'name':catalog.name(tid)} for tid in FUEL_BLOCKS],
             'magmatic_gas':{'id':MAGMATIC_GAS,'name':catalog.name(MAGMATIC_GAS)},

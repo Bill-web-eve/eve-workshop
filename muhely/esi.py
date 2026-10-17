@@ -27,7 +27,8 @@ PI_SCOPES = ['esi-planets.manage_planets.v1']
 SCOPES = INDUSTRY_SCOPES + SKILL_SCOPES + PI_SCOPES
 CORPORATION_SCOPES = ['esi-assets.read_corporation_assets.v1', 'esi-corporations.read_blueprints.v1',
                       'esi-industry.read_corporation_jobs.v1']
-ALL_SCOPES = SCOPES + CORPORATION_SCOPES
+MOON_SCOPES = ['esi-calendar.read_calendar_events.v1','esi-industry.read_corporation_mining.v1']
+ALL_SCOPES = SCOPES + CORPORATION_SCOPES + MOON_SCOPES
 USER_AGENT = 'EveMuhely/0.1 (local personal industry planner)'
 COMPATIBILITY = '2026-10-15'
 
@@ -53,6 +54,10 @@ class SkillScopeError(AuthenticationError):
 
 
 class PlanetScopeError(AuthenticationError):
+    pass
+
+
+class MoonScopeError(AuthenticationError):
     pass
 
 
@@ -253,9 +258,9 @@ class EveConnection:
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
         state = secrets.token_urlsafe(32)
         requested=SCOPES
-        if feature in ['skills','pi','corporations']:
+        if feature in ['skills','pi','corporations','moons']:
             existing=self.vault.read().get(str(character_id),{}) if character_id else {}
-            wanted=set(INDUSTRY_SCOPES+{'skills':SKILL_SCOPES,'pi':PI_SCOPES,'corporations':CORPORATION_SCOPES}[feature])
+            wanted=set(INDUSTRY_SCOPES+{'skills':SKILL_SCOPES,'pi':PI_SCOPES,'corporations':CORPORATION_SCOPES,'moons':MOON_SCOPES}[feature])
             wanted.update(set(existing.get('scopes',[])) & set(ALL_SCOPES))
             requested=[scope for scope in ALL_SCOPES if scope in wanted]
         with self.lock:
@@ -314,6 +319,8 @@ class EveConnection:
                     tokens['scopes'] = claims['scp'].split() if isinstance(claims['scp'],str) else claims['scp']
                     self.vault.set(char_id,tokens)
                 if not set(required_scopes).issubset(tokens['scopes']):
+                    if set(MOON_SCOPES) & (set(required_scopes)-set(tokens['scopes'])):
+                        raise MoonScopeError('Hiányzik a naptár vagy a corporation holdkitermelési engedélye. Engedélyezd a holdadatok olvasását.')
                     if set(CORPORATION_SCOPES) & (set(required_scopes)-set(tokens['scopes'])):
                         raise CorporationScopeError('Hiányzik a corporation készlet-, blueprint- és jobadatok olvasási engedélye. Engedélyezd a karakter corp-hozzáférését.')
                     if set(PI_SCOPES) & (set(required_scopes)-set(tokens['scopes'])):

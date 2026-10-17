@@ -1,0 +1,123 @@
+import json,tempfile,time,unittest,urllib.parse
+from datetime import datetime,timezone
+from pathlib import Path
+from unittest.mock import Mock
+from muhely.catalog import Catalog
+from muhely.store import Store
+from muhely.esi import EveConnection,EsiError,MOON_SCOPES,SCOPES
+from muhely.extractions import report,sync,event_ores,validate_timers,crystal_plan,cached
+from muhely.moons import validate_moon,dashboard
+ROOT=Path(__file__).resolve().parents[1]
+def iso(n):return datetime.fromtimestamp(n,timezone.utc).isoformat()
+def snap(data,when=None,expires=None):
+    now=time.time();return {'data':data,'fetched':when or now,'expires':expires or now+600,'etag':'test'}
+
+class ExtractionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):cls.c=Catalog(ROOT/'data/catalog.sqlite3')
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.s=Store(self.tmp.name)
+        self.s.add_character(1,'Test');self.now=time.time()
+        self.sid=next(i for i,s in self.c.moon_systems.items() if s['name']=='RP2-OQ')
+        self.mid=next(m['id'] for m in self.c.moon_locations(self.sid) if m['name']=='RP2-OQ VI - Moon 7')
+        self.moon=validate_moon({'system_id':self.sid,'moon_id':self.mid,'structure':'Athanor','ores':[{'id':45490,'percent':75},{'id':45494,'percent':25}]},self.c,[]);self.s.save_moon(self.moon)
+        self.timer={'moon_id':self.mid,'structure_id':900001,'extraction_start_time':iso(self.now-7*86400),'chunk_arrival_time':iso(self.now+7*86400),'natural_decay_time':iso(self.now+7*86400+10800)}
+        self.event={'event_id':50,'title':'RP2-OQ VI - Moon 7 extraction','text':'Zeolites: 750,000 m³<br>Cobaltite: 250,000 m³','date':self.timer['chunk_arrival_time']}
+    def seed(self,rows=None,event=True):
+        parts={'moon_timers':snap({'corporation_id':98,'rows':[self.timer] if rows is None else rows})}
+        if event:parts['moon_calendar']=snap([self.event])
+        self.s.save_snapshots(1,parts,domain='moon_timers')
+    def test_natural_decay_is_not_ore_expiry(self):
+        self.seed();e=report(self.s,self.c,self.now)['events'][0]
+        self.assertEqual(e['volume'],1000000);self.assertEqual(e['volume_source'],'esi_calendar')
+        self.assertEqual(e['belt_latest_expiry'],self.now+7*86400+10800+48*3600)
+        self.assertNotEqual(e['belt_latest_expiry'],__import__('muhely.extractions',fromlist=['stamp']).stamp(e['natural_decay_time']))
+    def test_calendar_composition_overlays_without_mutating_manual_input(self):
+        self.moon['ores']=[{'id':45490,'percent':99}];self.s.save_moon(self.moon);self.seed()
+        m=dashboard(self.s,self.c)['moons'][0]
+        self.assertEqual(m['composition_source'],'esi_calendar');self.assertEqual([r['percent'] for r in m['ores']],[75,25])
+        self.assertEqual(m['manual_ores'],[{'id':45490,'percent':99}]);self.assertEqual(self.s.moon_records()[0]['ores'],m['manual_ores'])
+    def test_no_volume_never_turns_manual_scan_into_esi_scan(self):
+        self.event['text']='No scan in this calendar';self.seed();e=report(self.s,self.c,self.now)['events'][0]
+        self.assertEqual(e['composition_source'],'manual');self.assertAlmostEqual(e['volume'],14*24*30000)
+        self.assertEqual(dashboard(self.s,self.c)['moons'][0]['composition_source'],'manual')
+    def test_manual_ratio_is_three_to_one(self):
+        plan=crystal_plan(self.s,self.c,self.moon['id']);self.assertEqual([r['count'] for r in plan['rows']],[3,1])
+    def test_explicit_extraction_volume_ratio_is_three_to_one(self):
+        self.seed();e=report(self.s,self.c)['events'][0];plan=crystal_plan(self.s,self.c,self.moon['id'],e['id'])
+        self.assertEqual([r['count'] for r in plan['rows']],[3,1]);self.assertEqual(plan['total_count'],4)
+    def test_same_class_ores_are_combined_before_ratio(self):
+        self.moon['ores']=[{'id':45490,'percent':50},{'id':45492,'percent':25},{'id':45494,'percent':25}];self.s.save_moon(self.moon)
+        plan=crystal_plan(self.s,self.c,self.moon['id']);self.assertEqual([r['count'] for r in plan['rows']],[3,1]);self.assertEqual(len(plan['rows'][0]['ores']),2)
+    def test_exact_decimal_ratio_and_no_false_wear(self):
+        self.moon['ores']=[{'id':45490,'percent':37.5},{'id':45494,'percent':12.5}];self.s.save_moon(self.moon)
+        self.assertEqual([r['count'] for r in crystal_plan(self.s,self.c,self.moon['id'])['rows']],[3,1])
+    def test_metenox_never_warns_or_needs_crystals(self):
+        self.moon['structure']='Metenox';self.s.save_moon(self.moon)
+        self.assertEqual(report(self.s,self.c)['moons'][self.moon['id']]['status'],'not_applicable')
+        self.assertEqual(crystal_plan(self.s,self.c,self.moon['id'])['rows'],[])
+    def test_stopped_drill_not_missing(self):
+        self.moon['enabled']=False;self.s.save_moon(self.moon)
+        self.assertEqual(report(self.s,self.c)['moons'][self.moon['id']]['status'],'not_applicable')
+    def test_missing_and_unavailable_are_distinct(self):
+        self.assertEqual(report(self.s,self.c)['moons'][self.moon['id']]['status'],'unknown')
+        self.seed(rows=[],event=False);self.assertEqual(report(self.s,self.c)['moons'][self.moon['id']]['status'],'missing')
+    def test_stale_calendar_cannot_overwrite_scan(self):
+        self.seed();self.s.resource_error(1,'moon_calendar','offline')
+        self.assertIsNone(report(self.s,self.c)['moons'][self.moon['id']]['composition'])
+    def test_new_empty_corp_snapshot_supersedes_old_member_timer(self):
+        self.seed(event=False);self.s.add_character(2,'Other');self.s.save_snapshots(2,{'moon_timers':snap({'corporation_id':98,'rows':[]},self.now+5)},domain='moon_timers')
+        self.assertFalse(report(self.s,self.c,self.now)['events'])
+    def test_calendar_meeting_does_not_confirm_drill(self):
+        self.s.save_snapshots(1,{'moon_calendar':snap([dict(self.event,text='Meet to mine')])},domain='moon_calendar')
+        self.assertEqual(report(self.s,self.c)['moons'][self.moon['id']]['status'],'calendar_only')
+    def test_conflicting_scans_are_not_auto_applied(self):
+        self.seed();self.s.save_snapshots(1,{'moon_calendar':snap([self.event,dict(self.event,event_id=51,text='Zeolites 500 m³<br>Cobaltite 500 m³')])},domain='moon_calendar')
+        self.assertIsNone(report(self.s,self.c)['moons'][self.moon['id']]['composition'])
+    def test_parser_refuses_ambiguous_unknown_and_duplicate_data(self):
+        for body in ['Zeolites 7,5 m³','Unknown 100 m³','Zeolites 5 m³<br>Zeolites 2 m³','Zeolites -5 m³','Zeolites 1e6 m³','Zeolites 100 m³<br>Cobaltite 25%']:
+            self.assertFalse(event_ores(dict(self.event,text=body),self.c),body)
+    def test_table_calendar_and_two_to_one_exact_volume(self):
+        ores=event_ores(dict(self.event,text='<table><tr><td>Zeolites</td><td>2 m³</td></tr><tr><td>Cobaltite</td><td>1 m³</td></tr></table>'),self.c)
+        self.assertEqual([o['volume'] for o in ores],[2,1])
+    def test_timers_validation(self):
+        for row in [dict(self.timer,moon_id=True),dict(self.timer,natural_decay_time='bad'),dict(self.timer,chunk_arrival_time=iso(self.now-9*86400))]:
+            with self.assertRaises(EsiError):validate_timers([row])
+    def test_cache_and_304_preserve_snapshot(self):
+        eve=EveConnection(self.s,vault=Mock(),transport=Mock());self.s.save_snapshots(1,{'test':snap([])})
+        self.assertEqual(cached(eve,1,'test','url','token',lambda x:None)['data'],[]);eve.http.request.assert_not_called()
+        self.s.save_snapshots(1,{'test':snap([],expires=self.now-1)});eve.http.request.return_value=(None,{'Cache-Control':'max-age=300'})
+        self.assertEqual(cached(eve,1,'test','url','token',lambda x:None)['data'],[])
+    def test_dedicated_consent_keeps_existing_scopes(self):
+        self.s.save_settings({'client_id':'public'});vault=Mock();vault.read.return_value={'1':{'scopes':SCOPES}}
+        eve=EveConnection(self.s,vault=vault,transport=Mock());url=eve.start('cookie','http://127.0.0.1/callback',1,'moons')
+        granted=set(urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)['scope'][0].split());self.assertEqual(granted,set(SCOPES+MOON_SCOPES))
+    def test_sync_does_not_modify_industry_data_or_inventory(self):
+        eve=EveConnection(self.s,vault=Mock(),transport=Mock());eve.token=Mock(return_value='private')
+        def respond(url,**kw):
+            if url.endswith('/calendar'):return ([dict(event_id=50,event_date=self.event['date'])],{'Cache-Control':'max-age=600'})
+            if '/calendar/50' in url:return (self.event,{'Cache-Control':'max-age=600'})
+            if '/mining/extractions' in url:return ([self.timer],{'X-Pages':'1'})
+            return ({'corporation_id':98},{})
+        eve.http.request.side_effect=respond
+        self.assertTrue(all(r['ok'] for r in sync(eve)));self.assertIsNone(self.s.snapshot(1,'assets'));self.assertEqual(self.s.mapping('inventory'),{})
+        self.assertEqual(report(self.s,self.c)['moons'][self.moon['id']]['status'],'scheduled')
+        calls=eve.http.request.call_count;self.assertTrue(all(r['ok'] for r in sync(eve)));self.assertEqual(eve.http.request.call_count,calls+1) # membership checked
+    def test_failed_sync_retains_old_snapshot_and_marks_stale(self):
+        self.seed();eve=EveConnection(self.s,vault=Mock(),transport=Mock());eve.token=Mock(side_effect=EsiError('offline'))
+        self.assertTrue(all(not r['ok'] for r in sync(eve)));self.assertEqual(self.s.snapshot(1,'moon_timers')['data']['rows'],[self.timer])
+        self.assertEqual(report(self.s,self.c)['moons'][self.moon['id']]['status'],'stale')
+    def test_cache_control_ignores_cached_age_and_honors_server_ttl(self):
+        from muhely.extractions import cache_expiry
+        self.assertEqual(cache_expiry({'Cache-Control':'max-age=3600','Age':'100'},1000),4500)
+        self.assertEqual(cache_expiry({'Cache-Control':'max-age=0'},1000),1060)
+    def test_previous_belt_does_not_count_as_a_scheduled_next_extraction(self):
+        previous=dict(self.timer,extraction_start_time=iso(self.now-16*86400),chunk_arrival_time=iso(self.now-86400),natural_decay_time=iso(self.now-86400+10800))
+        self.s.save_snapshots(1,{'moon_timers':snap({'corporation_id':98,'rows':[],'history':[previous]})},domain='moon_timers')
+        r=report(self.s,self.c,self.now);self.assertEqual(r['moons'][self.moon['id']]['status'],'missing');self.assertEqual(r['events'][0]['kind'],'history')
+    def test_cancelled_future_history_does_not_reappear(self):
+        self.s.save_snapshots(1,{'moon_timers':snap({'corporation_id':98,'rows':[],'history':[self.timer]})},domain='moon_timers')
+        self.assertFalse(report(self.s,self.c,self.now)['events'])
+    def test_invalid_excess_scan_has_no_crystal_suggestion(self):
+        self.moon['ores']=[{'id':45490,'percent':100},{'id':45494,'percent':100}];self.s.save_moon(self.moon)
+        result=crystal_plan(self.s,self.c,self.moon['id']);self.assertEqual(result['rows'],[]);self.assertTrue(result['unavailable'])

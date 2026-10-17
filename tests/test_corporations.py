@@ -185,7 +185,7 @@ class CorporationConnectionTests(unittest.TestCase):
         self.assertEqual(self.eve.token(1),'private-1')
         with self.assertRaises(CorporationScopeError):self.eve.token(1,CORPORATION_SCOPES)
         url=self.eve.start('session','http://127.0.0.1/callback',1,'corporations')
-        self.assertEqual(set(urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)['scope'][0].split()),set(ALL_SCOPES))
+        self.assertEqual(set(urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)['scope'][0].split()),set(SCOPES+CORPORATION_SCOPES))
     def test_malformed_page_and_changed_snapshot_do_not_commit(self):
         self.app.store.character_corporation(1,A,'Alpha Corp')
         self.http.request.side_effect=[([asset(1,100)],{'X-Pages':'2','Last-Modified':'A'}),([asset(2,100)],{'X-Pages':'2','Last-Modified':'B'})]
