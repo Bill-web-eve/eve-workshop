@@ -126,6 +126,72 @@ def duration(row,recipe,producer,settings,runs):
     return max(.001,runs*recipe['seconds']*(1-row['parameters']['te']/100)*producer['factor']*(1-f['time_role']/100)*(1-f['time_rig']/100))
 
 
+def compact_reactions(jobs, initial, catalog, settings, limits, start, shopping):
+    """Merge serial reactions without delaying any downstream job.
+
+    Track each original output's earliest consumer, including consumers moved
+    into an earlier combined job. Replaying the material ledger afterwards
+    applies the actual combined-job rounding and rebuilds all dependency IDs.
+    """
+    if not jobs:return jobs,shopping,0
+    earliest=defaultdict(lambda:math.inf)
+    ends={j['id']:j['end'] for j in jobs}
+    def allocations(parts):
+        return (a for j in parts for m in j['materials'] for a in m['allocations'])
+    def purchases(rows):
+        used=defaultdict(int)
+        for j in rows:
+            for m in j['materials']:
+                used[m['id']]+=sum(a['quantity'] for a in m['allocations'] if a['source']=='purchase')
+        return used
+    for j in jobs:
+        for a in allocations([j]):
+            if a['source']=='job':earliest[a['job_id']]=min(earliest[a['job_id']],j['start'])
+    groups=[];lanes={}
+    for j in sorted(jobs,key=lambda j:(j['start'],j['end'],j['id'])):
+        lane=(j['character_id'],j['activity'],j['slot']);group=lanes.get(lane)
+        same=group and j['activity']=='reaction' and all(group['job'][k]==j[k] for k in
+            ['product_id','blueprint_key','blueprint_kind','me','te','procure_blueprint','transfer_required'])
+        can_merge=False
+        if same:
+            first=group['job'];parts=group['parts']+[j];runs=first['runs']+j['runs']
+            ready=max([start]+[ends[a['job_id']] if a['source']=='job' else a['available_at'] for a in allocations(parts)])
+            consumed=min(earliest[p['id']] for p in parts)
+            can_merge=(abs(first['end']-j['start'])<1e-6 and runs<=limits[j['product_id']]
+                       and j['end']-first['start']<=30*86400 and ready<=first['start']
+                       and j['end']<=consumed)
+        if can_merge:
+            group['parts'].append(j);first.update(runs=runs,output=first['output']+j['output'],end=j['end'],seconds=first['seconds']+j['seconds'])
+            for p in group['parts']:ends[p['id']]=first['end']
+            for a in allocations(group['parts']):
+                if a['source']=='job':earliest[a['job_id']]=min(earliest[a['job_id']],first['start'])
+        else:
+            group={'job':dict(j),'parts':[j]};groups.append(group);lanes[lane]=group
+    merged=len(jobs)-len(groups)
+    if not merged:return jobs,shopping,0
+    ledger=copy.deepcopy(initial)
+    result=sorted((g['job'] for g in groups),key=lambda j:(j['start'],j['end'],j['id']))
+    for j in result:
+        f=settings[j['activity']];factor=(Decimal(1)-Decimal(str(j['me']))/100)
+        factor*=1-Decimal(str(f['material_role']))/100;factor*=1-Decimal(str(f['material_rig']))/100
+        inputs=[];dependencies=[]
+        for m in catalog.recipes[j['product_id']]['materials']:
+            n=material_for_batch(m['quantity'],j['runs'],factor);sources=ledger.consume(m['typeID'],n,j['start'])
+            inputs.append(dict(id=m['typeID'],name=catalog.name(m['typeID']),quantity=n,allocations=sources))
+            dependencies.extend(dict(job_id=a['job_id'],material_id=m['typeID'],quantity=a['quantity']) for a in sources if a['source']=='job')
+        ready=max([start]+[a['available_at'] for m in inputs for a in m['allocations']])
+        j.update(materials=inputs,dependencies=dependencies,materials_ready=ready,material_wait=ready-start)
+        ledger.add(j['product_id'],j['output'],j['end'],'job',j['id'])
+    before=purchases(jobs);after=purchases(result);materials=[]
+    for row in shopping:
+        reduction=0 if row.get('is_blueprint') else max(0,before[row['id']]-after[row['id']])
+        revised={**row,'buy':row['buy']-reduction}
+        if reduction:
+            revised.update(missing=revised['buy'],required=max(0,row['required']-reduction))
+        if revised['buy']:materials.append(revised)
+    return result,materials,merged
+
+
 def _strategy(context,store,catalog,calculate,options,now=None,granularity=1):
     now=time.time() if now is None else now
     start=options.get('start',now);supply=options.get('supply_at',start)
@@ -145,6 +211,7 @@ def _strategy(context,store,catalog,calculate,options,now=None,granularity=1):
         if bp.get('runs',-1)>=0 and bp.get('quantity')!=-1:
             bp['runs']=max(0,bp['runs']-sum(j.get('runs',0) for j in jobs if j.get('blueprint_id')==bp['item_id'] and j.get('activity_id') in [1,9] and j.get('status') in ['active','paused','ready']))
     base=calculate(context)
+    merge_limits={r['id']:min(r['parameters']['job_runs'],catalog.recipes[r['id']]['copy_limit']) for r in base['queue']}
     # Short jobs expose parallel capacity without changing ME/TE. Recalculate
     # the complete BOM so per-job rounding and BPC boundaries remain exact.
     for row in base['queue']:
@@ -170,6 +237,7 @@ def _strategy(context,store,catalog,calculate,options,now=None,granularity=1):
             ledger.add(row['id'],row['used_wip'],when,'wip')
             if not math.isfinite(when):warnings.append({'id':row['id'],'name':row['name'],'reason':'A folyamatban lévő anyag érkezése nem ellenőrizhető.'})
         if row['buy']:ledger.add(row['id'],row['buy'],supply,'purchase')
+    initial=copy.deepcopy(ledger)
     for row in plan['queue']:
         eligible=qualified(row,catalog,workers);eligibility[row['id']]=eligible
         held=context.get('reservations',{}).get(row['parameters']['bp_id'],{}).get('blueprint_runs',{})
@@ -245,9 +313,10 @@ def _strategy(context,store,catalog,calculate,options,now=None,granularity=1):
             blocked.append({'id':tid,'name':row['name'],'runs':remaining,'reason':reason})
     target_ready=ledger.ready(plan['product_id'],plan['quantity'])
     finish=max([start]+[j['end'] for j in scheduled]+([target_ready] if math.isfinite(target_ready) else []))
-    return {'jobs':sorted(scheduled,key=lambda j:(j['start'],j['end'],j['id'])),'blocked':blocked,'blueprint_shortages':shortages,
+    scheduled,shopping,merged=compact_reactions(scheduled,initial,catalog,context['settings'],merge_limits,start,plan['shopping'])
+    return {'jobs':sorted(scheduled,key=lambda j:(j['start'],j['end'],j['id'])),'merged_reaction_jobs':merged,'blocked':blocked,'blueprint_shortages':shortages,
             'workers':[{k:w[k] for k in ['id','name','capacity','as_of','jobs_as_of','stale','excluded','until']} for w in workers],
-            'material_shortfall':plan['shopping'],'material_warnings':warnings,'start':start,'finish':finish if not blocked and not warnings else None,
+            'material_shortfall':shopping,'material_warnings':warnings,'start':start,'finish':finish if not blocked and not warnings else None,
             'partial_finish':finish,'seconds':finish-start,'complete':not blocked and not warnings,'owned_only':owned,
             'runs':sum(j['runs'] for j in scheduled),'source':plan['source'],'corporation_id':context['corporation_id'],
             'scope_label':plan['scope_label'],'supply_at':supply,'heuristic':True,'calculated_at':now,

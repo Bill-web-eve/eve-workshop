@@ -4,7 +4,7 @@ import unittest
 from datetime import datetime,timezone
 from test_planner import FakeCatalog
 from muhely.planner import Planner,PlanningError
-from muhely.scheduler import build,Materials
+from muhely.scheduler import build,Materials,_strategy
 from muhely.store import Store,DEFAULT_SETTINGS
 
 NOW=1800000000
@@ -31,6 +31,7 @@ class SchedulerTests(unittest.TestCase):
         def calc(ctx):
             result=self.planner.calculate(product,quantity,ctx['settings'],ctx['inventory'],ctx['parameters'],ctx['stock'],ctx['wip'],ctx['blueprints'],ctx['jobs'],reservations=ctx['reservations'],skill_profiles=ctx['skill_profiles'])
             return dict(result,source='manual',scope_label='Personal')
+        if '_granularity' in opts:return _strategy(self.context,self.store,self.catalog,calc,opts,NOW,opts.pop('_granularity'))
         return build(self.context,self.store,self.catalog,calc,opts,NOW)
     def test_two_characters_run_in_parallel_without_overlapping_slots_or_blueprints(self):
         result=self.run_plan();self.assertTrue(result['complete']);self.assertEqual(len(result['jobs']),2)
@@ -245,3 +246,48 @@ class SchedulerTests(unittest.TestCase):
         self.context['stock']={m['typeID']:1000000 for m in self.catalog.recipes[product]['materials']}
         covered=self.run_plan(quantity=10,product=product,owned_only=False)
         self.assertTrue(covered['complete']);self.assertTrue(all(j['start']==NOW for j in covered['jobs']))
+
+    def test_serial_terminal_reactions_combine_and_recompute_real_material_rounding(self):
+        self.recipe(100,{200:11},activity='reaction');self.context['skill_profiles']=self.context['skill_profiles'][:1]
+        self.context['blueprints']=[bp(1)];self.context['settings']['reaction']['material_rig']=2.6
+        result=self.run_plan(quantity=20,_granularity=4)
+        self.assertTrue(result['complete']);self.assertEqual(len(result['jobs']),1)
+        self.assertEqual(result['merged_reaction_jobs'],3);self.assertEqual(result['jobs'][0]['runs'],20)
+        self.assertEqual(result['jobs'][0]['materials'][0]['quantity'],215)
+        self.assertEqual(next(r['buy'] for r in result['material_shortfall'] if r['id']==200),215)
+        self.assertEqual(result['seconds'],1600)
+
+    def test_useful_early_reaction_output_is_not_delayed_by_combining_jobs(self):
+        from unittest.mock import patch
+        self.recipe(100,{130:1});self.recipe(130,{200:1},activity='reaction')
+        self.context['parameters']={100:{'job_runs':1}}
+        self.context['skill_profiles']=self.context['skill_profiles'][:1];self.context['blueprints']=[bp(1),bp(2,product=130)]
+        with patch('muhely.scheduler.compact_reactions',side_effect=lambda jobs,initial,catalog,settings,limits,start,shopping:(jobs,shopping,0)):
+            original=self.run_plan(quantity=10,_granularity=4)
+        result=self.run_plan(quantity=10,_granularity=4);self.assertEqual(result['finish'],original['finish'])
+        self.assertGreater(len([j for j in result['jobs'] if j['activity']=='reaction']),1)
+        before={j['id']:j for j in original['jobs'] if j['activity']=='manufacturing'};jobs={j['id']:j for j in result['jobs']}
+        for j in result['jobs']:
+            if j['activity']=='manufacturing':self.assertEqual(j['start'],before[j['id']]['start'])
+            for d in j['dependencies']:self.assertLessEqual(jobs[d['job_id']]['end'],j['start'])
+
+    def test_reaction_input_arrivals_prevent_combining_even_when_output_can_wait(self):
+        self.recipe(100,{120:1});self.recipe(120,{130:1},activity='reaction');self.recipe(130,{200:1},activity='reaction')
+        self.context['skill_profiles']=self.context['skill_profiles'][:1];self.context['blueprints']=[bp(1),bp(2,product=120),bp(3,product=130)]
+        result=self.run_plan(quantity=12,_granularity=4);self.assertTrue(result['complete']);jobs={j['id']:j for j in result['jobs']}
+        self.assertGreater(len([j for j in result['jobs'] if j['product_id']==120]),1)
+        for j in result['jobs']:
+            for m in j['materials']:
+                self.assertEqual(sum(a['quantity'] for a in m['allocations']),m['quantity'])
+                for a in m['allocations']:self.assertLessEqual(a['available_at'],j['start'])
+            for d in j['dependencies']:self.assertLessEqual(jobs[d['job_id']]['end'],j['start'])
+
+    def test_combined_reactions_respect_user_run_cap_and_thirty_day_duration(self):
+        self.recipe(100,{200:1},activity='reaction');self.context['skill_profiles']=self.context['skill_profiles'][:1]
+        self.context['blueprints']=[bp(1)];self.context['parameters']={100:{'job_runs':5}}
+        result=self.run_plan(quantity=20,_granularity=4);self.assertEqual(len(result['jobs']),4)
+        self.assertTrue(all(j['runs']<=5 for j in result['jobs']))
+        self.context['parameters']={};self.catalog.recipes[100]['seconds']=100000
+        result=self.run_plan(quantity=50,_granularity=4);self.assertTrue(result['complete'])
+        self.assertEqual(sum(j['runs'] for j in result['jobs']),50);self.assertEqual(len(result['jobs']),2)
+        self.assertTrue(all(j['seconds']<=30*86400 for j in result['jobs']))
