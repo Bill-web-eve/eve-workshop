@@ -1,5 +1,27 @@
 'use strict';
 let moonData=null,moonTab='register',moonFilter='all',moonEditing=false,moonRequest=null,moonSelected=null,moonSystemGeneration=0,moonSearchGeneration=0,moonSearchTimer;
+function setMoonMenu(open){
+  $('#moon-submenu').hidden=!open;
+  $('[data-view="moons"]').setAttribute('aria-expanded',String(open));
+}
+function syncMoonNavigation(){
+  $$('[data-moon-nav]').forEach(button=>{
+    const active=view==='moons'&&moonTab===button.dataset.moonNav;
+    button.classList.toggle('active',active);
+    if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');
+  });
+}
+function selectMoonTab(tab){
+  if(view==='moons'&&moonTab===tab){setMoonMenu(true);return;}
+  if(view!=='moons'){
+    const previous=moonTab;moonTab=tab;
+    if(!navigate('moons'))moonTab=previous;
+    return;
+  }
+  if(Object.keys(dirty).length&&!confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?'))return;
+  dirty={};moonEditing=false;moonSystemGeneration++;moonSearchGeneration++;clearTimeout(moonSearchTimer);
+  moonTab=tab;setMoonMenu(true);render();
+}
 const moonDecimal=n=>new Intl.NumberFormat('hu-HU',{maximumFractionDigits:4}).format(n??0);
 const moonPercent=n=>`${moonDecimal(n)}%`;
 const moonStatus=m=>!m.enabled?'Leállítva':m.status==='invalid'?'100% felett · javítandó':m.status==='partial'?'Részleges összetétel':'Rendben';
@@ -25,7 +47,7 @@ function renderMoons(content){
     <div class="moon-toolbar"><label>Struktúraszűrő <select id="moon-filter"><option value="all">Összes struktúra</option><option value="Athanor">Athanor</option><option value="Metenox">Metenox</option></select></label><span>Időszak: 30 nap · 720 óra</span></div><div id="moon-body"></div>`;
   $('#moon-filter').value=moonFilter;
   $('#moon-filter').onchange=e=>{if((dirty.moon_fuel||dirty.moon_settings||dirty.moon_crystals)&&!confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?')){e.target.value=moonFilter;return;}dirty={};moonFilter=e.target.value;renderMoonBody();};
-  $$('[data-moon-tab]').forEach(b=>b.onclick=()=>{if(Object.keys(dirty).length&&!confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?'))return;dirty={};moonEditing=false;moonSystemGeneration++;moonSearchGeneration++;moonTab=b.dataset.moonTab;render();});
+  $$('#view-content [data-moon-tab]').forEach(b=>b.onclick=()=>selectMoonTab(b.dataset.moonTab));
   const warnings=moonWarnings(d);if(warnings)$('#moon-body').insertAdjacentHTML('beforebegin',warnings);
   renderMoonBody();
 }

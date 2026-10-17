@@ -22,13 +22,48 @@ function bindMoonAuth(){
   $('#extraction-refresh').onclick=()=>startTask('/api/moons/extractions/sync');
   $$('[data-moon-auth]').forEach(b=>b.onclick=async()=>{try{b.disabled=true;const data=await api('/api/auth/start',{feature:'moons',character_id:Number(b.dataset.moonAuth)});sessionStorage.setItem('eve-muhely-auth-return','moons');window.location.assign(data.url);}catch(e){b.disabled=false;error(e.message);}});
 }
+let moonCalendarFeed=null,moonCalendarFeedRequest=null;
+function calendarFeedURL(url){return url+'?lang='+EveI18n.language;}
+function calendarIntegrationPanel(){
+  const feed=moonCalendarFeed;
+  return `<section class="panel calendar-subscription" id="moon-calendar-integration"><div class="panel-head"><h2>Helyi naptár szinkronizálása</h2></div><div class="panel-body">
+    <p>A hold neve és a kőzet megérkezése kerül a naptárba. Az összes működő Athanor betöltött kitermelése szerepel benne, a nézet szűrőjétől és hónapjától függetlenül.</p>
+    <a class="button compact" href="/api/moons/calendar.ics?lang=${EveI18n.language}" download="eve-moon-extractions.ics">ICS letöltése</a>
+    ${feed?.enabled?`<a class="button primary compact" id="moon-calendar-subscribe" href="${esc(calendarFeedURL(feed.webcal_url))}">Feliratkozás a helyi naptárban</a><label>Feliratkozási hivatkozás<input id="moon-calendar-url" data-i18n-skip readonly value="${esc(calendarFeedURL(feed.url))}"></label><button class="button compact" id="moon-calendar-copy">Hivatkozás másolása</button><button class="text-button" data-feed-action="reset">Új hivatkozás</button><button class="text-button" data-feed-action="disable">Szinkronizálás letiltása</button>`:`<button class="button primary compact" data-feed-action="enable" ${feed?'':'disabled'}>Naptárszinkron engedélyezése</button>`}
+    <p class="footnote">Macen a Naptár alkalmazásban válaszd a helyi, Saját Mac naptárat és az óránkénti frissítést. Az appnak futnia kell a lekéréskor; csak az EVE-ből már betöltött adatok frissülnek. A localhost hivatkozást felhős naptárszolgáltatás nem tudja lekérni. Az ICS letöltése egyszeri másolat, nem automatikus szinkron.</p>
+    <p class="footnote">Az időpontokat a naptár a saját időzónájában jeleníti meg. A feliratkozás csak olvasható. Az új hivatkozás érvényteleníti a régit; utána újra fel kell iratkozni.</p>
+  </div></section>`;
+}
+window.addEventListener('eve-language-change',()=>{
+  const download=$('#moon-calendar-integration a[download]');if(download)download.href='/api/moons/calendar.ics?lang='+EveI18n.language;
+  const subscribe=$('#moon-calendar-subscribe'),input=$('#moon-calendar-url');
+  if(moonCalendarFeed?.enabled){if(subscribe)subscribe.href=calendarFeedURL(moonCalendarFeed.webcal_url);if(input)input.value=calendarFeedURL(moonCalendarFeed.url);}
+});
+function bindCalendarIntegration(){
+  if(moonCalendarFeed===null&&!moonCalendarFeedRequest){
+    moonCalendarFeedRequest=api('/api/moons/calendar').then(feed=>{moonCalendarFeed=feed;if(view==='moons'&&moonTab==='calendar'&&$('#moon-calendar-integration')){const panel=$('#moon-calendar-integration');panel.outerHTML=calendarIntegrationPanel();bindCalendarIntegration();}}).catch(e=>{if(view==='moons'&&moonTab==='calendar')error(e.message);}).finally(()=>{moonCalendarFeedRequest=null;});
+  }
+  $$('[data-feed-action]').forEach(button=>button.onclick=async()=>{
+    const action=button.dataset.feedAction;
+    if(action!=='enable'&&!confirmUI('A korábbi naptárhivatkozás nem fog tovább frissülni. Folytatod?'))return;
+    try{button.disabled=true;moonCalendarFeed=await api('/api/moons/calendar',{action});const panel=$('#moon-calendar-integration');if(panel){panel.outerHTML=calendarIntegrationPanel();bindCalendarIntegration();}}
+    catch(e){button.disabled=false;error(e.message);}
+  });
+  const copy=$('#moon-calendar-copy');if(copy)copy.onclick=async()=>{
+    const input=$('#moon-calendar-url');
+    try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(input.value);else{input.focus();input.select();if(!document.execCommand('copy'))throw Error();}toast('Naptárhivatkozás másolva.');}
+    catch{input.focus();input.select();error('A másolás nem sikerült. Másold ki a kijelölt hivatkozást.');}
+  };
+}
 function renderMoonCalendar(target,moons){
   const ids=new Set(moons.filter(m=>m.structure==='Athanor').map(m=>m.id)),events=moonData.extractions.events.filter(e=>ids.has(e.moon_record_id));
   const first=new Date(moonCalendarMonth+'-01T00:00:00Z'),start=new Date(first);start.setUTCDate(1-(first.getUTCDay()+6)%7);
   const dayKey=d=>d.toISOString().slice(0,10);
   const cells=Array.from({length:42},(_,i)=>{const day=new Date(start.getTime()+i*86400000),key=dayKey(day),entries=events.filter(e=>e.date.slice(0,10)===key);return `<div class="moon-calendar-day ${day.getUTCMonth()===first.getUTCMonth()?'':'outside'}"><time datetime="${key}">${day.getUTCDate()}</time>${entries.map(e=>`<button class="moon-calendar-event ${e.stale?'stale':''}" data-calendar-event="${esc(e.id)}"><span data-i18n-skip>${esc(e.date.slice(11,16))} · ${esc(e.moon_name)}</span><small>${e.volume==null?'–':fmt(e.volume)} m³</small></button>`).join('')}</div>`;}).join('');
-  target.innerHTML=moonAuthPanel()+`<div class="banner">A naptár UTC időt mutat. Az ESI natural_decay_time az automatikus széttörés időpontja. Az ércek eltűnését a széttörés és a holdnál megadott élettartam alapján becsüljük; a korábbi kézi széttörés és a rig módosíthatja.</div><div class="moon-toolbar"><button id="moon-prev-month" class="button compact" aria-label="Előző hónap">←</button><label>Hónap<input id="moon-calendar-month" type="month" value="${moonCalendarMonth}"></label><button id="moon-next-month" class="button compact" aria-label="Következő hónap">→</button></div><div class="moon-calendar" aria-label="Kitermelési naptár">${Array.from({length:7},(_,i)=>`<div class="moon-calendar-weekday" data-i18n-skip>${new Intl.DateTimeFormat(EveI18n.locale,{weekday:'short',timeZone:'UTC'}).format(new Date(Date.UTC(2026,0,5+i)))}</div>`).join('')}${cells}</div><div id="extraction-details"></div>`;
-  target.innerHTML+=panel('Kitermelések és várható ércek','Az ércarányok forrása minden sorban látható',events.length?moonTable(['Hold','Érkezés · UTC','Automatikus széttörés · UTC','Érctérfogat (m³)','Összetétel forrása','Ércek eltűnése · becsült tartomány'],events.map(e=>`<tr><td><button class="text-button" data-calendar-event="${esc(e.id)}">${verbatim(e.moon_name)}</button></td><td data-sort-value="${Date.parse(e.date)}">${moonTime(e.date)}</td><td>${moonTime(e.natural_decay_time)}</td><td class="num">${e.volume==null?'–':fmt(e.volume)}</td><td><span>${moonSource(e.composition_source)}</span>${e.kind.includes('history')?' · <span>Korábbi esemény</span>':''}${e.stale?' · <span>Régi adat</span>':''}</td><td>${moonTime(e.belt_earliest_expiry)} — ${moonTime(e.belt_latest_expiry)}</td></tr>`),'extraction-events'):empty('Nincs hozzáférhető kitermelési esemény'));
+  const calendarGrid=`<div class="banner">A naptár UTC időt mutat. Az ESI natural_decay_time az automatikus széttörés időpontja. Az ércek eltűnését a széttörés és a holdnál megadott élettartam alapján becsüljük; a korábbi kézi széttörés és a rig módosíthatja.</div><div class="moon-toolbar"><button id="moon-prev-month" class="button compact" aria-label="Előző hónap">←</button><label>Hónap<input id="moon-calendar-month" type="month" value="${moonCalendarMonth}"></label><button id="moon-next-month" class="button compact" aria-label="Következő hónap">→</button></div><div class="moon-calendar" aria-label="Kitermelési naptár">${Array.from({length:7},(_,i)=>`<div class="moon-calendar-weekday" data-i18n-skip>${new Intl.DateTimeFormat(EveI18n.locale,{weekday:'short',timeZone:'UTC'}).format(new Date(Date.UTC(2026,0,5+i)))}</div>`).join('')}${cells}</div><div id="extraction-details"></div>`;
+  const extractionTable=panel('Kitermelések és várható ércek','Az ércarányok forrása minden sorban látható',events.length?moonTable(['Hold','Érkezés · UTC','Automatikus széttörés · UTC','Érctérfogat (m³)','Összetétel forrása','Ércek eltűnése · becsült tartomány'],events.map(e=>`<tr><td><button class="text-button" data-calendar-event="${esc(e.id)}">${verbatim(e.moon_name)}</button></td><td data-sort-value="${Date.parse(e.date)}">${moonTime(e.date)}</td><td>${moonTime(e.natural_decay_time)}</td><td class="num">${e.volume==null?'–':fmt(e.volume)}</td><td><span>${moonSource(e.composition_source)}</span>${e.kind.includes('history')?' · <span>Korábbi esemény</span>':''}${e.stale?' · <span>Régi adat</span>':''}</td><td>${moonTime(e.belt_earliest_expiry)} — ${moonTime(e.belt_latest_expiry)}</td></tr>`),'extraction-events'):empty('Nincs hozzáférhető kitermelési esemény'));
+  target.innerHTML=moonAuthPanel()+calendarIntegrationPanel()+extractionTable+calendarGrid;
+  bindCalendarIntegration();
   bindMoonAuth();
   const change=amount=>{const date=new Date(moonCalendarMonth+'-01T00:00:00Z');date.setUTCMonth(date.getUTCMonth()+amount);moonCalendarMonth=date.toISOString().slice(0,7);renderMoonBody();};
   $('#moon-prev-month').onclick=()=>change(-1);$('#moon-next-month').onclick=()=>change(1);

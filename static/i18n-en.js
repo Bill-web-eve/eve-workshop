@@ -1,6 +1,22 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Helyi naptár szinkronizálása": "Sync with a local calendar",
+  "A hold neve és a kőzet megérkezése kerül a naptárba. Az összes működő Athanor betöltött kitermelése szerepel benne, a nézet szűrőjétől és hónapjától függetlenül.": "The calendar includes the moon name and chunk arrival time for all enabled Athanors with loaded extraction data, regardless of the view’s filter or month.",
+  "ICS letöltése": "Download ICS",
+  "Feliratkozás a helyi naptárban": "Subscribe in your local calendar",
+  "Feliratkozási hivatkozás": "Subscription URL",
+  "Hivatkozás másolása": "Copy URL",
+  "Új hivatkozás": "Replace URL",
+  "Szinkronizálás letiltása": "Disable sync",
+  "Naptárszinkron engedélyezése": "Enable calendar sync",
+  "Macen a Naptár alkalmazásban válaszd a helyi, Saját Mac naptárat és az óránkénti frissítést. Az appnak futnia kell a lekéréskor; csak az EVE-ből már betöltött adatok frissülnek. A localhost hivatkozást felhős naptárszolgáltatás nem tudja lekérni. Az ICS letöltése egyszeri másolat, nem automatikus szinkron.": "On Mac, choose On My Mac in Calendar and set auto-refresh to every hour. The app must be running when the calendar fetches updates; it uses EVE data already loaded in the app. Cloud calendar services cannot fetch a localhost URL. Downloading ICS creates a one-time copy, not an automatic subscription.",
+  "Az időpontokat a naptár a saját időzónájában jeleníti meg. A feliratkozás csak olvasható. Az új hivatkozás érvényteleníti a régit; utána újra fel kell iratkozni.": "Times use your calendar’s local time zone. The subscription is read-only. Replacing the URL invalidates the previous link; you will need to subscribe again.",
+  "A korábbi naptárhivatkozás nem fog tovább frissülni. Folytatod?": "The previous calendar URL will stop updating. Continue?",
+  "Naptárhivatkozás másolva.": "Calendar URL copied.",
+  "A másolás nem sikerült. Másold ki a kijelölt hivatkozást.": "Copy failed. Copy the selected URL manually.",
+  "Nincs ilyen naptár.": "Calendar not found.",
+
   "EVE Műhely · Gyártástervező": "EVE Workshop · Industry Planner",
   "EVE Műhely kezdőlap": "EVE Workshop home",
   "MŰHELY": "WORKSHOP",
@@ -1015,7 +1031,7 @@ globalThis.EveEnglish={
   "PI-részletek": "PI details",
   "Szerkesztés": "Edit",
   "Mégse": "Cancel",
-  "Holdak és kitermelés": "Moons and extraction",
+  "Holdak és kitermelés": "Moon management",
   "HOLDGAZDÁLKODÁS": "MOON MANAGEMENT",
   "Kézi holdnyilvántartás, 30 napos termelés, üzemanyag és bányászkristály-arányok.": "Manual moon register, 30-day production, fuel and mining crystal shares.",
   "↻ Rendszeradatok ellenőrzése": "↻ Check system data",

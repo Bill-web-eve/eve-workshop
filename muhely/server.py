@@ -21,7 +21,7 @@ import uuid
 import webbrowser
 
 from . import __version__
-from . import moons, extractions
+from . import moons, extractions, moon_calendar
 from .market import Market,validate_ids as market_ids
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
@@ -526,6 +526,13 @@ class Handler(BaseHTTPRequestHandler):
             if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
+            if path.startswith('/calendar/moons/'):
+                token = moon_calendar.feed_token(self.app.store)
+                supplied = path.removeprefix('/calendar/moons/').removesuffix('.ics')
+                if not token or not path.endswith('.ics') or not secrets.compare_digest(supplied, token):
+                    return self.send(404, {'error': 'Nincs ilyen naptár.'})
+                with self.app.catalog.lock:
+                    return self.send(200, moon_calendar.export(self.app.store, self.app.catalog, query.get('lang', ['en'])[0]), 'text/calendar; charset=utf-8')
             if not self.authorized():
                 return self.send(403, {'error': 'Nyisd meg az alkalmazás kezdőlapját.'})
             if path == '/callback':
@@ -551,6 +558,11 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/prices':
                 ids=market_ids([int(v) for v in query.get('ids',[''])[0].split(',') if v],self.app.catalog)
                 return self.send(200,self.app.market.snapshot(ids))
+            if path == '/api/moons/calendar':
+                return self.send(200, moon_calendar.feed_status(self.app.store, self.app.origin))
+            if path == '/api/moons/calendar.ics':
+                with self.app.catalog.lock:
+                    return self.send(200, moon_calendar.export(self.app.store, self.app.catalog, query.get('lang', ['en'])[0]), 'text/calendar; charset=utf-8', headers={'Content-Disposition': 'attachment; filename="eve-moon-extractions.ics"'})
             if path == '/api/moons':
                 with self.app.catalog.lock:return self.send(200,moons.dashboard(self.app.store,self.app.catalog,self.app.eve.granted_scopes()))
             if path == '/api/moons/crystals':
@@ -607,6 +619,12 @@ class Handler(BaseHTTPRequestHandler):
                 ids=market_ids(data.get('ids'),self.app.catalog)
                 self.app.market.start(ids)
                 return self.send(200,self.app.market.snapshot(ids))
+            elif path == '/api/moons/calendar':
+                action = data.get('action')
+                if action not in ['enable', 'reset', 'disable']:
+                    raise PlanningError('Hibás kérés.')
+                moon_calendar.feed_token(self.app.store, action)
+                return self.send(200, moon_calendar.feed_status(self.app.store, self.app.origin))
             elif path == '/api/moons/save':
                 with self.app.catalog.lock:
                     value=moons.validate_moon(data,self.app.catalog,self.app.store.moon_records())

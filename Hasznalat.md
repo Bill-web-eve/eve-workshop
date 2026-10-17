@@ -263,3 +263,15 @@ A terv késztermékének **Jita buy** és **Jita sell** eladási értéke egysze
 A **Termelés Jita-értéke** panel tartalmazza az üzemanyagot és Magmatic Gas-t, a megadott bérletet és egyéb költséget, az eladási díjakat, a teljes költséget és a **Profit / 30 nap** sort. Holdanként a **Szerkesztés** alatt add meg a havi bérletet és a további költségeket; ide írható például a külön Tatara üzemanyaga, a finomítás, bányászat és szállítás költsége. Ezek nem kerülnek automatikusan becslésre.
 
 Az eladási adót és a broker fee-t a holdak **Számítási beállítások** lapján adhatod meg. Kezdetben mindkettő 0%. Buy áron történő eladásnál nincs új eladási megbízás broker fee-je; sell és split esetén a megadott broker fee is számít. A struktúraszűrő a költséget és a profitot is szűri. A kézi Fuel Block ár mező az ezreseket automatikusan tagolja, a tizedesrészt megtartja.
+
+## Holdkitermelések a helyi naptárban
+
+A **Moon management / Holdak és kitermelés** menü a bal oldali sávban lenyitható. Az almenükből közvetlenül megnyitható a holdnyilvántartás, a 30 napos termelés, a fogyasztás, a kitermelési naptár, a kristályterv és a számítási beállítások.
+
+A **Kitermelési naptár → Helyi naptár szinkronizálása** részben engedélyezd a naptárszinkront, majd válaszd a **Feliratkozás a helyi naptárban** gombot. Macen a Naptár alkalmazásban a **Saját Mac / On My Mac** helyet és az óránkénti automatikus frissítést válaszd. Kézzel is feliratkozhatsz a kimásolható URL-re. A működés az Apple naptárfeliratkozási lehetőségét használja: https://support.apple.com/en-ie/102301
+
+A naptár a működő Athanorok már betöltött kitermeléseit tartalmazza, a hold nevével és a kőzet megérkezési idejével; a leírásban az ismert ércmennyiségekkel és a becsült eltűnési adatokkal. A kliens helyi időzónában mutatja az időpontot. Az esemény egy időpontjelölő, nem bányászati időtartam. Az app és az EVE-frissítés továbbra is szükséges az új adatokhoz. A naptár lekérdezése nem indít külön ESI-frissítést.
+
+A feliratkozás csak ezen a gépen működik, futó app mellett. Felhős naptárszolgáltatás és másik eszköz nem éri el a localhost címet. A naptár csak olvasható; nem módosítja az EVE-adatokat. Az **Új hivatkozás** érvényteleníti a régit, ezért új feliratkozás kell; a **Szinkronizálás letiltása** megszünteti a hozzáférést. A már letöltött eseményeket a naptáralkalmazásból külön kell eltávolítani.
+
+Az **ICS letöltése** egy egyszer importálható fájlt ad. Ez nem frissül automatikusan; ismételt importáláskor a naptárkliens duplikálhat eseményeket. A feliratkozás ajánlott a folyamatos frissítéshez.

@@ -231,6 +231,8 @@ function navigate(next) {
   if(Object.keys(dirty).length && !confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?')) return false;
   if(view==='moons'){moonEditing=false;moonSystemGeneration++;moonSearchGeneration++;clearTimeout(moonSearchTimer);}
   view=next; dirty={};
+  if(next==='moons')setMoonMenu(true);
+  syncMoonNavigation();
   clearTimeout(skillTimer);
   clearTimeout(piTimer);
   if(['skills','pi'].includes(next))error('');
@@ -240,6 +242,7 @@ function navigate(next) {
 }
 function render() {
   if(!state) return;
+  syncMoonNavigation();
   if(view==='settings'&&dirty.facilities&&$('#settings-form'))return;
   if(view==='moons'&&(moonEditing&&$('#moon-form')||dirty.moon_settings&&$('#moon-settings')||dirty.moon_fuel&&$('#moon-fuel-settings')||dirty.moon_crystals&&$('#crystal-settings')))return;
   const content=$('#view-content'); actions();
@@ -638,7 +641,11 @@ function csv(rows, headers, name) {
 }
 
 $('#plan-form').onsubmit=event=>{event.preventDefault();if(!productId)return error('Előbb válassz egy terméket a találatok közül.');calculate();};
-$$('.nav').forEach(el=>el.onclick=()=>navigate(el.dataset.view));
+$$('.nav').forEach(el=>el.onclick=()=>{
+  if(el.dataset.view==='moons'&&view==='moons'){setMoonMenu($('#moon-submenu').hidden);return;}
+  navigate(el.dataset.view);
+});
+$$('[data-moon-nav]').forEach(el=>el.onclick=()=>selectMoonTab(el.dataset.moonNav));
 
 $('#sync').onclick=()=>startTask('/api/sync');
 $('#production-scope').onchange=event=>setProductionScope(Number(event.target.value)||null);
