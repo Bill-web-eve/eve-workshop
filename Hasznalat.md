@@ -321,17 +321,8 @@ Az ütemező nem indít vagy módosít EVE-jobot, és a készletet sem írja át
 
 Az ütemező külön **Reaction schedule / Reakciók ütemterve** és **Manufacturing schedule / Gyártás ütemterve** táblázatot mutat. A reakció és a gyártás ugyanannál a karakternél is párhuzamosan futhat, ha az anyagok és a megfelelő blueprintek rendelkezésre állnak. A külön slotkeretek nem foglalják egymást.
 
-A **Schedule graph and timeline / Ütemezési gráf és idővonal** közös időtengelyen, karakterenként és tevékenységenként külön sávokon mutatja a jobokat. Kattints egy sávra vagy a táblázat Job-számára: az alatta megjelenő lista megmutatja minden bemenet mennyiségét, forrását és érkezését. A kapcsolónyilak minden, az aktuális oldalon látható anyagkapcsolatot mutatnak; a kijelölt job teljes előzmény- és felhasználási lánca kiemelést kap. A forrás vagy felhasználó Job-számával másik oldalra is át lehet ugrani. A gráf és a két táblázat külön lapozható, 100 jobos oldalakon.
+A **Schedule graph and timeline / Ütemezési gráf és idővonal** közös időtengelyen, karakterenként és tevékenységenként külön sávokon mutatja a jobokat. Kattints egy sávra vagy a táblázat Job-számára: az alatta megjelenő lista megmutatja minden bemenet mennyiségét, forrását és érkezését. A forrás vagy felhasználó Job-számával másik oldalra is át lehet ugrani. A gráf és a két táblázat külön lapozható, 100 jobos oldalakon.
 
 Egy bemenet csak egyszer költhető el, a következő job pedig csak az összes szükséges mennyiség megérkezése után indul. Készlet, beszerzés, meglévő folyamatban lévő munka és az újonnan ütemezett jobok kimenete külön forrásként látszik. Az anyag rendelkezésre állása után még a slotra vagy a blueprintre is várhat a job.
 
 A **Production material cost** összesítésében a célmennyiség teljes eladási értéke mellett külön **Sell price per unit · Jita sell** sor mutatja a késztermék darabonkénti Jita sell árát. Ez nem változik az anyagár módjával vagy a célmennyiséggel.
-
-
-### A teljes ütemezett függőségi lánc
-
-A **Full production dependency chain / Teljes gyártási függőségi lánc** az összes ütemezett jobot termékenként vonja össze. A reakció → reakció → komponens → késztermék kapcsolatok akkor is együtt láthatók, ha több száz vagy ezer job készül. A nyíl az ütemező által ténylegesen a következő jobhoz rendelt kimenetből származik. A meglévő készletből fedezett bemenethez nem rajzolunk új reakciójob-függőséget.
-
-Egy kártya a hozzá tartozó jobok első kezdését és utolsó befejezését mutatja. Két összekapcsolt termék időtartama átfedhet: ha a szükséges részmennyiség már elkészült, az arra épülő job indulhat, miközben további reakciós jobok még futnak. Minden egyes jobnak a teljes saját bemeneti mennyiségét meg kell várnia. A kártyára kattintva megnyílik az egyik hozzá tartozó job pontos anyagforrása és időpontja.
-
-A gráf nagyítható és szélességre igazítható; a jobonkénti idővonal és a két tevékenység táblázata továbbra is külön lapozható.
