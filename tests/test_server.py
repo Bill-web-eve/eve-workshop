@@ -31,7 +31,7 @@ class ServerTests(unittest.TestCase):
             defaults.update({'Content-Type':'application/json','Origin':self.app.origin,'X-CSRF-Token':self.app.csrf})
         connection.request('GET' if body is None else 'POST',path,body=data,headers={**defaults,**headers})
         response=connection.getresponse();raw=response.read();status=response.status;h=dict(response.getheaders());connection.close()
-        return status,json.loads(raw) if 'application/json' in h.get('Content-Type','') else raw,h
+        return status,json.loads(raw) if raw and 'application/json' in h.get('Content-Type','') else raw,h
 
     def test_moon_calendar_and_crystal_routes_are_local_and_validate_ids(self):
         status,body,_=self.request('/extractions.js');self.assertEqual(status,200);self.assertIn(b'renderMoonCalendar',body)
@@ -40,6 +40,13 @@ class ServerTests(unittest.TestCase):
         self.app.start_task=Mock()
         status,_,_=self.request('/api/moons/extractions/sync',{},Origin='http://other.local');self.assertEqual(status,403);self.app.start_task.assert_not_called()
         status,_,_=self.request('/api/moons/extractions/sync',{});self.assertEqual(status,200);self.app.start_task.assert_called_once_with('extractions')
+
+    def test_moon_authorization_callback_starts_refresh_and_handles_invalid_scope(self):
+        self.app.eve.finish=Mock(return_value=1);self.app.eve.authorized_feature='moons';self.app.start_task=Mock()
+        status,_,headers=self.request('/callback?state=test&code=test')
+        self.assertEqual(status,303);self.assertEqual(headers['Location'],'/?connected=1');self.app.start_task.assert_called_once_with('extractions')
+        status,body,_=self.request('/callback?error=invalid_scope')
+        self.assertEqual(status,400);self.assertIn(b'Developer',body)
 
     def test_manual_plan_and_search_work_without_any_eve_account(self):
         status,plan,_=self.request('/api/plan?product_id=22428&quantity=1')

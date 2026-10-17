@@ -162,7 +162,7 @@ class Catalog:
                     break
 
             self.moon_systems,self.moon_ores,self.moon_crystals,self.moon_rules={},{},{},{}
-            self.moon_source=None;self.moon_meta={}
+            self.moon_source=None;self.moon_meta={};self.moon_variants={}
             for source in dict.fromkeys(p for p in [self.path,self.pi_fallback] if p):
                 with closing(sqlite3.connect(source)) as moon_db:
                     moon_db.row_factory=sqlite3.Row
@@ -172,9 +172,16 @@ class Catalog:
                     self.moon_ores={r['id']:json.loads(r['data']) for r in moon_db.execute('SELECT * FROM moon_ores')}
                     self.moon_crystals={r['id']:json.loads(r['data']) for r in moon_db.execute('SELECT * FROM moon_crystals')}
                     meta=dict(moon_db.execute('SELECT key,value FROM meta'))
-                    self.moon_rules=json.loads(meta.get('moonRules','{}'));self.moon_meta=meta
+                    self.moon_rules=json.loads(meta.get('moonRules','{}'));self.moon_meta={k:v for k,v in meta.items() if k!='moonOreVariants'}
+                    self.moon_variants={int(k):v for k,v in json.loads(meta.get('moonOreVariants','{}')).items()}
                     self.moon_source=source
                     break
+
+            if not self.moon_variants and self.pi_fallback and self.pi_fallback.resolve()!=self.path.resolve():
+                with closing(sqlite3.connect(self.pi_fallback)) as fallback:
+                    meta=dict(fallback.execute('SELECT key,value FROM meta'))
+                    if meta.get('buildNumber')==self.meta.get('buildNumber'):
+                        self.moon_variants={int(k):v for k,v in json.loads(meta.get('moonOreVariants','{}')).items()}
 
     def moon_locations(self, system_id):
         if not self.moon_source:return []

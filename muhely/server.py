@@ -79,7 +79,7 @@ class App:
                     if any(c['synced_at'] for c in self.store.corporations()):
                         corp_results=self.eve.sync_corporations()
                         message+=f" Corp-adatok: {sum(r['ok'] for r in corp_results)} sikeres lekérés; részletek a Corporationok oldalon."
-                    if any(self.store.snapshot(c['id'],'moon_calendar') or self.store.snapshot(c['id'],'moon_timers') for c in self.store.characters()):
+                    if any(self.store.snapshot(c['id'],'moon_calendar') or self.store.snapshot(c['id'],'moon_timers') or self.store.snapshot(c['id'],'moon_notifications') for c in self.store.characters()):
                         moon_results=extractions.sync(self.eve)
                         if any(not r['ok'] for r in moon_results):message+=' Néhány holdadat nem frissült; ellenőrizd a Kitermelési naptár hozzáféréseit.'
                 elif kind == 'skills':
@@ -530,9 +530,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(403, {'error': 'Nyisd meg az alkalmazás kezdőlapját.'})
             if path == '/callback':
                 error = query.get('error')
+                if error==['invalid_scope']:
+                    raise PlanningError('Az EVE Developer alkalmazás nem engedélyezi az egyik kért scope-ot. Add hozzá a naptár, corporation mining és karakterértesítési olvasási engedélyeket a Client ID alkalmazásához, majd lépj be újra.')
                 if error:
                     raise PlanningError('Az EVE-belépés megszakadt. Az EVE-kapcsolat oldalon újraindítható.')
                 self.app.eve.finish(query.get('state', [''])[0], query.get('code', [''])[0], self.app.cookie)
+                if self.app.eve.authorized_feature=='moons':
+                    try:self.app.start_task('extractions')
+                    except PlanningError:pass
                 return self.send(303, b'', headers={'Location': '/?connected=1'})
             if path == '/api/state':
                 return self.send(200, self.app.state(query.get('corporation_id',[None])[0]))
@@ -547,7 +552,7 @@ class Handler(BaseHTTPRequestHandler):
                 ids=market_ids([int(v) for v in query.get('ids',[''])[0].split(',') if v],self.app.catalog)
                 return self.send(200,self.app.market.snapshot(ids))
             if path == '/api/moons':
-                with self.app.catalog.lock:return self.send(200,moons.dashboard(self.app.store,self.app.catalog))
+                with self.app.catalog.lock:return self.send(200,moons.dashboard(self.app.store,self.app.catalog,self.app.eve.granted_scopes()))
             if path == '/api/moons/crystals':
                 with self.app.catalog.lock:return self.send(200,extractions.crystal_plan(self.app.store,self.app.catalog,query.get('moon_id',[''])[0],query.get('event_id',[None])[0]))
             if path == '/api/moons/systems':

@@ -27,7 +27,7 @@ PI_SCOPES = ['esi-planets.manage_planets.v1']
 SCOPES = INDUSTRY_SCOPES + SKILL_SCOPES + PI_SCOPES
 CORPORATION_SCOPES = ['esi-assets.read_corporation_assets.v1', 'esi-corporations.read_blueprints.v1',
                       'esi-industry.read_corporation_jobs.v1']
-MOON_SCOPES = ['esi-calendar.read_calendar_events.v1','esi-industry.read_corporation_mining.v1']
+MOON_SCOPES = ['esi-calendar.read_calendar_events.v1','esi-industry.read_corporation_mining.v1','esi-characters.read_notifications.v1']
 ALL_SCOPES = SCOPES + CORPORATION_SCOPES + MOON_SCOPES
 USER_AGENT = 'EveMuhely/0.1 (local personal industry planner)'
 COMPATIBILITY = '2026-10-15'
@@ -106,7 +106,9 @@ class Transport:
                 except ValueError:
                     self.blocked_until = time.time()+60
             if exc.code in [401, 403]:
-                raise AuthenticationError('Az EVE-hozzáférés lejárt vagy nincs jogosultság. Engedélyezd újra a karaktert.') from None
+                error=AuthenticationError('Az EVE-hozzáférés lejárt vagy nincs jogosultság. Engedélyezd újra a karaktert.')
+                error.status_code=exc.code
+                raise error from None
             raise EsiError(f'Az EVE szerver HTTP {exc.code} hibát jelzett. A korábbi adatok megmaradtak.') from None
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
             raise EsiError('Az EVE-adatok most nem érhetők el. A korábbi adatok megmaradtak.') from None
@@ -237,6 +239,7 @@ class EveConnection:
         self.keys = None
         self.keys_expires = 0
         self.sync_lock = threading.Lock()
+        self.authorized_feature = None
 
     def jwks(self):
         if self.keys is None or time.time() >= self.keys_expires:
@@ -266,7 +269,7 @@ class EveConnection:
         with self.lock:
             self.pending = {k: v for k, v in self.pending.items() if v['expires'] > time.time()}
             self.pending[state] = dict(session=session, verifier=verifier, client=client,
-                                       redirect=redirect, expires=time.time()+600, character_id=character_id,scopes=requested)
+                                       redirect=redirect, expires=time.time()+600, character_id=character_id,scopes=requested,feature=feature)
         return SSO+'/v2/oauth/authorize?'+urllib.parse.urlencode({
             'response_type': 'code', 'client_id': client, 'redirect_uri': redirect,
             'scope': ' '.join(requested), 'state': state, 'code_challenge': challenge,
@@ -293,7 +296,16 @@ class EveConnection:
         if set(SKILL_SCOPES).issubset(tokens['scopes']):self.store.skill_access_granted(char_id)
         if set(PI_SCOPES).issubset(tokens['scopes']):self.store.resource_access_granted(char_id,'pi')
         if set(CORPORATION_SCOPES).issubset(tokens['scopes']):self.store.resource_access_granted(char_id,'corporations')
+        self.authorized_feature=pending.get('feature')
+        for domain,scope in [('moon_calendar',MOON_SCOPES[0]),('moon_timers',MOON_SCOPES[1]),('moon_notifications',MOON_SCOPES[2])]:
+            if scope in tokens['scopes']:self.store.resource_access_granted(char_id,domain)
         return char_id
+
+    def granted_scopes(self):
+        # Read only the verified scope metadata; never expose any token.
+        try:
+            with self.lock:return {int(cid):[s for s in token.get('scopes',[]) if s in ALL_SCOPES] for cid,token in self.vault.read().items()}
+        except EsiError:return {}
 
     def token(self, char_id, required_scopes=None):
         with self.lock:
@@ -319,6 +331,8 @@ class EveConnection:
                     tokens['scopes'] = claims['scp'].split() if isinstance(claims['scp'],str) else claims['scp']
                     self.vault.set(char_id,tokens)
                 if not set(required_scopes).issubset(tokens['scopes']):
+                    if MOON_SCOPES[2] in set(required_scopes)-set(tokens['scopes']):
+                        raise MoonScopeError('Hiányzik a karakterértesítések olvasási engedélye. Engedélyezd a holdadatok új értesítési hozzáférését.')
                     if set(MOON_SCOPES) & (set(required_scopes)-set(tokens['scopes'])):
                         raise MoonScopeError('Hiányzik a naptár vagy a corporation holdkitermelési engedélye. Engedélyezd a holdadatok olvasását.')
                     if set(CORPORATION_SCOPES) & (set(required_scopes)-set(tokens['scopes'])):

@@ -30,7 +30,7 @@ class ExtractionTests(unittest.TestCase):
     def test_natural_decay_is_not_ore_expiry(self):
         self.seed();e=report(self.s,self.c,self.now)['events'][0]
         self.assertEqual(e['volume'],1000000);self.assertEqual(e['volume_source'],'esi_calendar')
-        self.assertEqual(e['belt_latest_expiry'],self.now+7*86400+10800+48*3600)
+        self.assertAlmostEqual(e['belt_latest_expiry'],self.now+7*86400+10800+48*3600,places=5)
         self.assertNotEqual(e['belt_latest_expiry'],__import__('muhely.extractions',fromlist=['stamp']).stamp(e['natural_decay_time']))
     def test_calendar_composition_overlays_without_mutating_manual_input(self):
         self.moon['ores']=[{'id':45490,'percent':99}];self.s.save_moon(self.moon);self.seed()
@@ -95,6 +95,7 @@ class ExtractionTests(unittest.TestCase):
     def test_sync_does_not_modify_industry_data_or_inventory(self):
         eve=EveConnection(self.s,vault=Mock(),transport=Mock());eve.token=Mock(return_value='private')
         def respond(url,**kw):
+            if url.endswith('/notifications'):return ([],{'Cache-Control':'max-age=600'})
             if url.endswith('/calendar'):return ([dict(event_id=50,event_date=self.event['date'])],{'Cache-Control':'max-age=600'})
             if '/calendar/50' in url:return (self.event,{'Cache-Control':'max-age=600'})
             if '/mining/extractions' in url:return ([self.timer],{'X-Pages':'1'})

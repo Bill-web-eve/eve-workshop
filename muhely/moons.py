@@ -150,9 +150,9 @@ def composition_state(ores):
     return total,('invalid' if total>D('100.02') else 'partial' if total<D('99.98') else 'ok')
 
 
-def dashboard(store,catalog):
+def dashboard(store,catalog,access_scopes=None):
     from .extractions import report
-    extraction=report(store,catalog)
+    extraction=report(store,catalog,access_scopes=access_scopes)
     prefs=preferences(store);rules=catalog.moon_rules
     if not rules:raise PlanningError('A holdadatokhoz frissítsd az EVE-receptadatbázist.')
     refining=reprocessing_yield(rules,prefs)
@@ -217,7 +217,7 @@ def dashboard(store,catalog):
         for group in [structure,'all']:
             fuel_totals[group]['fuel']+=fuel;fuel_totals[group]['gas']+=gas;fuel_totals[group]['online_fuel']+=online;fuel_totals[group]['count']+=int(active)
         moons.append({**record,'name':name,'system':s,'esi_checked':min(cache['fetched'],const['fetched']) if cache and const else None,
-                      'manual_ores':record['ores'],'composition_source':'esi_calendar' if observation.get('composition') else 'manual','extraction_status':observation.get('status','unknown'),'percent_total':float(total),'status':status,'included':valid and active,'ores':ores,'outputs':out,'crystals':crystal_rows,
+                      'manual_ores':record['ores'],'composition_source':observation.get('composition_source','manual'),'extraction_status':observation.get('status','unknown'),'percent_total':float(total),'status':status,'included':valid and active,'ores':ores,'outputs':out,'crystals':crystal_rows,
                       'fuel':fuel,'gas':gas,'online_fuel':online,'refining_yield':float(factor)})
     total_volume=sum(c['volume'] for c in crystal_totals.values())
     for c in crystal_totals.values():c['share']=c['volume']/total_volume*100 if total_volume else 0

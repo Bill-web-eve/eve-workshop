@@ -682,6 +682,6 @@ document.addEventListener('click',event=>{if(!event.target.closest('.search-wrap
     if(saved?.id && saved?.quantity){productId=saved.id;productName=saved.name;activePlanId=saved.saved_plan_id||null;EveNumbers.set($('#target-quantity'),saved.quantity);}
   }catch{}
   $('#product-search').value=productName;
-  try {await reloadState();if(productId)await calculate(false);else render();if(new URLSearchParams(location.search).has('connected')){history.replaceState(null,'','/');const back=sessionStorage.getItem('eve-muhely-auth-return');sessionStorage.removeItem('eve-muhely-auth-return');navigate(['skills','pi','corporations'].includes(back)?back:'connection');if(back==='corporations')void startTask('/api/corporations/sync');toast('Karakter engedélyezve. Frissítsd az EVE-adatokat.');}}
+  try {await reloadState();if(productId)await calculate(false);else render();if(new URLSearchParams(location.search).has('connected')){history.replaceState(null,'','/');const back=sessionStorage.getItem('eve-muhely-auth-return');sessionStorage.removeItem('eve-muhely-auth-return');navigate(['skills','pi','corporations','moons'].includes(back)?back:'connection');if(back==='corporations')void startTask('/api/corporations/sync');toast(back==='moons'?'Holdadatok engedélyezve. A betöltés automatikusan elindult.':'Karakter engedélyezve. Frissítsd az EVE-adatokat.');}}
   catch(e){error(e.message);}
 })();

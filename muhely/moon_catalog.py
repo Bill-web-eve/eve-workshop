@@ -54,6 +54,7 @@ def import_moons(db, archive):
             data={'id':i,'name':name,'skill_id':int(a[182]),'variant':name.split('Type ')[1],
                   'volatility':a[783],'damage':a[784],'hp':a.get(9,1)}
             db.execute('INSERT INTO moon_crystals VALUES (?,?)',(i,json.dumps(data)))
+    db.execute('INSERT INTO meta VALUES (?,?)',('moonOreVariants',json.dumps(variant_data(types,dogma,materials))))
     def attr(name,attribute):
         i=next(i for i,t in types.items() if t.get('name',{}).get('en')==name)
         return dogma[i][attribute]
@@ -70,3 +71,14 @@ def import_moons(db, archive):
                'rig_base':attr('Standup L-Set Reprocessing Monitor II',717),
                'rig_nullsec':attr('Standup L-Set Reprocessing Monitor II',2357)}
         db.execute('INSERT INTO meta VALUES (?,?)',('moonRules',json.dumps(rules)))
+
+
+def variant_data(types,dogma,materials):
+    """Uncompressed base, enriched and jackpot moon ores from official SDE."""
+    result={}
+    for tid,t in types.items():
+        base=int(dogma.get(tid,{}).get(2711,0))
+        if t.get('groupID') not in ORE_GROUPS or not t.get('published') or base not in types or tid not in materials or t.get('volume',0)<1:continue
+        result[tid]={'id':tid,'base_id':base,'name':t['name']['en'],'volume':t['volume'],'portion':t['portionSize'],
+                     'materials':[{'id':m['materialTypeID'],'name':types[m['materialTypeID']]['name']['en'],'quantity':m['quantity']} for m in materials[tid]]}
+    return result
