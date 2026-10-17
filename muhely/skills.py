@@ -131,7 +131,9 @@ def dashboard(store,catalog,now=None):
     now=time.time() if now is None else now
     rows=[character_view(c,skills,queue,status,catalog.name,now)
           for c,skills,queue,status in store.skill_records()]
-    order={'idle':0,'soon':1,'unknown':2,'training':3}
+    from .accounts import load,apply_tracking,dashboard as account_dashboard
+    apply_tracking(rows,load(store),now)
+    order={'idle':0,'soon':1,'unknown':2,'training':3,'excluded':4}
     rows.sort(key=lambda r:(order[r['status']],r['name'].casefold()))
     return {'characters':rows,'summary':{key:sum(r['status']==key for r in rows)
-            for key in ['idle','soon','unknown','training']},'calculated_at':now,'threshold_seconds':FIVE_DAYS}
+            for key in ['idle','soon','unknown','training','excluded']},'accounts':account_dashboard(store,now),'calculated_at':now,'threshold_seconds':FIVE_DAYS}

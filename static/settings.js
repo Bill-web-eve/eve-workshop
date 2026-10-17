@@ -1,6 +1,6 @@
 'use strict';
 let settingsTab='structures',settingsAccessData=null,settingsAccessRequest=null;
-const settingsSections={structures:'Struktúrák és bónuszok',connection:'EVE-kapcsolat',access:'Adathozzáférések',moons:'Holdak számítási beállításai',calendar:'Naptárszinkron'};
+const settingsSections={structures:'Struktúrák és bónuszok',connection:'EVE-kapcsolat',access:'Adathozzáférések',moons:'Holdak számítási beállításai',calendar:'Naptárszinkron',accounts:'Accountok és tanulás'};
 function settingsShortcut(message,tab='access'){
   return `<div class="banner"><span>${esc(message)}</span> <button class="text-button" data-open-settings="${tab}">Beállítások megnyitása</button></div>`;
 }
@@ -24,6 +24,7 @@ function openSettingsTab(tab){
     return true;
   }
   if(Object.keys(dirty).length&&!confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?'))return false;
+  if(settingsTab==='accounts')accountDraft=null;
   dirty={};settingsTab=tab;setSettingsMenu(true);render();return true;
 }
 function renderSettings(content){
@@ -33,6 +34,7 @@ function renderSettings(content){
   $('#plan-status').hidden=true;
   if(settingsTab==='structures')renderStructureSettings(target);
   else if(settingsTab==='connection')renderConnection(target);
+  else if(settingsTab==='accounts')renderAccounts(target);
   else if(!moonData){target.innerHTML=empty('Holdadatok betöltése');void refreshMoons();}
   else if(settingsTab==='moons')renderMoonSettings(target);
   else if(settingsTab==='calendar'){target.innerHTML=calendarIntegrationPanel();bindCalendarIntegration();}

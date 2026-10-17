@@ -86,7 +86,7 @@ class SkillViewTests(unittest.TestCase):
                 name=staticmethod(str)
             r=dashboard(Store(folder),Catalog(),NOW)
             self.assertEqual({c['id'] for c in r['characters']},{1,2})
-            self.assertEqual(r['summary'],{'idle':1,'soon':0,'training':1,'unknown':0})
+            self.assertEqual(r['summary'],{'idle':1,'soon':0,'training':1,'unknown':0,'excluded':0})
             store.forget_character(1)
             self.assertIsNone(store.resource_status(1,'skills'))
             self.assertIsNone(store.snapshot(1,'skills'))

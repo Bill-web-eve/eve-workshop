@@ -19,6 +19,9 @@
   <script src="/pi.js" defer></script>
   <script src="/extractions.js" defer></script>
   <script src="/moons.js" defer></script>
+  <script src="/multibuy.js" defer></script>
+  <script src="/accounts.js" defer></script>
+  <script src="/schedule.js" defer></script>
   <script src="/settings.js" defer></script>
   <script src="/costs.js" defer></script>
   <script src="/prices.js" defer></script>
@@ -32,6 +35,7 @@
     <nav aria-label="Főmenü">
       <button class="nav active" data-view="queue"><span class="nav-icon">▤</span>Gyártási terv <span id="queue-count" class="nav-count">–</span></button>
       <button class="nav" data-view="graph"><span class="nav-icon">⑂</span>Gyártási gráf</button>
+      <button class="nav" data-view="schedule"><span class="nav-icon">◴</span>Gyártásütemező</button>
       <button class="nav" data-view="shopping"><span class="nav-icon">◈</span>Alapanyaghiány</button>
       <button class="nav" data-view="inventory"><span class="nav-icon">▥</span>Készlet</button>
       <button class="nav" data-view="blueprints"><span class="nav-icon">▧</span>Blueprint</button>
@@ -60,6 +64,7 @@
           <button data-settings-nav="access">Adathozzáférések</button>
           <button data-settings-nav="moons">Holdak számítási beállításai</button>
           <button data-settings-nav="calendar">Naptárszinkron</button>
+          <button data-settings-nav="accounts">Accountok és tanulás</button>
         </div>
       </div>
       <button class="nav" data-view="saved"><span class="nav-icon">▱</span>Mentett tervek</button>

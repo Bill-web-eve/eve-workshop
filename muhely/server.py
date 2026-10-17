@@ -21,7 +21,7 @@ import uuid
 import webbrowser
 
 from . import __version__
-from . import moons, extractions, moon_calendar
+from . import moons, extractions, moon_calendar, accounts, scheduler
 from .market import Market,validate_ids as market_ids
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
@@ -307,6 +307,21 @@ class App:
                 'own': allocation['by_plan'].get(saved_plan_id)}
             return plan
 
+    def schedule(self,data):
+        with self.planning_lock,self.catalog.lock:
+            cid=self.scope_id(data.get('corporation_id'))
+            context=self._context(cid)
+            product=integer(data.get('product_id'),'Termék',10**9,1)
+            quantity=data.get('quantity');sid=data.get('saved_plan_id')
+            plans=self.store.plans();saved=self._saved(plans,sid) if sid else None
+            if saved and (saved.get('corporation_id')!=cid or saved['product_id']!=product):
+                raise PlanningError('A mentett terv más termékhez vagy gyártási körhöz tartozik.')
+            preview=[{**p,'quantity':quantity} if p['id']==sid else p for p in plans]
+            allocation=self._allocate(preview,context);other,own=except_owner(allocation,sid)
+            context['reservations']=other
+            def calculate(current):return self._calculate(product,quantity,current,other,own,None)
+            return scheduler.build(context,self.store,self.catalog,calculate,data)
+
     def shopping_summary(self):
         """Preview every saved goal against one pool; no persistent holds change."""
         with self.planning_lock, self.catalog.lock:
@@ -342,6 +357,8 @@ class App:
                     for key in ['required','used_stock','used_wip','buy']:row[key]+=material[key]
                     row['plans'].append({'id':saved['id'],'name':saved['name'],'quantity':saved['quantity'],'buy':material['buy'],
                                          'corporation_id':saved.get('corporation_id'),'scope_label':self.scope_label(saved.get('corporation_id'))})
+            blueprint_ids={r['bp_id'] for r in self.catalog.recipes.values()}
+            for row in rows.values():row['is_blueprint']=row['id'] in blueprint_ids
             return {'rows':sorted(rows.values(),key=lambda r:(r['category'],r['name'].casefold())),
                     'plans':included,'source':self.store.settings()['source'],'separate_pools':len(contexts)>1 or any(contexts),
                     'stale_characters':list(dict.fromkeys(n for c in contexts.values() for n in c['stale'])),'calculated_at':time.time()}
@@ -523,7 +540,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/icon.svg']:
+            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/calendar/moons/'):
@@ -550,6 +567,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, self.app.state(query.get('corporation_id',[None])[0]))
             if path == '/api/corporations':
                 return self.send(200,corporation_dashboard(self.app.store))
+            if path == '/api/accounts':return self.send(200,accounts.dashboard(self.app.store))
             if path == '/api/skills':
                 with self.app.catalog.lock:
                     return self.send(200, skill_dashboard(self.app.store,self.app.catalog))
@@ -619,6 +637,10 @@ class Handler(BaseHTTPRequestHandler):
                 ids=market_ids(data.get('ids'),self.app.catalog)
                 self.app.market.start(ids)
                 return self.send(200,self.app.market.snapshot(ids))
+            elif path == '/api/schedule':
+                return self.send(200,self.app.schedule(data))
+            elif path == '/api/accounts':
+                return self.send(200,accounts.save(self.app.store,data))
             elif path == '/api/moons/calendar':
                 action = data.get('action')
                 if action not in ['enable', 'reset', 'disable']:

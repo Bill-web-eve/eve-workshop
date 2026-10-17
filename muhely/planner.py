@@ -272,6 +272,8 @@ class Planner:
             stage[tid] = 1+max((stage[m['typeID']] for m in recipe['materials']), default=0) if recipe else 0
             rows[tid]['stage'] = stage[tid]
         queue = sorted((r for r in rows.values() if r['runs']), key=lambda r: (r['stage'], r['activity'] != 'reaction', normalize_name(r['name'])))
+        blueprint_ids={recipe['bp_id'] for recipe in c.recipes.values()}
+        for row in [*rows.values(),*blueprint_shortages]:row['is_blueprint']=row['id'] in blueprint_ids
         shopping = sorted([r for r in rows.values() if r['buy']]+blueprint_shortages, key=lambda r: (r['category'], normalize_name(r['name'])))
         return {'product_id': product_id, 'name': c.name(product_id), 'quantity': quantity,
                 'activity':c.recipes[product_id]['activity'],'manufacturer_id':manufacturer_id,

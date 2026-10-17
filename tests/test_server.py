@@ -41,6 +41,16 @@ class ServerTests(unittest.TestCase):
         status,_,_=self.request('/api/moons/extractions/sync',{},Origin='http://other.local');self.assertEqual(status,403);self.app.start_task.assert_not_called()
         status,_,_=self.request('/api/moons/extractions/sync',{});self.assertEqual(status,200);self.app.start_task.assert_called_once_with('extractions')
 
+    def test_accounts_and_scheduler_routes_require_local_authorization(self):
+        self.assertEqual(self.request('/api/accounts')[0],200)
+        self.assertEqual(self.request('/api/accounts',{'accounts':[],'characters':{}},Origin='https://evil.invalid')[0],403)
+        self.assertEqual(self.request('/api/accounts',{'accounts':[],'characters':{}})[0],200)
+        self.assertEqual(self.request('/api/schedule',{'product_id':590,'quantity':1},Origin='https://evil.invalid')[0],403)
+        status,result,_=self.request('/api/schedule',{'product_id':590,'quantity':1})
+        self.assertEqual(status,200);self.assertFalse(result['complete']);self.assertTrue(result['blocked'])
+        self.assertEqual(self.request('/api/schedule',{'product_id':590,'quantity':1,'characters':[999]})[0],400)
+        self.assertEqual(self.request('/api/schedule',{'product_id':590,'quantity':1,'owned_only':'yes'})[0],400)
+
     def test_moon_authorization_callback_starts_refresh_and_handles_invalid_scope(self):
         self.app.eve.finish=Mock(return_value=1);self.app.eve.authorized_feature='moons';self.app.start_task=Mock()
         status,_,headers=self.request('/callback?state=test&code=test')
@@ -57,7 +67,7 @@ class ServerTests(unittest.TestCase):
         status,_,headers=self.request('/')
         self.assertIn('HttpOnly',headers['Set-Cookie'])
         self.assertIn("frame-ancestors 'none'",headers['Content-Security-Policy'])
-        for path in ['/graph.js','/graph.css','/skills.js','/pi.js','/numbers.js','/i18n.js','/i18n-en.js','/settings.js']:
+        for path in ['/graph.js','/graph.css','/skills.js','/pi.js','/numbers.js','/i18n.js','/i18n-en.js','/settings.js','/accounts.js','/schedule.js','/multibuy.js']:
             status,content,headers=self.request(path)
             self.assertEqual(status,200)
             self.assertTrue(content)

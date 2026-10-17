@@ -20,6 +20,12 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Jita buy/sell/split alapanyagárak, termékeladási érték, ESI-rendszerindex és beállítható ipari díjak.
 - Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
 
+## Helyi fejlesztői változat · még nincs kiadás
+
+Az új forrásváltozatban Multibuy-kompatibilis, blueprint nélküli bevásárlólista, kézzel vezethető account/Omega/MCT-nyilvántartás és a tanulási jogosultsághoz igazított figyelmeztetés is van. A külön **Production scheduler / Gyártásütemező** karakteres skill-, slot-, anyag- és blueprintkorlátokkal készít jobtervet; választható a kizárólag meglévő BPO/BPC-kre támaszkodó mód. Az accountok és a többi beállítás a **Settings / Beállítások** menüben található. Részletek és feltételezések: [Hasznalat.md](Hasznalat.md).
+
+Ezek a változtatások a fenti 0.11.0-s letöltésekben még nincsenek benne; új release egyelőre nem készül.
+
 ## Használat
 
 Az oldalsávban, a sötét mód kapcsolója alatt a **Magyar / English** gombokkal válthatsz nyelvet. A választást a böngésző megjegyzi; a nyelv a megnyitott nézetben is azonnal változik. A beírt értékek, szűrők és még nem mentett módosítások megmaradnak. A karakterek, corporationök, mentett tervek és EVE-tárgyak neve nem változik.

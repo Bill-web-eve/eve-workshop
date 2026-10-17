@@ -136,7 +136,7 @@ A bónuszok szorzódnak. A skill időszorzó alapból 1,00; állítsd át, ha a 
 
 - Bármely recepttel rendelkező köztes termék **Vételre** állítható a Blueprintok oldalon. Ekkor annak saját alapanyagai eltűnnek, és maga a köztes termék kerül a beszerzési listára.
 - Fuel block bemenetet alapból vásároltnak tekint, ahogy a korábbi táblázatok. Külön célterméknek kiválasztva gyártható, vagy a tervben Gyártásra állítható.
-- A PI-termékek beszerzendő levelek. A PI-kolóniák külön menüben követhetők; invention, BPC-másolás és slotok naptári ütemezése nem része a tervezőnek. Az ISK-költségek és a jobdíjak külön becslésként jelennek meg. Az összes munkaóra a jobidők összege, nem a párhuzamos gyártás átfutási ideje.
+- A PI-termékek beszerzendő levelek. A PI-kolóniák külön menüben követhetők; invention és BPC-másolás külön jobjait nem tervezi. A karakterek közötti slotkiosztáshoz a külön Gyártásütemező használható. Az ISK-költségek és a jobdíjak külön becslésként jelennek meg. Az összes munkaóra a jobidők összege, nem a párhuzamos gyártás átfutási ideje.
 - A **Terv mentése és foglalás** a célterméket és darabszámot tárolja, valamint aktív készletfoglalást indít. A készlet és a blueprintparaméterek közösek. A foglalások kezelését az alábbi rész írja le.
 - A gyártási és beszerzési lista CSV-be menthető; a beszerzési lista vágólapra is másolható.
 - A **Receptadatok frissítése** a CCP hivatalos SDE-jét tölti le. A mellékelt adatbázis: **3607705**, 2026. október 12.; **4172 választható, publikált gyártható termék**. Frissítés nélkül az előre csomagolt receptek internet nélkül is használhatók.
@@ -289,3 +289,30 @@ A bal oldali **Settings / Beállítások** menü lenyitható, és az alábbi ré
 A műveleti nézeteken a hozzáférési és beállítási panelek helyett rövid hivatkozások mutatnak az új helyre. Az EVE-engedélyezés után a megfelelő Beállítások lap nyílik meg. A még nem mentett értékekre lapváltáskor figyelmeztetünk.
 
 A Mining crystals / Bányászkristályok nézet nem mutat Tatara-kihozatalt. A kristályarány minden tagja 1–9 közötti egész szám. Az azonos kristályt igénylő érceket előbb összevonjuk. A legkisebb pontos arányt megtartjuk, ha minden tagja legfeljebb 9 (75:25 → 3:1). Egyébként a legnagyobb tagot 9-re skálázzuk, minden tagot felfelé kerekítünk, majd a közös osztóval egyszerűsítünk (99,99:0,01 → 9:1; 37,3:62,7 → 2:3). Ez közelítő készletarány, nem kopásból számolt tényleges fogyasztás; egyetlen szükséges kristálytípus sem tűnik el nullára kerekítés miatt.
+
+## EVE Multibuy lista
+
+A Material shortfall / Alapanyaghiány oldalon a kiválasztott és az összesített lista másolása EVE Multibuy formátumot használ: soronként az angol itemnév, tabulátor és tagolatlan egész mennyiség. Nincs fejléc vagy mértékegység. A BPO-k, BPC-k, hiányzó BPC-runok és reakcióformulák kimaradnak a vágólapról; a felületen továbbra is külön követhetők. Az azonos anyagok mennyisége összeadódik.
+
+## Accountok, Omega és MCT
+
+A **Settings → Accounts and training / Beállítások → Accountok és tanulás** alatt adj meg egy saját accountnevet, az Omega állapotát és lejáratát, illetve a két MCT-hely lejáratát. Az ESI nem szolgáltat accountazonosítót, Omega- vagy MCT-lejáratot, ezért ezek kézi adatok. Nem kérünk fióknevet, jelszót vagy előfizetéshez hozzáférést. CCP-tájékoztató: https://developers.eveonline.com/blog/caution-accountstatus-xml-aspx-deprecated-and-unreliable
+
+Accountonként legfeljebb három hozzáadott karakter csoportosítható. A tanulási hely lehet automatikus, alaphely, MCT 1, MCT 2 vagy kézzel kizárt. A lejárt MCT-helyre rendelt, a más karakterek által elfoglalt hely miatt nem tanítható, illetve a kézzel kizárt karakter nem kap „nem tanul” riasztást. Az ismeretlen jogosultságot nem tekintjük automatikusan tiltottnak. Alpha státusz önmagában nem tiltja a tanulást; a legalább 5 millió betöltött SP-t is vizsgáljuk.
+
+A Skillek és tanulás nézetben az összes megadott lejárat megtekinthető, a lejárt és 5 napon belül lejáró időpontok külön jelzést kapnak. A konkrét tanulási hely lejárata az aktív sor folytonosságának becslését is korlátozza. Az adatok frissítése nem hosszabbítja meg a kézzel beírt előfizetési dátumokat; megújításkor ezeket is módosítani kell. MCT-információ: https://support.eveonline.com/hc/en-us/articles/203411052-Multiple-Character-Training
+
+## Gyártásütemező
+
+A **Production scheduler / Gyártásütemező** a felül kiválasztott termékhez, célmennyiséghez és személyes vagy corp gyártási körhöz készít kézzel indítható jobtervet. Válaszd ki a bevonható karaktereket, majd nyomd meg a Calculate schedule / Ütemterv kiszámítása gombot.
+
+- A gyártási slotkeret: 1 + aktív Mass Production + aktív Advanced Mass Production. A reakcióké külön: 1 + Mass Reactions + Advanced Mass Reactions. A tudományos jobok nem foglalnak gyártási slotot, de a bennük használt blueprintet igen. Az app a karakterek személyes és az összes betöltött corporation jobját együtt, Job ID alapján egyszer számolja. Az egy napnál régebbi/hibás skill- vagy hiányzó/egy napnál régebbi jobadatot frissíteni kell.
+- Csak a recept közvetlen aktív skillkövetelményeit teljesítő karakter kap munkát. A gyártási időben az ő skilljei, a blueprint TE-je és az aktuális struktúrabónuszok szerepelnek. A tanulásfigyelésből kizárt karakter industry slotjai továbbra is használhatók. Slotmechanika: https://support.eveonline.com/hc/en-us/articles/203210272-Activities-and-Job-Types
+- A **Use only owned BPOs/BPCs / Csak a meglévő BPO/BPC készlettel** módban tényleges, a kiválasztott ME/TE-vel egyező assetpéldányok kellenek. A kézi runkeret nem helyettesít fizikai blueprintet. A más tervek által lefoglalt BPC-runokat és a futó jobokba kötött runokat levonjuk. Ugyanazt a példányt nem használjuk két egyidejű jobhoz. A BPC-k eltérő ME/TE-csoportjait nem vonjuk össze; a Blueprint oldalon választható másik csoport.
+- Ha a meglévő készletre korlátozás ki van kapcsolva, a gyorsabb párhuzamos munkához további BPC-ket vagy reakcióformulákat is tervezhet. A szükséges példányszámot, runokat és feltételezett run/BPC értéket külön táblázat mutatja. A beszerzés vagy másolás/invention ideje az általad megadott új-blueprint-érkezés; ezeket a külön kutatási jobokat nem indítjuk vagy ütemezzük.
+- A személyes blueprinteket alapból csak a tulajdonos karakter használja. A karakterek közötti átadás külön engedélyezhető, és az érintett jobok megjelölést kapnak. Corp terv kizárólag az adott corporation készletével, blueprintjeivel és tagkaraktereivel számol; a szükséges corp indítási és hangárjogosultságokat biztosítottnak tekinti.
+- Meglévő készlet azonnal, folyamatban készülő termék csak a hozzá tartozó job befejezésekor használható. A kézi folyamatban mennyiség érkezési dátum nélkül megakasztja az érintett sort; ilyenkor az ütemterv részleges. Vásárolandó anyagok és új blueprintek a megadott anyagérkezéskor érkeznek, üres mező esetén a kezdésre.
+- Az anyagok felhasználása egyszer történik meg, a gyártási függőségek figyelembevételével. Több jobfelosztást hasonlítunk össze, és a rövidebb teljes megoldást választjuk. Ez heurisztikus becslés, nem garantált matematikai optimum. A jobok azonnali átvételét, azonnali árumozgatást és aktuális slotadatokat feltételez. A megadott Omega-idő után új jobot csak frissített aktív skillekkel/megújított dátummal tervez.
+- Az új jobfelosztás anyagkerekítése különbséget okozhat az eredeti tervhez képest: az ütemező saját, újraszámolt anyaghiányát is megmutatja, Multibuy-másolással. A mentett terv foglalását nem módosítja. Az ütemterv CSV-be menthető; egyszerre legfeljebb 10 000 job tervezhető. A felület 100 jobot mutat oldalanként.
+
+Az ütemező nem indít vagy módosít EVE-jobot, és a készletet sem írja át. Ha új jobot indítasz vagy átveszel az EVE-ben, frissítsd az EVE-adatokat, majd készíts új ütemtervet.

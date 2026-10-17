@@ -101,7 +101,7 @@ async function reloadState() {
   }
   const requestedScope=corporationId,nextState=await api(scoped('/api/state'));
   if(requestedScope!==corporationId)return;
-  state=nextState;corporationData=null;
+  state=nextState;corporationData=null;scheduleRevision++;
   shoppingData=null;shoppingRevision++;
   deliveryWait=state.delivery_wait||null;scheduleDeliveryCheck();
   if(activePlanId && !state.plans.some(p=>p.id===activePlanId&&(p.corporation_id??null)===corporationId)) activePlanId=null;
@@ -231,6 +231,7 @@ async function calculate(refreshState=true) {
 function navigate(next) {
   if(next==='connection')return openSettingsTab('connection');
   if(Object.keys(dirty).length && !confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?')) return false;
+  if(view==='settings'&&settingsTab==='accounts')accountDraft=null;
   if(view==='moons'){moonEditing=false;moonSystemGeneration++;moonSearchGeneration++;clearTimeout(moonSearchTimer);}
   view=next; dirty={};
   if(next==='moons')setMoonMenu(true);
@@ -241,7 +242,7 @@ function navigate(next) {
   clearTimeout(piTimer);
   if(['skills','pi'].includes(next))error('');
   $$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
-  const names={queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek'};
+  const names={schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek'};
   $('#breadcrumb').textContent='Műhely / '+names[view]; render();return true;
 }
 function render() {
@@ -260,6 +261,7 @@ function render() {
   if(view==='settings') return renderSettings(content);
   if(view==='connection') return renderConnection(content);
   if(view==='saved') return renderSaved(content);
+  if(view==='schedule')return renderSchedule(content);
   if(view==='jobs'){renderJobs(content);if(corporationId)content.insertAdjacentHTML('afterbegin',scopeBanner());return;}
   if(view==='shopping'&&shoppingMode==='all')return renderAllShopping(content);
   if(!plan&&deliveryWait)return renderDeliveryWait(content);
@@ -427,7 +429,7 @@ function renderShopping(content) {
   content.innerHTML=shoppingTabs()+costSummary('shopping-current',plan.shopping.map(r=>({...r,quantity:r.buy})),'A hiányzó anyagok költsége','Csak a még beszerzendő mennyiségek Jita-értéke.')+panel('Alapanyaghiány',`${fmt(rows.length)} beszerzendő termék`,rows.length?table(['Termék','Típus','Szükséglet','Elérhető','Folyamatban','Beszerzendő','Egység','Blueprint beszerzés','Jita-egységár','Beszerzési érték'],rows):empty('Nincs alapanyaghiány','A hátralévő gyártás minden szükséges anyagát fedezi a készlet.'));
   content.innerHTML+='<p class="footnote">A már meglévő vagy folyamatban lévő komponensek anyagait a terv nem kéri újra. A PI-termékek itt beszerzendő tételek. A BPC-hiány a kiválasztott ME/TE-csoport még felhasználható runjai alapján számolódik; a db-becslés a jelzett run/BPC feltételezéssel értendő. BPC másolással (ha a BPO másolható), inventionnel vagy vásárlással szerezhető; ezek külön jobjait és anyagait nem tervezzük. A reakcióformula nem másolható.</p>';
   bindShoppingTabs();bindJita(plan.shopping.filter(r=>r.unit!=='run').map(r=>r.id));
-  $('#copy-shopping').onclick=async()=>{try{await navigator.clipboard.writeText(plan.shopping.map(r=>`${r.name}\t${r.buy}\t${r.unit||'db'}`).join('\n'));toast('A beszerzési lista a vágólapon.');}catch{error('A böngésző nem engedte a másolást. A CSV-mentést használhatod.');}};
+  $('#copy-shopping').onclick=async()=>{try{await navigator.clipboard.writeText(EveMultibuy.text(plan.shopping));toast('A beszerzési lista a vágólapon.');}catch{error('A böngésző nem engedte a másolást. A CSV-mentést használhatod.');}};
   $('#export-csv').onclick=()=>csv(plan.shopping.map(r=>[r.name,r.buy,r.unit||'db',blueprintSupply(r),...jitaCsv(r.id,r.buy,r.unit)]),['Termék','Mennyiség','Egység','Blueprint beszerzés','Árazás','Jita-egységár','Beszerzési érték'],'alapanyaghiany');
 }
 function shoppingTabs(){
@@ -462,7 +464,7 @@ function renderAllShopping(content){
   content.innerHTML+=`<details class="panel shopping-included"><summary>Beszámított tervek · ${data.plans.length}</summary>${table(['Elsőbbség','Terv','Gyártási kör','Célmennyiség','Foglalás'],data.plans.map(p=>`<tr><td>${p.priority}</td><td>${planLabel(p)}</td><td>${p.corporation_id?verbatim(p.scope_label):esc(p.scope_label||'Személyes gyártás')}</td><td>${fmt(p.quantity)} db</td><td>${p.reserve_active?'Aktív':'Nincs aktív foglalás; beleszámít'}</td></tr>`))}</details><p class="footnote">A kész komponensek és hajók alapanyagai nem kerülnek vissza a hiányba. A közösen használható reakcióformula készlettulajdonosonként egyszer szerepel. Azonos anyag egy sorban szerepel; a tervenkénti bontás a még hiányzó mennyiségeket mutatja. A termékmezőben végzett, még nem mentett módosításokat ez az összesítés nem tartalmazza. Számítás: ${esc(date(data.calculated_at))}.</p>`;
   bindShoppingTabs();
   bindJita(data.rows.filter(r=>r.unit!=='run').map(r=>r.id));
-  $('#copy-all-shopping').onclick=async()=>{try{await navigator.clipboard.writeText(data.rows.map(r=>`${r.name}\t${r.buy}\t${r.unit||'db'}`).join('\n'));toast('Az összesített beszerzési lista a vágólapon.');}catch{error('A másolás nem sikerült. Használd a CSV-mentést.');}};
+  $('#copy-all-shopping').onclick=async()=>{try{await navigator.clipboard.writeText(EveMultibuy.text(data.rows));toast('Az összesített beszerzési lista a vágólapon.');}catch{error('A másolás nem sikerült. Használd a CSV-mentést.');}};
   $('#export-csv').onclick=()=>csv(data.rows.map(r=>[r.name,r.buy,r.unit||'db',r.plans.map(p=>`${p.name} (${p.quantity} db cél): ${p.buy}`).join(' | '),...jitaCsv(r.id,r.buy,r.unit)]),['Termék','Összesen beszerzendő','Egység','Hiány tervenként','Árazás','Jita-egységár','Beszerzési érték'],'osszes-terv-alapanyaghiany');
 }
 function numberInput(row,key,value,placeholder='0',extra='') {
@@ -562,7 +564,7 @@ function renderStructureSettings(content) {
   };
   content.innerHTML=`<form id="settings-form"><div class="grid-two">${group('manufacturing','Manufacturing')}${group('reaction','Reakció')}</div><p class="footnote">Job cost = EIV × (system index × job cost bónusz + facility tax + SCC + Alpha). Az EIV az eredeti, ME és rig előtti recept és az ESI adjusted price alapján számít; a Jita-árazástól független. Manufacturing és reakció külön rendszert és adót használhat.</p><div class="section-actions"><button class="button primary" type="submit">Bónuszok mentése</button><small>A kézi időszorzó csak kézi módban vagy hiányzó skilladatnál érvényesül; karakterből számolt skillekkel nem szorozzuk újra.</small></div></form><div class="section-actions"><button type="button" class="button compact" data-industry-refresh>↻ Ipari költségadatok frissítése</button><small data-industry-status></small></div>`;
   content.innerHTML+=panel('Készletforrás és helyszín','A karakterek kiválasztása az EVE-kapcsolat oldalon',`<div class="panel-body"><div class="source-choices"><label><input type="radio" name="stock-source" value="manual" ${state.settings.source==='manual'?'checked':''}>Kézi készlet</label><label><input type="radio" name="stock-source" value="eve" ${state.settings.source==='eve'?'checked':''}>Személyes EVE-készlet</label></div><label for="location-ids">Hely-ID-k, vesszővel elválasztva</label><input id="location-ids" class="connection-input" value="${state.settings.location_ids.join(', ')}" placeholder="Üresen minden hely"><p class="footnote">Állomás vagy struktúra ID-t adj meg. A benne lévő konténerek készletét is számolja. A jobok kimeneti helyére ugyanez a szűrés érvényes.</p><div class="chip-list">${state.locations.slice(0,20).map(id=>`<span class="chip">${id}</span>`).join('')}</div><div class="section-actions"><button id="save-source" class="button compact">Készletforrás mentése</button></div></div>`);
-  content.innerHTML+=panel('Receptadatbázis',`SDE ${state.sde.buildNumber}`,`<div class="panel-body"><p>${fmt(state.recipe_count)} választható gyártható termék. Adatcsomag kiadása: ${esc(state.sde.releaseDate)}. Az anyag-, idő- és becsült jobköltséget számolja; ütemezett slotkiosztást nem készít.</p><button id="update-sde" class="button compact">Receptadatok frissítése</button></div>`);
+  content.innerHTML+=panel('Receptadatbázis',`SDE ${state.sde.buildNumber}`,`<div class="panel-body"><p>${fmt(state.recipe_count)} választható gyártható termék. Adatcsomag kiadása: ${esc(state.sde.releaseDate)}. Az anyag-, idő- és becsült jobköltség mellett külön Gyártásütemező is használható.</p><button id="update-sde" class="button compact">Receptadatok frissítése</button></div>`);
   $('#settings-form').oninput=()=>{dirty.facilities=true;};
   $('#settings-form').onsubmit=async event=>{event.preventDefault();try{const body={manufacturing:{},reaction:{}};$$('[data-facility]').forEach(el=>body[el.dataset.facility][el.dataset.field]=Number(el.value));$$('[data-facility-system]').forEach(el=>{if(el.value.trim()&&!el.dataset.systemId)throw new Error('Válassz rendszert a találati listából.');body[el.dataset.facilitySystem].system_id=el.dataset.systemId?Number(el.dataset.systemId):null;});await api('/api/settings',body);delete dirty.facilities;await reloadState();if(productId&&!Object.keys(dirty).length)await calculate(false);else render();toast('Bónuszok mentve.');}catch(e){error(e.message);}};
   bindFacilitySystems();
