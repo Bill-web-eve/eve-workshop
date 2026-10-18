@@ -167,7 +167,8 @@ function renderPlanShortcuts(){
 }
 async function openSavedPlan(id){
   const saved=state.plans.find(p=>p.id===id);if(!saved)return;
-  if(!navigate('queue'))return;
+  if(Object.keys(dirty).length&&!confirmUI('Az új számítás eldobja a még nem alkalmazott módosításokat. Folytatod?'))return;
+  dirty={};
   planGeneration++;corporationId=saved.corporation_id??null;plan=null;restorePlanSelector();$('#view-content').innerHTML=empty('A mentett terv saját készletének betöltése…');
   activePlanId=saved.id;productId=saved.product_id;productName=saved.product_name;
   $('#product-search').value=productName;EveNumbers.set($('#target-quantity'),saved.quantity);manufacturerId=saved.manufacturer_id??0;productActivity=saved.activity||null;

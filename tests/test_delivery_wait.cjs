@@ -14,7 +14,7 @@ async function setup(wait=pending()){
  w.fetch=async url=>{
   calls.push(url);
   if(url==='/api/state')return {ok:true,json:async()=>({...fixture,delivery_wait:currentWait})};
-  if(url.startsWith('/api/plan?'))return currentWait?{ok:false,json:async()=>({error:'untranslated server fallback',delivery_wait:currentWait})}:{ok:true,json:async()=>({product_id:22428,activity:'manufacturing',summary:{items:1},stale_characters:[],calculated_at:1000})};
+  if(url.startsWith('/api/plan?'))return currentWait?{ok:false,json:async()=>({error:'untranslated server fallback',delivery_wait:currentWait})}:{ok:true,json:async()=>({product_id:Number(new URL(url,w.location.href).searchParams.get('product_id')),activity:'manufacturing',summary:{items:1},stale_characters:[],calculated_at:1000})};
   throw Error('Unexpected request: '+url);
  };
  for(const script of d.querySelectorAll('script[src]'))run(fs.readFileSync(path.join(root,script.getAttribute('src')),'utf8'));
@@ -53,4 +53,52 @@ test('expired caches allow retry now, dynamic names stay plain text, and fresh d
  setWait(null);await run('calculate()');await tick();
  assert(alert.hidden);assert.equal(alert.textContent,'');assert.equal(run('plan.product_id'),22428);assert.equal(run('deliveryWait'),null);assert.equal(d.querySelector('#calculate').disabled,false);
  assert.equal(run('activePlanId'),'saved-redeemer');
+});
+
+test('saved-plan shortcuts keep the scheduler open and retain options while discarding the old schedule',async t=>{
+ const {w,d,run,fixture,calls}=await setup(null);t.after(()=>w.close());
+ fixture.plans.push({...fixture.plans[0],id:'saved-salvation',name:'Salvation',product_name:'Salvation',product_id:92822,quantity:2});
+ run('updatePlanControls()');
+ const selector=d.querySelector('.plan-selector'),calculate=d.querySelector('#calculate'),form=d.querySelector('#schedule-form');
+ form.elements.min_job_hours.value='24';form.elements.owned_only.checked=false;form.dispatchEvent(new w.Event('input',{bubbles:true}));
+ run('scheduleResult={key:scheduleKey(),data:{}};scheduleSelected=99;');
+ d.querySelector('[data-saved-shortcut="saved-salvation"]').click();await tick();await tick();
+ assert.equal(run('view'),'schedule');assert.equal(run('activePlanId'),'saved-salvation');assert.equal(run('productId'),92822);assert.equal(run('plan.product_id'),92822);
+ assert.equal(d.querySelector('.schedule-setup>.plan-selector'),selector);assert.equal(d.querySelector('#calculate'),calculate);
+ assert.equal(d.querySelector('#product-search').value,'Salvation');assert.equal(d.querySelector('#target-quantity').value,'2');
+ assert.equal(d.querySelector('#schedule-form').elements.min_job_hours.value,'24');assert.equal(d.querySelector('#schedule-form').elements.owned_only.checked,false);
+ assert.equal(run('scheduleResult'),null);assert.equal(d.querySelector('#schedule-result').textContent,'');
+ assert(d.querySelector('[data-view=schedule]').classList.contains('active'));
+ const query=new URL(calls.find(p=>p.startsWith('/api/plan?')),w.location.href).searchParams;
+ assert.equal(query.get('saved_plan_id'),'saved-salvation');assert.equal(query.get('quantity'),'2');
+ assert.equal(d.querySelector('[data-saved-shortcut="saved-salvation"]').getAttribute('aria-pressed'),'true');
+ // Calculate plan remains bound to the original selector after moving it.
+ calculate.click();await tick();await tick();assert.equal(calls.filter(p=>p.startsWith('/api/plan?')).length,2);assert.equal(run('view'),'schedule');
+});
+test('every plan shortcut and the saved-plan Open action retain the current view even during an inventory wait',async t=>{
+ const {w,d,run,fixture}=await setup();t.after(()=>w.close());
+ fixture.plans.push({...fixture.plans[0],id:'saved-salvation',name:'Salvation',product_name:'Salvation',product_id:92822,quantity:2});
+ run('updatePlanControls()');
+ const selector=d.querySelector('.plan-selector');
+ for(const view of ['schedule','queue','graph','shopping','inventory','blueprints','jobs','saved']){
+  run('navigate('+JSON.stringify(view)+')');await tick();
+  const id=run('activePlanId')==='saved-salvation'?'saved-redeemer':'saved-salvation';
+  d.querySelector('[data-saved-shortcut="'+id+'"]').click();await tick();await tick();
+  assert.equal(run('view'),view,view);assert.equal(run('activePlanId'),id,view);
+  assert.equal(d.querySelector('.plan-selector'),selector);assert(d.querySelector('[data-view="'+view+'"]').classList.contains('active'),view);
+  assert.equal(d.querySelector('[data-saved-shortcut="'+id+'"]').getAttribute('aria-pressed'),'true');
+ }
+ d.querySelector('[data-load-plan="saved-salvation"]').click();await tick();await tick();
+ assert.equal(run('view'),'saved');assert.equal(run('activePlanId'),'saved-salvation');assert(d.querySelector('[data-load-plan="saved-salvation"]'));
+});
+test('cancelled dirty-plan switches leave the current view, target and unsaved inputs intact',async t=>{
+ const {w,d,run,fixture,calls}=await setup(null);t.after(()=>w.close());
+ fixture.plans.push({...fixture.plans[0],id:'saved-salvation',name:'Salvation',product_name:'Salvation',product_id:92822,quantity:2});run('updatePlanControls();dirty={inventory:true};');
+ let prompts=0;w.confirm=()=>{prompts++;return false;};
+ const selector=d.querySelector('.plan-selector'),before=calls.length;d.querySelector('#target-quantity').value='73';
+ d.querySelector('[data-saved-shortcut="saved-salvation"]').click();await tick();
+ assert.equal(prompts,1);assert.equal(calls.length,before);assert.equal(run('view'),'schedule');assert.equal(run('activePlanId'),'saved-redeemer');assert.equal(run('productId'),22428);assert.equal(run('dirty.inventory'),true);
+ assert.equal(d.querySelector('.plan-selector'),selector);assert.equal(d.querySelector('#target-quantity').value,'73');
+ w.confirm=()=>{prompts++;return true;};await run('openSavedPlan("saved-salvation")');await tick();
+ assert.equal(prompts,2);assert.equal(run('view'),'schedule');assert.equal(run('activePlanId'),'saved-salvation');assert.equal(run('Object.keys(dirty).length'),0);
 });

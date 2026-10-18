@@ -177,7 +177,7 @@ Reservations exist only inside Workshop; they do not move EVE items. BPC runs ar
 
 **Saved plans** has separate Personal and corporation categories, aligned with **Production scope**. Only plans saved to the selected category are displayed. Saving uses that scope; updating an existing plan preserves its owner. Create a new plan to use a different owner. Personal and corporation reservations never mix.
 
-The **Saved plans** shortcuts below the product field show only plans in the current scope, with their name and quantity. Clicking opens that same saved plan with access to its own hold and highlights it. Saving or deleting a plan updates the row. These shortcuts do not copy item names.
+The **Saved plans** shortcuts below the product field show only plans in the current scope, with their name and quantity. Clicking opens that same saved plan with access to its own hold and highlights it. Saving or deleting a plan updates the row. Selecting a plan keeps the current page open: the scheduler, graph, material shortfall and other views update for the selected plan without returning to Production plan. Scheduler options are retained; recalculate the schedule for the new plan. Unapplied edits require confirmation before switching. These shortcuts do not copy item names.
 
 **Material shortfall → All saved plans** combines requirements into one row per material, with the total purchase quantity and a per-plan breakdown. Shared stock and active output are used once. Active reservations receive their existing priority; unreserved saved plans follow in creation order. Unreserved plans are included without activating their reservations. **Included plans** lists the goals and allocation order.
 
