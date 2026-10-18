@@ -101,3 +101,24 @@ test('timeline span reloads independently and ignores malformed saved preference
   assert.equal(run('scheduleTimelineDays'),expected);assert.equal(d.querySelector('#schedule-timeline-days').value,expected===null?'':String(expected));dom.window.close();
  }
 });
+
+test('actual EVE jobs have separate lanes and IDs; planned start times do not imply running',async()=>{
+ const now=Date.now()/1000,data=fixture();data.start=now;data.calculated_at=now;data.partial_finish=now+500;
+ data.jobs=[j(1,'manufacturing',now,now+500)];
+ data.running_jobs=[{...j('eve:1','manufacturing',now-100,now+100),existing:true,eve_job_id:1,observed_at:now-10,stale:false}];
+ const pure=graph.build(data);assert.equal(pure.lanes.length,2);assert.notEqual(pure.nodes[0].y,pure.nodes[1].y);assert.equal(pure.nodes[0].x,pure.left);
+ const {dom,d,run}=await setup(data);
+ assert.equal(d.querySelectorAll('.schedule-job.existing').length,1);assert(!d.querySelector('g[data-schedule-select="1"]').classList.contains('existing'));
+ d.querySelector('g[data-schedule-select="eve:1"]').dispatchEvent(new dom.window.MouseEvent('click',{bubbles:true}));
+ assert(d.querySelector('g[data-schedule-select="eve:1"].selected'));assert(d.querySelector('#schedule-job-detail').textContent.includes('Folyamatban az EVE-ben'));assert.equal(Math.floor(d.querySelector('progress').value),50);
+ assert.equal(d.querySelectorAll('table.schedule-manufacturing tbody tr').length,1);assert.equal(data.jobs.length,1);
+ dom.window.fixture.running_jobs[0].end=now-1;run('updateRunningJobMarkers(fixture,document.querySelector("main"))');
+ assert(d.querySelector('.schedule-job.existing-ready'));assert(d.querySelector('#schedule-job-detail').textContent.includes('Várhatóan elkészült'));
+ dom.window.fixture.running_jobs[0].end=now+100;dom.window.fixture.running_jobs[0].stale=true;run('updateRunningJobMarkers(fixture,document.querySelector("main"))');assert(d.querySelector('.schedule-job.existing-stale'));
+ dom.window.EveI18n.setLanguage('en');await new Promise(r=>setImmediate(r));assert(d.body.textContent.includes('Running in EVE'));assert(d.querySelector('#schedule-job-detail').textContent.includes('Running · older EVE data'));run('updateRunningJobMarkers(fixture,document.querySelector("main"))');assert(!d.querySelector('.schedule-window-range').textContent.includes('okt.'));
+ dom.window.close();
+});
+test('running-only plans show the current window even when the next planned start is in the future',()=>{
+ const data={...fixture(),start:200000,calculated_at:1000,jobs:[],running_jobs:[{...j('eve:77','reaction',500,5000),existing:true,eve_job_id:77}]};
+ const g=graph.build(data,0,null,{days:1,window:0});assert.equal(g.start,1000);assert.equal(g.nodes.length,1);assert.equal(g.nodes[0].id,'eve:77');assert.equal(g.nodes[0].x,g.left);
+});

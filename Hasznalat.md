@@ -369,6 +369,14 @@ Egy bemenet csak egyszer költhető el, a következő job pedig csak az összes 
 
 A **Production material cost** összesítésében a célmennyiség teljes eladási értéke mellett külön **Sell price per unit · Jita sell** sor mutatja a késztermék darabonkénti Jita sell árát. Ez nem változik az anyagár módjával vagy a célmennyiséggel.
 
+### Folyamatban lévő jobok az idővonalon
+
+Az idővonal a betöltött EVE-adatokban **active** állapotú, még futó gyártási és reakciós jobokat is mutatja, ha a kiválasztott terv valamely termékét állítják elő, és a kiválasztott karakterekhez, készlettulajdonoshoz és helyszűréshez tartoznak. A zöld, szaggatott keret, az **EVE** felirat és a **Folyamatban az EVE-ben** jelölés különbözteti meg őket az újonnan tervezett munkáktól. Saját EVE-sávban jelennek meg; nem adódnak hozzá ismét a tervezett runokhoz, a beszerzéshez vagy a CSV új jobjaihoz.
+
+Kijelölve látható az eredeti EVE Job ID, a karakter, a kezdés és befejezés, a run és kimenet, a dátumokból becsült előrehaladás, valamint a jobpillanatkép ideje. A korábbi EVE-adat szürke jelölést kap. Ha közben letelik a befejezési idő, **Várhatóan elkészült** jelzésre vált; a tényleges állapothoz EVE-frissítés és új ütemezés szükséges. Egy tervezett jobot az app nem jelöl futónak csak azért, mert elérkezett a számolt kezdése. Szüneteltetett, átvehető és átvett job nem jelenik meg futóként.
+
+Az ütemezőben a tervválasztó és az ütemezési beállítások széles ablakban két kompakt, egymás melletti blokkban jelennek meg, kisebb ablakban egymás alá kerülnek. Az **Ütemezési tudnivalók** lenyitható súgó tartalmazza a minimum jobhossz és az anyagérkezés magyarázatát.
+
 ### Az idővonalon látható napok
 
 A **Schedule graph and timeline / Ütemezési gráf és idővonal** panel **Látható napok** mezőjében 1–3650 közötti egész számot adhatsz meg. Alapból legfeljebb **7 nap** látszik egyszerre. A böngésző megjegyzi a napok számát. Üres mező vagy a **Teljes időtáv** gomb az egész ütemtervet mutatja.

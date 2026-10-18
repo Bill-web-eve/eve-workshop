@@ -239,6 +239,14 @@ Select a timeline bar or a Job number to inspect each input's quantity, source a
 
 Consecutive reactions on the same character, slot and physical formula are combined only when all inputs were available at the first start and no consumer would be delayed. The combined material rounding and dependency references are rebuilt. Short jobs needed for early downstream output or later input arrivals remain separate.
 
+### Jobs already running in EVE
+
+The timeline also shows loaded **active** manufacturing and reaction jobs that are still running, produce an item in the selected plan and belong to the selected characters, inventory owner and location filter. A green dashed border, **EVE** label and **Running in EVE** marker distinguish them from proposed work. They have separate EVE lanes and are not added again to planned runs, purchasing or the new-job CSV.
+
+Select a running bar for its original EVE Job ID, character, start/end, runs/output, progress estimated from timestamps and job snapshot time. Older snapshots receive a grey marker. When the expected end passes, the label changes to **Expected complete**; refresh EVE data and recalculate to confirm the actual state. A planned job never becomes an actual running job just because its proposed start time has arrived. Paused, ready and delivered jobs are not shown as running.
+
+On wide screens the plan selector and scheduling settings appear as two compact side-by-side cards; smaller screens stack them. Expand **Scheduling notes** for explanations of minimum job duration and material arrival.
+
 ### Visible days on the timeline
 
 Set **Visible days** in **Schedule graph and timeline** to any whole number from **1 to 3650**. The default is up to **7 days** at once, and your browser remembers the setting. Leave the field empty or choose **Full time range** to fit the entire schedule.

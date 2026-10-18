@@ -72,6 +72,37 @@ def worker_profiles(context,store,jobs,checked,selected,now,reference_now=None):
     return result
 
 
+
+def running_jobs(context,store,catalog,workers,plan,now):
+    """Display actual scoped jobs separately; never add their output twice."""
+    people={p['id']:p for p in workers}
+    relevant={r['id'] for r in plan['rows']}
+    result=[];seen=set();lanes=defaultdict(int);snapshots={}
+    for job in context['jobs']:
+        cid=job.get('character_id');tid=job.get('product_type_id')
+        start=stamp(job.get('start_date'));end=stamp(job.get('end_date'))
+        recipe=catalog.recipes.get(tid)
+        if (cid not in people or tid not in relevant or job.get('job_id') in seen
+                or job.get('status')!='active' or not recipe or start is None or end is None
+                or not start<=now<end or job.get('expected_output',0)<=0
+                or job.get('activity_id')!=(9 if recipe['activity']=='reaction' else 1)
+                or job.get('blueprint_type_id')!=recipe['bp_id']):continue
+        if context['settings']['location_ids'] and job.get('output_location_id') not in context['settings']['location_ids']:continue
+        key=context['corporation_id'] or cid
+        if key not in snapshots:
+            snapshots[key]=(store.corporation_snapshot(context['corporation_id'],'jobs') if context['corporation_id']
+                            else store.snapshot(cid,'jobs'))
+        snapshot=snapshots[key]
+        seen.add(job['job_id']);key=(cid,recipe['activity']);lanes[key]+=1
+        result.append(dict(id='eve:'+str(job['job_id']),eve_job_id=job['job_id'],existing=True,
+                           product_id=tid,name=catalog.name(tid),activity=recipe['activity'],character_id=cid,
+                           character_name=people[cid]['name'],slot=lanes[key],start=start,end=end,seconds=end-start,
+                           runs=job.get('runs',0),output=job['expected_output'],status='active',
+                           observed_at=snapshot.get('fetched') if snapshot else None,
+                           stale=not snapshot or snapshot['expires']<=now))
+    return result
+
+
 def qualified(row,catalog,workers):
     result=[]
     for worker in workers:
@@ -335,7 +366,7 @@ def _strategy(context,store,catalog,calculate,options,now=None,granularity=1):
     finish=max([start]+[j['end'] for j in scheduled]+([target_ready] if math.isfinite(target_ready) else []))
     scheduled,shopping,merged=compact_reactions(scheduled,initial,catalog,context['settings'],merge_limits,start,plan['shopping'])
     for j in scheduled:j['below_minimum']=bool(minimum_seconds and j['seconds']+1e-6<minimum_seconds)
-    return {'min_job_hours':min_hours,'short_jobs':sum(j['below_minimum'] for j in scheduled),'jobs':sorted(scheduled,key=lambda j:(j['start'],j['end'],j['id'])),'merged_reaction_jobs':merged,'blocked':blocked,'blueprint_shortages':shortages,
+    return {'running_jobs':running_jobs(context,store,catalog,workers,plan,now),'min_job_hours':min_hours,'short_jobs':sum(j['below_minimum'] for j in scheduled),'jobs':sorted(scheduled,key=lambda j:(j['start'],j['end'],j['id'])),'merged_reaction_jobs':merged,'blocked':blocked,'blueprint_shortages':shortages,
             'workers':[{k:w[k] for k in ['id','name','capacity','as_of','jobs_as_of','stale','excluded','until']} for w in workers],
             'material_shortfall':shopping,'material_warnings':warnings,'start':start,'finish':finish if not blocked and not warnings else None,
             'partial_finish':finish,'seconds':finish-start,'complete':not blocked and not warnings,'owned_only':owned,

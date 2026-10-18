@@ -1,6 +1,14 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Ütemezési tudnivalók": "Scheduling notes",
+  "Folyamatban az EVE-ben": "Running in EVE",
+  "Várhatóan elkészült": "Expected complete",
+  "Folyamatban · korábbi EVE-adat": "Running · older EVE data",
+  "Gyártás előrehaladása": "Production progress",
+  "EVE-jobadat ideje": "EVE job snapshot time",
+  "A zöld jelölés a betöltött EVE-jobadatból származik. A tervezett jobokat az idő múlása nem indítja el.": "The green marker comes from loaded EVE job data. Planned jobs are not started by the passage of time.",
+
   "Látható napok": "Visible days",
   "Teljes időtáv": "Full time range",
   "← Előző időszak": "← Previous period",

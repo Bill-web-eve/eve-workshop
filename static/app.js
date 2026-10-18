@@ -19,13 +19,17 @@ let graphExpanded=false;
 let deliveryWait=null,deliveryTimer=null,deliveryRetryAfter=0;
 let shoppingMode="current",shoppingData=null,shoppingRequest=null,shoppingRevision=0;
 function scoped(path){return corporationId?path+(path.includes('?')?'&':'?')+'corporation_id='+encodeURIComponent(corporationId):path;}
+function restorePlanSelector(){
+  const selector=$('.plan-selector'),anchor=$('#plan-selector-anchor');
+  if(selector&&anchor&&selector.parentNode!==anchor.parentNode)anchor.after(selector);
+}
 async function setProductionScope(id){
   if((id||null)===corporationId)return;
   if(Object.keys(dirty).length){$('#production-scope').value=corporationId||'';return error('Előbb alkalmazd a még nem mentett készlet- vagy blueprintmódosításokat.');}
   planGeneration++;corporationId=id||null;manufacturerId=0;activePlanId=null;reservationDetailId=null;plan=null;graphSelected=null;blueprintDetailId=null;deliveryWait=null;
   const generation=planGeneration;
   $('#queue-count').textContent='–';
-  $('#view-content').innerHTML=empty('A kiválasztott készlet betöltése…');
+  restorePlanSelector();$('#view-content').innerHTML=empty('A kiválasztott készlet betöltése…');
   error('');
   try{
     await reloadState();if(generation!==planGeneration)return;
@@ -151,7 +155,7 @@ function renderPlanShortcuts(){
 async function openSavedPlan(id){
   const saved=state.plans.find(p=>p.id===id);if(!saved)return;
   if(!navigate('queue'))return;
-  planGeneration++;corporationId=saved.corporation_id??null;plan=null;$('#view-content').innerHTML=empty('A mentett terv saját készletének betöltése…');
+  planGeneration++;corporationId=saved.corporation_id??null;plan=null;restorePlanSelector();$('#view-content').innerHTML=empty('A mentett terv saját készletének betöltése…');
   activePlanId=saved.id;productId=saved.product_id;productName=saved.product_name;
   $('#product-search').value=productName;EveNumbers.set($('#target-quantity'),saved.quantity);manufacturerId=saved.manufacturer_id??0;productActivity=saved.activity||null;
   $('#search-results').hidden=true;updatePlanControls();await calculate();
@@ -251,6 +255,9 @@ function render() {
   syncSettingsNavigation();
   if(view==='settings'&&Object.keys(dirty).length&&$('#settings-content'))return;
   if(view==='moons'&&(moonEditing&&$('#moon-form')||dirty.moon_settings&&$('#moon-settings')||dirty.moon_fuel&&$('#moon-fuel-settings')||dirty.moon_crystals&&$('#crystal-settings')))return;
+  // Move the original selector node back before replacing view content, keeping
+  // its bound handlers and unsaved field values intact across schedule redraws.
+  restorePlanSelector();
   const content=$('#view-content'); actions();
   document.body.classList.toggle('manual-view',view==='documentation');
   $('.plan-selector').hidden=['skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures');

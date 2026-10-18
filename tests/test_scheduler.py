@@ -4,7 +4,7 @@ import unittest
 from datetime import datetime,timezone
 from test_planner import FakeCatalog
 from muhely.planner import Planner,PlanningError
-from muhely.scheduler import build,Materials,_strategy
+from muhely.scheduler import build,Materials,_strategy,running_jobs
 from muhely.store import Store,DEFAULT_SETTINGS
 
 NOW=1800000000
@@ -34,6 +34,49 @@ class SchedulerTests(unittest.TestCase):
             return dict(result,source='manual',scope_label='Personal')
         if '_granularity' in opts:return _strategy(self.context,self.store,self.catalog,calc,opts,NOW,opts.pop('_granularity'))
         return build(self.context,self.store,self.catalog,calc,opts,NOW)
+    def live_job(self,jid=50,cid=1,product=100,**overrides):
+        return dict(dict(job_id=jid,character_id=cid,product_type_id=product,blueprint_type_id=product+1000,
+                         activity_id=1,status='active',start_date=iso(NOW-100),end_date=iso(NOW+500),
+                         runs=2,expected_output=2,output_location_id=6001),**overrides)
+    def test_timeline_adds_actual_running_jobs_without_changing_planned_jobs_or_stock(self):
+        before=self.run_plan()
+        job=self.live_job();self.context['jobs']=[job,dict(job)]
+        after=self.run_plan()
+        self.assertEqual(before['jobs'],after['jobs']);self.assertEqual(before['runs'],after['runs'])
+        self.assertEqual(before['material_shortfall'],after['material_shortfall'])
+        self.assertEqual(len(after['running_jobs']),1)
+        live=after['running_jobs'][0];self.assertEqual(live['id'],'eve:50');self.assertEqual(live['eve_job_id'],50)
+        self.assertEqual(live['start'],NOW-100);self.assertEqual(live['end'],NOW+500)
+        self.assertTrue(live['existing']);self.assertFalse(live['stale']);self.assertEqual(live['character_name'],'Pilot 1')
+    def test_timeline_existing_jobs_follow_selected_character_scope_recipe_and_location(self):
+        plan={'rows':[{'id':100}]}
+        self.context['jobs']=[self.live_job(1),self.live_job(2,cid=2),self.live_job(3,product=999),
+            self.live_job(4,status='ready'),self.live_job(5,status='paused'),self.live_job(6,status='delivered'),
+            self.live_job(7,end_date=iso(NOW)),self.live_job(8,start_date=iso(NOW+10)),
+            self.live_job(9,activity_id=8),self.live_job(10,blueprint_type_id=123),self.live_job(11,expected_output=0),
+            self.live_job(12,end_date='not-a-date'),self.live_job(13,output_location_id=6002)]
+        self.context['settings']['location_ids']=[6001]
+        live=running_jobs(self.context,self.store,self.catalog,self.context['skill_profiles'][:1],plan,NOW)
+        self.assertEqual([j['eve_job_id'] for j in live],[1])
+        self.context['jobs']=[];self.assertEqual(running_jobs(self.context,self.store,self.catalog,self.context['skill_profiles'],plan,NOW),[])
+    def test_timeline_marks_stale_eve_job_snapshot_instead_of_claiming_fresh_data(self):
+        self.context['jobs']=[self.live_job()]
+        with self.store.db() as db:db.execute("UPDATE snapshots SET expires=? WHERE character_id=1 AND kind='jobs'",(NOW-1,))
+        live=running_jobs(self.context,self.store,self.catalog,self.context['skill_profiles'],{'rows':[{'id':100}]},NOW)
+        self.assertTrue(live[0]['stale']);self.assertEqual(live[0]['observed_at'],NOW)
+
+    def test_timeline_corporation_display_reads_only_its_context_and_snapshot(self):
+        from unittest.mock import Mock
+        self.context['corporation_id']=700
+        self.context['jobs']=[self.live_job(50)]
+        store=Mock();store.corporation_snapshot.return_value={'fetched':NOW-10,'expires':NOW+100}
+        live=running_jobs(self.context,store,self.catalog,self.context['skill_profiles'],{'rows':[{'id':100}]},NOW)
+        self.assertEqual([j['eve_job_id'] for j in live],[50])
+        self.assertEqual(live[0]['observed_at'],NOW-10)
+        store.corporation_snapshot.assert_called_once_with(700,'jobs');store.snapshot.assert_not_called()
+        self.context['jobs']=[]
+        self.assertEqual(running_jobs(self.context,store,self.catalog,self.context['skill_profiles'],{'rows':[{'id':100}]},NOW),[])
+
     def test_two_characters_run_in_parallel_without_overlapping_slots_or_blueprints(self):
         result=self.run_plan();self.assertTrue(result['complete']);self.assertEqual(len(result['jobs']),2)
         self.assertEqual({j['character_id'] for j in result['jobs']},{1,2});self.assertEqual(result['seconds'],400)
