@@ -99,3 +99,14 @@ test('PI forecast and manual fuel controls translate while keeping entered price
  assert.equal([...d.querySelectorAll('p')][1].textContent,'Estimated products in the next 24 hours');
  w.EveI18n.setLanguage('hu');await tick();assert.equal(d.querySelector('h3').textContent,'Időalapú termelési becslés');w.close();
 });
+
+test('complete delivered-job cache errors translate while preserving plan and item names',async()=>{
+ const dom=await page(),i=dom.window.EveI18n;i.setLanguage('en');
+ const materials='Caesarium Cadmide, Carbon Polymers, Fluxed Condensates, Prometium';
+ const body='Átvett jobok újabbak az EVE készletpillanatképénél: '+materials+'. Az EVE gyorsítótárának lejártáig az ismételt frissítés ugyanazt az adatot adhatja. A foglalásaid megmaradnak.';
+ const english='Delivered jobs are newer than the EVE inventory snapshot: '+materials+'. Refreshing again may return the same data until the EVE cache expires. Your reservations are preserved.';
+ assert.equal(i.t(body),english);
+ assert.equal(i.t('A(z) Redeemer terv készletfrissítésre vár. '+body),'Plan Redeemer is waiting for an inventory update. '+english);
+ assert.equal(i.t('A(z) Project. Készlet terv készletfrissítésre vár. '+body),'Plan Project. Készlet is waiting for an inventory update. '+english);
+ dom.window.close();
+});

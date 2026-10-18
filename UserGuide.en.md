@@ -367,6 +367,8 @@ Operational views link to the appropriate settings instead of repeating configur
 
 If a job has been delivered but the asset snapshot predates delivery, Workshop can show **Waiting for inventory refresh**. It lists affected character, material, stock timestamp, delivery time and EVE cache expiry. Repeating refresh before expiry can return the same data.
 
+**Calculate plan** shows a visible error in every view, including the scheduler, when inventory refresh is required. It names the affected plan and materials and gives the **earliest refresh attempt** with the full date, seconds and time zone in your browser’s local time. After that time, use **Refresh EVE data**; Calculate plan only recalculates from local snapshots. An already expired cache is explicitly labelled. The message and date follow the selected UI language.
+
 Saved plans and holds are retained. In an open foreground app, a refresh is attempted after the indicated expiry, at most once per minute, without interrupting another refresh or unapplied manual edits. Expiry does not guarantee that EVE has a newer snapshot; another wait can be necessary. There is no background check after the app is stopped.
 
 Delivered output is not simply added to old assets, which would double-count it when updated stock arrives. Items already fully covered by stock or active output do not cause this wait. A fresh snapshot resumes calculation with actual inventory. You do not need to delete or release the saved plan to recover.

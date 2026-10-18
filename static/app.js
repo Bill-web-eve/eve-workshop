@@ -45,7 +45,7 @@ async function api(path, body) {
   const options = body === undefined ? {} : {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':state?.csrf || ''}, body:JSON.stringify(body)};
   const response = await fetch(path, options);
   const result = await response.json();
-  if (!response.ok){const failure=new Error(result.error || 'A kérés nem sikerült.');failure.delivery_wait=result.delivery_wait;throw failure;}
+  if (!response.ok){const failure=new Error(result.delivery_wait?deliveryWaitMessage(result.delivery_wait):result.error || 'A kérés nem sikerült.');failure.delivery_wait=result.delivery_wait;throw failure;}
   return result;
 }
 function error(message) { const el=$('#global-error'); el.textContent=message; el.hidden=!message; }
@@ -135,9 +135,22 @@ function scheduleDeliveryCheck(){
   },delay);
 }
 function deliveryTimestamp(value){return value?EveI18n.date(value*1000,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'–';}
+function deliveryRetryTimestamp(value){return EveI18n.date(value*1000,{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',timeZoneName:'short'});}
+function deliveryRetryStatus(wait){
+  return wait.retry_at*1000<=Date.now()?'A jelzett gyorsítótár már lejárt; az EVE-frissítés most újra megpróbálható.':'Az EVE gyorsítótárának lejártáig az ismételt frissítés ugyanazt az adatot adhatja.';
+}
+function deliveryWaitMessage(wait){
+  const names=[...new Set(wait.items.map(i=>i.name))].sort().slice(0,5).join(', ');
+  return [wait.plan_name?`A(z) ${wait.plan_name} terv készletfrissítésre vár.`:'A számítás készletfrissítésre vár.',
+    `Átvett jobok újabbak az EVE készletpillanatképénél: ${names}.`,
+    `Legkorábbi frissítési próbálkozás: ${deliveryRetryTimestamp(wait.retry_at)}.`,
+    deliveryRetryStatus(wait),
+    'A foglalásaid megmaradnak. A számítás frissebb EVE-készletadat után folytatható; a lejárat nem garantálja az új adatot.'
+  ].join('\n');
+}
 function deliveryWaitMarkup(wait){
   const retry=wait.retry_at;
-  return `<div class="banner delivery-wait"><strong>Készletfrissítésre várunk${wait.plan_name?' · '+esc(wait.plan_name):''}</strong><p>A jobok már át vannak véve, de az EVE még az átvétel előtti készletet adja vissza. Az ismételt frissítés a gyorsítótár lejártáig ezt nem változtatja meg.</p><p><strong>Új adat legkorábban: ${esc(date(retry))}</strong>. Ha ez az ablak előtérben marad, a lejárat után automatikusan újra próbáljuk.</p>${table(['Anyag','Karakter','Készletpillanatkép','Job átvétele'],wait.items.map(i=>`<tr><td>${itemName(i.name)}</td><td>${esc(i.character_name||i.character_id||'–')}</td><td data-sort-value="${i.assets_as_of??''}">${esc(deliveryTimestamp(i.assets_as_of))}</td><td data-sort-value="${i.completed_at??''}">${esc(deliveryTimestamp(i.completed_at))}</td></tr>`))}<p>A mentett tervek és foglalások megmaradnak. Az átvett kimenetet nem adjuk hozzá még egyszer a készlethez. Az időpont a CCP által jelzett lejárat; nem garantálja, hogy rögtön új adat érkezik.</p></div>`;
+  return `<div class="banner delivery-wait"><strong>Készletfrissítésre várunk${wait.plan_name?' · '+esc(wait.plan_name):''}</strong><p>A jobok már át vannak véve, de az EVE még az átvétel előtti készletet adja vissza.</p><p><strong>Legkorábbi frissítési próbálkozás: ${esc(deliveryRetryTimestamp(retry))}.</strong><br>${esc(deliveryRetryStatus(wait))}</p><p>Ha ez az ablak előtérben marad, a lejárat után automatikusan újra próbáljuk.</p>${table(['Anyag','Karakter','Készletpillanatkép','Job átvétele'],wait.items.map(i=>`<tr><td>${itemName(i.name)}</td><td>${esc(i.character_name||i.character_id||'–')}</td><td data-sort-value="${i.assets_as_of??''}">${esc(deliveryTimestamp(i.assets_as_of))}</td><td data-sort-value="${i.completed_at??''}">${esc(deliveryTimestamp(i.completed_at))}</td></tr>`))}<p>A mentett tervek és foglalások megmaradnak. Az átvett kimenetet nem adjuk hozzá még egyszer a készlethez. Az időpont a CCP által jelzett lejárat; nem garantálja, hogy rögtön új adat érkezik.</p></div>`;
 }
 function renderDeliveryWait(content){
   setHead('EVE-KÉSZLET','Az átvett jobok készletadata még frissül','A számítást az új EVE-készlet megérkezése után folytatjuk.');
@@ -224,11 +237,13 @@ async function calculate(refreshState=true) {
   } catch(e) {
     if(generation!==planGeneration) return;
     plan=null;
-    if(e.delivery_wait){deliveryWait=e.delivery_wait;scheduleDeliveryCheck();error('');}else error(e.message);
+    if(e.delivery_wait){deliveryWait=e.delivery_wait;scheduleDeliveryCheck();}
+    error(e.message);
     $('#queue-count').textContent='–';
     $('#calculated-at').textContent='A számítás nem frissült';
     $('#plan-status').hidden=true;
     render();
+    if(refreshState)$('#global-error').scrollIntoView?.({block:'nearest',behavior:'smooth'});
     return null;
   } finally { if(generation===planGeneration) $('#calculate').disabled=false; }
 }
