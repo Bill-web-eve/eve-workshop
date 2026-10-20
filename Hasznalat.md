@@ -379,6 +379,8 @@ A bal oldali **Settings / Beállítások** menü lenyitható, és az alábbi ré
 
 - **Structures and bonuses / Struktúrák és bónuszok:** gyártás és reakció bónuszai, rendszer, adók, készletforrás, receptadatbázis.
 - **EVE connection / EVE-kapcsolat:** Client ID, karakterek hozzáadása, kiválasztása és eltávolítása.
+A **Minden hozzáférés engedélyezése** gomb egy karakterhez egyetlen EVE-belépéssel kéri az alkalmazás összes támogatott engedélyét: személyes készlet, blueprintek és jobok, skillek és tanulási sor, PI, corporationadatok, holdnaptár és értesítések, intelhelyzet és mining ledger. Az EVE-oldalon ugyanazt a karaktert válaszd. Saját Client ID esetén minden kért scope legyen engedélyezve a Developer alkalmazásban is; corporationadatokhoz a játékbeli szerepkörök továbbra is szükségesek. Jóváhagyás után frissítsd az EVE-adatokat. A külön engedélyező gombok továbbra is használhatók.
+
 - **Data access / Adathozzáférések:** karakterenkénti skill-, PI-, corporation- és holdadatengedélyek, scope-ok, frissítési lehetőségek.
 - **Moon calculation settings / Holdak számítási beállításai:** finomítás, implant, kristályváltozat, üzemanyagtípus, kézi üzemanyagár és gazdasági paraméterek.
 - **Calendar sync / Naptárszinkron:** helyi naptárfeliratkozás és ICS-letöltés. A meglévő feliratkozások változatlanul működnek.

@@ -33,6 +33,19 @@ class ServerTests(unittest.TestCase):
         response=connection.getresponse();raw=response.read();status=response.status;h=dict(response.getheaders());connection.close()
         return status,json.loads(raw) if raw and 'application/json' in h.get('Content-Type','') else raw,h
 
+    def test_all_access_route_is_character_bound_and_preserves_individual_routes(self):
+        self.app.store.add_character(123,'Test')
+        self.app.eve.start=Mock(return_value='https://login.eveonline.com/authorize')
+        for feature in ['all','skills','pi','corporations','moons','intel','mining']:
+            status,data,_=self.request('/api/auth/start',{'character_id':123,'feature':feature})
+            self.assertEqual(status,200)
+            self.assertEqual(data['url'],'https://login.eveonline.com/authorize')
+            self.app.eve.start.assert_called_with(self.app.cookie,self.app.origin+'/callback',123,feature)
+        self.app.eve.start.reset_mock()
+        self.assertEqual(self.request('/api/auth/start',{'character_id':456,'feature':'all'})[0],400)
+        self.assertEqual(self.request('/api/auth/start',{'character_id':123,'feature':'invalid'})[0],400)
+        self.app.eve.start.assert_not_called()
+
     def test_intel_routes_keep_settings_private_and_validate_scope(self):
         self.assertEqual(self.request('/api/intel',Cookie='')[0],403)
         self.assertEqual(self.request('/api/intel/preferences',{'enabled':False},Origin='https://other.invalid')[0],403)

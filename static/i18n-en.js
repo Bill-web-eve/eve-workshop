@@ -1,6 +1,9 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Minden hozzáférés": "All access",
+  "Minden hozzáférés engedélyezése": "Authorize all access",
+  "Minden hozzáférés: személyes készlet, blueprintek, jobok, skillek, PI, corporationadatok, holdadatok, intel és mining ledger egyetlen EVE-jóváhagyással.": "All access: personal inventory, blueprints, jobs, skills, PI, corporation data, moon data, intel and mining ledger in a single EVE approval.",
   "A napi finomított érték ugyanazzal a Jita-árazással készül, mint a felső összesítés. A finomítási adagok maradékát a következő napra visszük tovább a kiválasztott időszakon belül, karakterenként és érctípusonként. Az ISK-sorok kerekítése néhány fillér eltérést okozhat.": "Daily refined values use the same Jita pricing as the period total above. Refining leftovers carry forward to the next day within the selected period, separately for each character and ore type. Rounding individual ISK rows may cause a difference of a few cents.",
   "Árazási tudnivalók": "Pricing details",
   "Skillek, PI, corporation és mining ledger olvasási engedélyek": "Read permissions for skills, PI, corporations and mining ledgers",

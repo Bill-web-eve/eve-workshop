@@ -171,6 +171,37 @@ class ConnectionTests(unittest.TestCase):
         self.assertEqual(self.store.resource_status(123,'skills')['needs_auth'],0)
         self.assertIsNone(self.store.resource_status(123,'pi'))
 
+    def test_all_access_requests_every_scope_once_and_marks_all_domains(self):
+        from muhely.esi import ALL_SCOPES
+        self.vault.set(456,{'refresh_token':'other-character'})
+        url=self.eve.start('browser','http://127.0.0.1:8765/callback',123,'all')
+        query=urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+        scopes=query['scope'][0].split()
+        self.assertEqual(set(scopes),set(ALL_SCOPES))
+        self.assertEqual(len(scopes),len(set(scopes)))
+        pending=self.eve.pending[query['state'][0]]
+        self.assertEqual(pending['character_id'],123)
+        self.assertEqual(pending['feature'],'all')
+        self.http.request.return_value=({'access_token':self.token(scp=ALL_SCOPES),'refresh_token':'new'},{})
+        self.assertEqual(self.eve.finish(query['state'][0],'code','browser'),123)
+        self.assertEqual(self.eve.authorized_feature,'all')
+        for domain in ['skills','pi','corporations','intel_location','mining','moon_calendar','moon_timers','moon_notifications']:
+            with self.subTest(domain=domain):
+                self.assertEqual(self.store.resource_status(123,domain)['needs_auth'],0)
+        self.assertEqual(self.vault.read()['456'],{'refresh_token':'other-character'})
+
+    def test_all_access_rejects_wrong_character_and_incomplete_consent(self):
+        from muhely.esi import ALL_SCOPES
+        original={'refresh_token':'original','scopes':INDUSTRY_SCOPES}
+        self.vault.set(123,original)
+        for claims in [dict(sub='CHARACTER:EVE:456',scp=ALL_SCOPES),dict(scp=SCOPES)]:
+            with self.subTest(claims=claims):
+                url=self.eve.start('browser','http://127.0.0.1:8765/callback',123,'all')
+                state=urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)['state'][0]
+                self.http.request.return_value=({'access_token':self.token(**claims),'refresh_token':'new'},{})
+                with self.assertRaises(EsiError):self.eve.finish(state,'code','browser')
+                self.assertEqual(self.vault.read(),{'123':original})
+
     def test_skill_resource_uses_dict_shape_etag_cache_control_and_handles_304(self):
         data={'skills':[],'total_sp':0}
         old={'data':data,'fetched':1,'expires':2,'etag':'"old"'}

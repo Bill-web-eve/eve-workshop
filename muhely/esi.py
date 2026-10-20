@@ -275,7 +275,9 @@ class EveConnection:
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
         state = secrets.token_urlsafe(32)
         requested=SCOPES
-        if feature in ['skills','pi','corporations','moons','intel','mining']:
+        if feature == 'all':
+            requested=list(dict.fromkeys(ALL_SCOPES))
+        elif feature in ['skills','pi','corporations','moons','intel','mining']:
             existing=self.vault.read().get(str(character_id),{}) if character_id else {}
             wanted=set(INDUSTRY_SCOPES+{'skills':SKILL_SCOPES,'pi':PI_SCOPES,'corporations':CORPORATION_SCOPES,'moons':MOON_SCOPES,'intel':INTEL_SCOPES,'mining':MINING_SCOPES}[feature])
             wanted.update(set(existing.get('scopes',[])) & set(ALL_SCOPES))

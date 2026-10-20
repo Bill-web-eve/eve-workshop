@@ -384,6 +384,8 @@ Expand **Settings** in the sidebar for:
 
 - **Structures and bonuses:** manufacturing/reaction material and time bonuses, production systems, facility fees, stock source, location filters and recipe updates.
 - **EVE connection:** Client ID, character authorization, personal character selection and removal.
+**Authorize all access** requests every permission supported by the app for one character in a single EVE login: personal inventory, blueprints and jobs, skills and training queue, PI, corporation data, moon calendar and notifications, intel location and mining ledger. Select the same character on the EVE page. With your own Client ID, enable all requested scopes in the Developer application; corporation data still requires the appropriate in-game roles. Refresh EVE data after approval. Individual authorization buttons remain available.
+
 - **Data access:** per-character skill, PI, corporation and moon permissions, scopes and refresh actions.
 - **Moon calculation settings:** refining implant and recovery, crystal variant, fuel type, manual fuel price and economic parameters.
 - **Calendar sync:** local subscription and ICS export.
