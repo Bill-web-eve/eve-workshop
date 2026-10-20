@@ -65,3 +65,12 @@ test('contact callouts stay within the viewport and avoid identical placement',(
  const nodes=[{id:1,lx:5,ly:5,contacts:[{pilots:[{name:'One'}],ships:[]}]},{id:2,lx:1195,ly:710,contacts:[{pilots:[{name:'Two'}],ships:[]}]}];
  const cards=require('../static/intel-map.js').callouts(nodes);assert.equal(cards.length,2);assert(cards.every(c=>c.x>=0&&c.y>=0&&c.x+c.width<=1200&&c.y+c.height<=720));
 });
+test('detached map window buttons open only their requested window without bubbling into the root',async t=>{
+ const {w,d,run}=await fixture('map');t.after(()=>w.close());const opened=[];
+ w.EveDesktop.openIntelWindow=async(kind,options)=>opened.push({kind,options});
+ d.querySelector('button[data-intel-window=chat]').click();await tick();
+ assert.deepEqual(opened.map(call=>call.kind),['chat']);
+ assert.equal(d.documentElement.onclick,null);
+ d.querySelector('#intel-zoom-in').click();await tick();
+ assert.equal(opened.length,1);assert.equal(run('intelZoom'),1.25);
+});

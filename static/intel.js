@@ -72,7 +72,7 @@ function renderIntel(content){
   drawIntelMap();bindIntelLinks();
 }
 function bindIntelLinks(){
-  $$('[data-intel-window]').forEach(b=>b.onclick=()=>void openIntelWindow(b.dataset.intelWindow));
+  $$('button[data-intel-window]').forEach(b=>b.onclick=()=>void openIntelWindow(b.dataset.intelWindow));
   $$('[data-intel-locate]').forEach(b=>b.onclick=()=>showIntelSystem(b.dataset.intelLocate));
   if(EveDesktop.active)$$('[data-intel-pilot]').forEach(a=>a.onclick=e=>{e.preventDefault();void EveDesktop.openExternal(a.href).catch(e=>error(e.message));});
   $$('img[data-intel-image]').forEach(img=>img.onerror=()=>{img.hidden=true;});
