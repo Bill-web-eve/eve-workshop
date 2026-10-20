@@ -22,28 +22,25 @@ async function setup(data=fixture){
  await tick();await tick();run('navigate("mining")');await tick();await tick();await tick();
  return {dom,w,d,run,calls};
 }
-test('mining menu, totals, raw/refined values and Jita modes work without any residue UI',async t=>{
+test('mining totals use refined values in all Jita modes without raw-ore prices or residue UI',async t=>{
  const {w,d,run}=await setup();t.after(()=>w.close());
  assert(d.querySelector('[data-view=mining]').classList.contains('active'));assert(d.querySelector('.plan-selector').hidden);
  assert.equal(d.querySelector('#page-title').textContent,'Mining ledger');
- assert.equal(d.querySelector('[data-mining-value=summary][data-mining-basis=raw]').textContent,'4 200,00 ISK');
  assert.equal(d.querySelector('[data-mining-value=summary][data-mining-basis=refined]').textContent,'108,00 ISK');
  const mode=d.querySelector('[data-jita-mode]');mode.value='buy';mode.dispatchEvent(new w.Event('change'));
- assert.equal(d.querySelector('[data-mining-value=summary][data-mining-basis=raw]').textContent,'3 000,00 ISK');
  assert.equal(d.querySelector('[data-mining-value=summary][data-mining-basis=refined]').textContent,'54,00 ISK');
  mode.value='split';mode.dispatchEvent(new w.Event('change'));
- assert.equal(d.querySelector('[data-mining-value=summary][data-mining-basis=raw]').textContent,'3 600,00 ISK');
  assert.equal(d.querySelector('[data-mining-value=summary][data-mining-basis=refined]').textContent,'81,00 ISK');
  assert(!/residue|waste/i.test(d.body.textContent));
- for(const tab of ['ores','days','records']){d.querySelector('[data-mining-tab='+tab+']').click();await tick();assert(d.querySelector('.mining-'+(tab==='records'?'records':tab)));}
+ for(const tab of ['ores','days','records']){d.querySelector('[data-mining-tab='+tab+']').click();await tick();assert(d.querySelector('.mining-'+(tab==='records'?'records':tab)));assert(!/raw ore value|nyers érc/i.test(d.querySelector('#view-content').textContent));}
  assert.equal(d.querySelector('[data-mining-tab=records]').getAttribute('aria-pressed'),'true');
  assert(!/[áéíóöőúüű]/i.test(d.querySelector('#view-content').textContent),d.querySelector('#view-content').textContent);
  w.EveI18n.setLanguage('hu');await tick();assert.equal(d.querySelector('#page-title').textContent,'Bányászati napló');
  w.EveI18n.setLanguage('en');await tick();assert.equal(d.querySelector('#page-title').textContent,'Mining ledger');
 });
-test('character, ore and date filters go into the API query and refined mode changes the main valuation',async t=>{
+test('character, ore and date filters preserve the refined-only valuation',async t=>{
  const {w,d,calls}=await setup();t.after(()=>w.close());
- const form=d.querySelector('#mining-filters');form.elements.character.value='11';form.elements.ore.value='1';form.elements.period.value='7';form.elements.basis.value='refined';
+ const form=d.querySelector('#mining-filters');form.elements.character.value='11';form.elements.ore.value='1';form.elements.period.value='7';
  form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
  const query=new URL(calls.filter(u=>u.startsWith('/api/mining?')).at(-1),'http://localhost').searchParams;
  assert.equal(query.get('character_id'),'11');assert.equal(query.get('ore_id'),'1');assert(query.has('start'));assert(query.has('end'));
@@ -53,26 +50,37 @@ test('character, ore and date filters go into the API query and refined mode cha
  assert(d.querySelector('[name=start]'));assert(d.querySelector('[name=end]'));
 });
 test('missing access and missing prices are marked incomplete rather than presented as a complete total',async t=>{
- const data=structuredClone(fixture);data.characters[0].needs_auth=true;data.summary.raw.push({id:999,name:'Unknown ore',quantity:10});
+ const data=structuredClone(fixture);data.characters[0].needs_auth=true;data.summary.materials.push({id:999,name:'Unknown material',quantity:10});
  const {w,d}=await setup(data);t.after(()=>w.close());
  assert(d.querySelector('[data-open-settings=access]'));assert(d.querySelector('.banner.warn').textContent.includes('totals may be incomplete'));
  assert(d.querySelector('[data-cost-warning]').textContent.includes('subtotal'));
- assert(d.querySelector('[data-mining-value=summary][data-mining-basis=raw]').textContent.startsWith('≥ '));
+ assert(d.querySelector('[data-mining-value=summary][data-mining-basis=refined]').textContent.startsWith('≥ '));
 });
 
 
-test('daily totals show comparable raw and refined values and a period footer in every pricing mode',async t=>{
+test('daily refined totals and period footer agree with the headline in every pricing mode',async t=>{
  const {w,d}=await setup();t.after(()=>w.close());
- const form=d.querySelector('#mining-filters');form.elements.basis.value='refined';
- form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
  d.querySelector('[data-mining-tab=days]').click();await tick();
- const table=d.querySelector('.mining-days');assert(table);assert(table.tHead.textContent.includes('Raw ore value'));assert(table.tHead.textContent.includes('Refined value'));
- for(const [mode,raw,refined] of [['sell','4 200,00 ISK','108,00 ISK'],['buy','3 000,00 ISK','54,00 ISK'],['split','3 600,00 ISK','81,00 ISK']]){
+ const table=d.querySelector('.mining-days');assert(table);assert(!table.tHead.textContent.includes('Raw ore value'));assert(table.tHead.textContent.includes('Refined value'));
+ for(const [mode,refined] of [['sell','108,00 ISK'],['buy','54,00 ISK'],['split','81,00 ISK']]){
   const control=d.querySelector('[data-jita-mode]');control.value=mode;control.dispatchEvent(new w.Event('change'));await tick();
-  assert.equal(table.querySelector('tbody [data-mining-basis=raw]').textContent,raw);
+  assert.equal(table.querySelector('[data-mining-basis=raw]'),null);
   assert.equal(table.querySelector('tbody [data-mining-basis=refined]').textContent,refined);
   assert.equal(table.querySelector('tfoot [data-mining-basis=refined]').textContent,refined);
   assert.equal(d.querySelector('[data-cost-grand]').textContent,refined);
  }
- assert(d.querySelector('#view-content').textContent.includes('using the same Jita pricing as the period total above.'));
+ assert(d.querySelector('#view-content').textContent.includes('Daily refined values use the same Jita pricing as the period total above.'));
+});
+
+
+test('only refined materials are requested from Jita and the detailed CSV contains no raw-price columns',async t=>{
+ const {w,d,run,calls}=await setup();t.after(()=>w.close());
+ assert.equal(d.querySelector('[name=basis]'),null);
+ assert(calls.filter(u=>u.startsWith('/api/prices?')).every(u=>new URL(u,'http://localhost').searchParams.get('ids')==='34'));
+ d.querySelector('[data-mining-tab=records]').click();await tick();
+ const headers=[...d.querySelector('.mining-records').tHead.rows[0].cells];assert.equal(headers.length,6);
+ assert(!/raw ore value|unit price/i.test(d.querySelector('.mining-records').tHead.textContent));
+ run('csv=(rows,headers)=>{globalThis.miningExport={rows,headers};}');d.querySelector('#mining-export').click();
+ assert.equal(w.miningExport.headers.length,6);assert.equal(w.miningExport.rows[0].length,6);
+ assert(!/raw ore|Nyers|Árazás|Egységár/.test(w.miningExport.headers.join(' ')));
 });

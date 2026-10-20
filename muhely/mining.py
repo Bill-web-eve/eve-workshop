@@ -133,5 +133,5 @@ def dashboard(store,catalog,start=None,end=None,character_id=None,ore_id=None,ac
             'summary':finish(all_),'by_character':[{'id':c,'name':names[c],**finish(b)} for c,b in sorted(by_char.items())],
             'by_ore':[{'id':t,'name':catalog.name(t),**finish(b)} for t,b in sorted(by_ore.items())],
             'by_day':[{'date':d,**finish(b)} for d,b in sorted(by_day.items())],
-            'records':records,'price_ids':sorted(i for i in set(all_['raw'])|set(all_['materials']) if i in catalog.types),'refining_yield':float(yield_) if yield_ is not None else None,'implant':prefs['implant'],
+            'records':records,'price_ids':sorted(i for i in set(all_['materials']) if i in catalog.types),'refining_yield':float(yield_) if yield_ is not None else None,'implant':prefs['implant'],
             'scopes':MINING_SCOPES,'calculated_at':now}

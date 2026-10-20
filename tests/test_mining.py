@@ -39,6 +39,8 @@ class MiningTests(unittest.TestCase):
         d=self.view();self.assertEqual(d['summary']['quantity'],440)
         self.assertEqual(sum(c['quantity'] for c in d['by_character']),440)
         self.assertEqual(sum(o['quantity'] for o in d['by_ore']),440)
+        self.assertEqual(set(d['price_ids']),{m['id'] for m in d['summary']['materials']})
+        self.assertNotIn(1230,d['price_ids'])
         self.assertEqual(len(d['by_day']),2)
         refined={m['id']:m['quantity'] for m in d['summary']['materials']}
         totals={}
