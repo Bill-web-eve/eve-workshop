@@ -486,6 +486,8 @@ A report listing multiple pilots and ships is labelled **Multiple pilots · shar
 
 **Open map window** opens an independent, resizable Mac window with the full region, activity cards and range highlighting. **Open intel chat window** opens a game-like feed combining all selected intel channels. Each line shows its local time, channel, reporter and message. Identified pilot names link to zKillboard; selecting a system opens or focuses the map window there.
 
+The separate map window contains only the system map, zoom controls and legend. Choose the character, region and intel options on the main Intel map page; Open map window also applies that selection to an already open map window.
+
 The chat is **read-only** and never sends messages to EVE. Disable **Auto-scroll**, or scroll upwards, to retain your reading position. Returning to the bottom resumes following new messages. Messages are chronological, oldest first, with up to 500 entries from the last 24 hours. Unchanged rows are retained during background checks.
 
 One map and one chat window can be open. Opening one again focuses the existing window. Closing an auxiliary window keeps the main app and other window running. Closing the main window or quitting stops all windows and monitoring. Theme and language are shared. Only the main window delivers OS alerts, avoiding duplicate notifications from multiple windows.

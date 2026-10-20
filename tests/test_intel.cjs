@@ -65,12 +65,24 @@ test('contact callouts stay within the viewport and avoid identical placement',(
  const nodes=[{id:1,lx:5,ly:5,contacts:[{pilots:[{name:'One'}],ships:[]}]},{id:2,lx:1195,ly:710,contacts:[{pilots:[{name:'Two'}],ships:[]}]}];
  const cards=require('../static/intel-map.js').callouts(nodes);assert.equal(cards.length,2);assert(cards.every(c=>c.x>=0&&c.y>=0&&c.x+c.width<=1200&&c.y+c.height<=720));
 });
-test('detached map window buttons open only their requested window without bubbling into the root',async t=>{
- const {w,d,run}=await fixture('map');t.after(()=>w.close());const opened=[];
+test('detached chat window buttons open only their requested window without bubbling into the root',async t=>{
+ const {w,d}=await fixture('chat');t.after(()=>w.close());const opened=[];
  w.EveDesktop.openIntelWindow=async(kind,options)=>opened.push({kind,options});
- d.querySelector('button[data-intel-window=chat]').click();await tick();
- assert.deepEqual(opened.map(call=>call.kind),['chat']);
+ d.querySelector('button[data-intel-window=map]').click();await tick();
+ assert.deepEqual(opened.map(call=>call.kind),['map']);
  assert.equal(d.documentElement.onclick,null);
- d.querySelector('#intel-zoom-in').click();await tick();
- assert.equal(opened.length,1);assert.equal(run('intelZoom'),1.25);
+ d.querySelector('#intel-chat-auto').click();await tick();
+ assert.equal(opened.length,1);
+});
+
+test('detached map contains only the live system map and its navigation controls',async t=>{
+ const {w,d,run,intel}=await fixture('map');t.after(()=>w.close());
+ const content=d.querySelector('#view-content');assert.equal(content.children.length,1);assert(content.firstElementChild.classList.contains('panel'));assert.equal(content.querySelector('.banner'),null);
+ for(const selector of ['#intel-character','#intel-region','#intel-history','#intel-refresh','#intel-resolve','button[data-intel-window]','.intel-toolbar'])assert.equal(d.querySelector(selector),null,selector);
+ assert(d.querySelector('#intel-map svg'));assert(d.querySelector('.intel-legend'));assert.equal(d.querySelector('#view-actions').textContent,'');
+ d.querySelector('#intel-zoom-in').click();assert.equal(run('intelZoom'),1.25);
+ d.querySelector('#intel-fit').click();assert.equal(run('intelZoom'),1);
+ intel.characters[0].alertable=false;intel.reference=intel.characters[0];await run('refreshIntel(true)');
+ assert(content.querySelector('.intel-map-provenance'));assert(content.querySelector('.intel-range-stale'));
+ intel.nodes[0].state='clear';await run('refreshIntel(true)');assert(d.querySelector('.intel-node.clear'));
 });
