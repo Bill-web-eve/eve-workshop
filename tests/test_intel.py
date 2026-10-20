@@ -30,6 +30,11 @@ class ParserTests(unittest.TestCase):
     def test_reports_do_not_put_reporter_or_ships_in_pilot_list(self):
         p=self.parse('L-A5XP* Alti UX Buzzard*');self.assertEqual([x['name'] for x in p['pilots']],['Alti UX']);self.assertEqual(p['reporter'],'Reporter');self.assertFalse(p['pilots'][0]['verified'])
         self.assertEqual([x['name'] for x in self.parse('NuvoTeo J5A-IX carcacal NI')['pilots']],['NuvoTeo'])
+    def test_ship_names_are_not_systems_and_counts_are_not_pilots(self):
+        self.u=u.Universe({'systems':[{'id':1,'name':'Amarr','region_id':1},{'id':2,'name':'J5A-IX','region_id':1}],'edges':[[1,2]],'ships':['Amarr Shuttle','Hecate']})
+        p=self.parse('Pilot One J5A-IX Amarr Shuttle');self.assertEqual(p['systems'],[2]);self.assertEqual([x['name'] for x in p['pilots']],['Pilot One'])
+        p=self.parse('J5A-IX Hecate 3x');self.assertEqual(p['pilots'],[])
+        p=self.parse('J5A-IX  Pilot One  Pilot Two');self.assertEqual([x['name'] for x in p['pilots']],['Pilot One','Pilot Two'])
     def test_linked_character_named_after_system_is_not_a_location(self):
         p=self.parse('L-A5XP <url=showinfo:1373//999>Jita</url> Buzzard');self.assertEqual(p['systems'],[2]);self.assertEqual(p['pilots'],[{'name':'Jita','id':999,'verified':True}])
     def test_unambiguous_abbreviations_and_routes(self):

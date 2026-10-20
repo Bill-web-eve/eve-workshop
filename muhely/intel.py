@@ -74,6 +74,8 @@ def parse_message(line,universe,channel,channel_id,now=None,regions=()):
     plain=html.unescape(re.sub('<[^>]+>','',body))
     # A linked character can be named after a system. Do not parse their name as a location.
     searching=LINK.sub(lambda m:' '*len(m.group()),body)
+    # Racial ship names such as Amarr Shuttle also contain real system names.
+    searching=universe.ship_pattern.sub(lambda m:' '*len(m.group()),searching)
     mentions=universe.mentions(searching,regions)
     ids=list(dict.fromkeys(sid for sid,_,_ in mentions))
     arrow=bool(re.search(r'(?:->|→|=>)',plain))
@@ -88,8 +90,9 @@ def parse_message(line,universe,channel,channel_id,now=None,regions=()):
     text=universe.pattern.sub(' ',text);text=universe.ship_pattern.sub(' ',text)
     text=LINK.sub(' ',text)
     for pilot in linked:text=text.replace(pilot['name'],' ')
+    text=re.sub(r'(?:\+\s*\d+|\b(?:\d+\s*x|x\s*\d+)\b)',' ',text,flags=re.I)
     candidates=[]
-    for chunk in re.split(r'[|,;:()\[\]<>/]|(?:\s+[+\-]\s*)|(?:->|→|=>)',text):
+    for chunk in re.split(r'[|,;:()\[\]<>/]|\s{2,}|(?:\s+[+\-]\s*)|(?:->|→|=>)',text):
         parts=STOP.split(chunk)
         for part in parts:
             name=re.sub(r'\s+',' ',part).strip(' .!*+"\t-')
