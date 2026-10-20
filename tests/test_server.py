@@ -276,6 +276,46 @@ class ServerTests(unittest.TestCase):
         p=next(r for r in self.request('/api/plan?product_id=92822&quantity=4')[1]['rows'] if r['id']==92822)['parameters']
         self.assertEqual((p['bpc_count'],p['source']),(0,'manual'))
 
+    def test_notification_api_separates_owners_and_persists_os_receipts(self):
+        from datetime import datetime,timezone
+        self.app.store.add_character(1,'Pilot');self.app.store.character_corporation(1,99,'Corp A')
+        now=time.time();snap=lambda data:{'data':data,'fetched':now,'expires':now+600}
+        job={'job_id':123,'status':'ready','product_type_id':590,'runs':1,'installer_id':1,'end_date':datetime.fromtimestamp(now-10,timezone.utc).isoformat()}
+        self.app.store.save_snapshots(1,{'jobs':snap([job,{**job,'job_id':124}])})
+        self.app.store.save_corporation_snapshots(99,1,{'jobs':snap([job])})
+        self.assertEqual(self.request('/api/notifications',Cookie='')[0],403)
+        status,data,_=self.request('/api/notifications');self.assertEqual(status,200)
+        rows=[a for a in data['items'] if a['category']=='jobs']
+        self.assertEqual({(a['job_id'],a['corporation_id']) for a in rows},{(123,99),(124,None)})
+        self.assertEqual(self.request('/api/notifications/claim',{})[1]['items'],[])
+        self.assertEqual(self.request('/api/notifications/preferences',{'os_enabled':True},Origin='https://other.example')[0],403)
+        self.assertEqual(self.request('/api/notifications/preferences',{'moon_days':31})[0],400)
+        self.request('/api/notifications/preferences',{'os_enabled':True})
+        self.app.task['running']=True
+        self.assertEqual(self.request('/api/notifications/claim',{})[1]['items'],[])
+        self.app.task['running']=False
+        claims=self.request('/api/notifications/claim',{})[1]['items'];self.assertEqual(len(claims),2)
+        self.request('/api/notifications/sent',{'receipts':[a['receipt'] for a in claims]})
+        self.assertEqual(self.request('/api/notifications/claim',{})[1]['items'],[])
+        self.assertIn(b'renderNotifications',self.request('/notifications.js')[1])
+        self.assertNotIn('access_token',json.dumps(data));self.assertNotIn('refresh_token',json.dumps(data))
+
+    def test_background_notification_sync_respects_cooldown_and_keeps_inventory_mode(self):
+        self.app.store.add_character(1,'Pilot')
+        self.app.eve.sync=Mock(return_value=[{'id':1,'ok':True}]);self.app.eve.sync_skills=Mock(return_value=[]);self.app.eve.sync_pi=Mock(return_value=[])
+        self.request('/api/notifications/sync',{})
+        for _ in range(100):
+            if not self.app.task['running']:break
+            time.sleep(.01)
+        self.request('/api/notifications/sync',{})
+        self.assertEqual(self.app.eve.sync.call_count,1)
+        self.assertEqual(self.app.store.settings()['source'],'manual')
+        self.request('/api/notifications/sync',{'manual':True})
+        for _ in range(100):
+            if not self.app.task['running']:break
+            time.sleep(.01)
+        self.assertEqual(self.app.eve.sync.call_count,2)
+
     def test_desktop_auth_handoff_is_one_use_and_browser_callback_resumes_window(self):
         from urllib.parse import urlsplit,parse_qs
         self.request('/api/settings',{'client_id':'public-client'})

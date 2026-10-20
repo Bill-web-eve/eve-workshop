@@ -1,6 +1,6 @@
 'use strict';
 let settingsTab='appearance',settingsAccessData=null,settingsAccessRequest=null;
-const settingsSections={appearance:'Megjelenés és nyelv',structures:'Struktúrák és bónuszok',connection:'EVE-kapcsolat',access:'Adathozzáférések',moons:'Holdak számítási beállításai',calendar:'Naptárszinkron',accounts:'Accountok és tanulás'};
+const settingsSections={notifications:'Értesítések',appearance:'Megjelenés és nyelv',structures:'Struktúrák és bónuszok',connection:'EVE-kapcsolat',access:'Adathozzáférések',moons:'Holdak számítási beállításai',calendar:'Naptárszinkron',accounts:'Accountok és tanulás'};
 function settingsShortcut(message,tab='access'){
   return `<div class="banner"><span>${esc(message)}</span> <button class="text-button" data-open-settings="${tab}">Beállítások megnyitása</button></div>`;
 }
@@ -32,7 +32,8 @@ function renderSettings(content){
   $$('[data-settings-tab]').forEach(button=>button.onclick=()=>openSettingsTab(button.dataset.settingsTab));
   const target=$('#settings-content');
   $('#plan-status').hidden=true;
-  if(settingsTab==='appearance')renderAppearanceSettings(target);
+  if(settingsTab==='notifications')renderNotificationSettings(target);
+  else if(settingsTab==='appearance')renderAppearanceSettings(target);
   else if(settingsTab==='structures')renderStructureSettings(target);
   else if(settingsTab==='connection')renderConnection(target);
   else if(settingsTab==='accounts')renderAccounts(target);

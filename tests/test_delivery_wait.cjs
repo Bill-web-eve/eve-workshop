@@ -8,11 +8,16 @@ async function setup(wait=pending()){
  const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://127.0.0.1:8765',runScripts:'outside-only'}),w=dom.window,d=w.document,run=s=>vm.runInContext(s,dom.getInternalVMContext());
  const saved={id:'saved-redeemer',name:'Redeemer',product_name:'Redeemer',product_id:22428,quantity:3,reserve_active:true,manufacturer_id:0};
  const fixture={csrf:'test',version:'1.0.0',corporations:[],plans:[saved],production_characters:[],characters:[],jobs:[],settings:{source:'eve'},task:{running:false},sde:{buildNumber:1},recipe_count:1,delivery_wait:wait};
+ const notificationFixture={items:[],counts:{skills:0,jobs:0,pi:0,moons:0,data:0},task:{running:false},next_sync_at:9999999999,corporations:[],moons:[],preferences:{os_enabled:false,auto_refresh:true,personal:true,corporations:true,moon_days:3,categories:{skills:true,jobs:true,pi:true,moons:true},moon_owners:{}},claims:[]};
  const calls=[],scrolls=[];let currentWait=wait;
  w.localStorage.setItem('eve-muhely-language','en');w.confirm=()=>true;
  w.HTMLElement.prototype.scrollIntoView=function(){scrolls.push(this.id);};
- w.fetch=async url=>{
+ w.fetch=async (url,options)=>{
   calls.push(url);
+  if(url==='/api/notifications')return {ok:true,json:async()=>notificationFixture};
+  if(url==='/api/notifications/claim')return {ok:true,json:async()=>({items:notificationFixture.claims})};
+  if(url==='/api/notifications/sent'){notificationFixture.receipts=JSON.parse(options.body).receipts;return {ok:true,json:async()=>({ok:true})};}
+  if(url==='/api/notifications/preferences'){Object.assign(notificationFixture.preferences,JSON.parse(options.body));return {ok:true,json:async()=>notificationFixture.preferences};}
   if(url==='/api/state')return {ok:true,json:async()=>({...fixture,delivery_wait:currentWait})};
   if(url.startsWith('/api/plan?'))return currentWait?{ok:false,json:async()=>({error:'untranslated server fallback',delivery_wait:currentWait})}:{ok:true,json:async()=>({product_id:Number(new URL(url,w.location.href).searchParams.get('product_id')),activity:'manufacturing',summary:{items:1},stale_characters:[],calculated_at:1000})};
   throw Error('Unexpected request: '+url);
@@ -21,7 +26,7 @@ async function setup(wait=pending()){
  await tick();await tick();
  run('productId=22428;productName="Redeemer";activePlanId="saved-redeemer";$("#product-search").value="Redeemer";EveNumbers.set($("#target-quantity"),3);navigate("schedule");');
  await tick();
- return {dom,w,d,run,calls,scrolls,saved,fixture,setWait:value=>{currentWait=value;}};
+ return {dom,w,d,run,calls,scrolls,saved,fixture,notificationFixture,setWait:value=>{currentWait=value;}};
 }
 test('Calculate plan visibly reports the wait and exact local retry time from the scheduler',async t=>{
  const {dom,w,d,run,calls,scrolls,fixture}=await setup();t.after(()=>w.close());
@@ -115,4 +120,37 @@ test('appearance and language controls work in Settings across repeated renders 
  assert.equal(d.querySelector('[data-theme-toggle]').getAttribute('aria-pressed'),'false');assert.equal(d.querySelector('[data-ui-language=hu]').getAttribute('aria-pressed'),'true');
  d.querySelector('[data-ui-language=en]').click();await tick();assert.equal(d.querySelector('#page-title').textContent,'Appearance and language');assert.equal(w.localStorage.getItem('eve-muhely-language'),'en');
  assert(!/[áéíóöőúüű]/i.test(d.querySelector('#settings-content').textContent.replace('Magyar','')));
+});
+
+function notificationItem(id,corp=null,kind='job_ready'){
+ return {id:'job:'+id,domain:'jobs:'+id,category:'jobs',kind,subject:'Item '+id,corporation_id:corp,scope_name:corp?'Corp A':'Personal',when:1000,checked_at:2000,reliable:true,character_name:'Test Pilot',receipt:'receipt-'+id,notification_id:'notification-'+id};
+}
+test('the notification hub keeps personal and corporation alerts separate from the production scope',async t=>{
+ const {w,d,run,notificationFixture:n}=await setup(null);t.after(()=>w.close());
+ n.items=[notificationItem(1),notificationItem(2,99)];n.corporations=[{id:99,name:'Corp A'}];n.counts.jobs=2;
+ run('corporationId=99;openNotificationCenter()');await tick();
+ assert.equal(d.querySelector('#page-title').textContent,'Notifications');assert(d.querySelector('[data-notification-open="job:1"]'));assert.equal(d.querySelector('[data-notification-open="job:2"]'),null);
+ d.querySelector('[data-notification-scope=corporations]').click();await tick();
+ assert(d.querySelector('[data-notification-open="job:2"]'));assert.equal(d.querySelector('[data-notification-open="job:1"]'),null);assert.equal(run('corporationId'),99);
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('#view-content').textContent));
+ d.querySelector('[data-notification-category=data]').click();await tick();assert(d.querySelector('.empty').textContent.includes('No matching alerts'));
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('#view-content').textContent));
+});
+test('OS delivery groups by owner and category and acknowledges only accepted notifications',async t=>{
+ const {w,run,notificationFixture:n}=await setup(null);t.after(()=>w.close());
+ n.preferences.os_enabled=true;n.preferences.auto_refresh=false;n.claims=[notificationItem(1),notificationItem(2),notificationItem(3,99)];n.items=n.claims;
+ const sent=[];w.EveDesktop.active=true;w.EveDesktop.notificationStatus=async()=>({status:'authorized'});w.EveDesktop.notify=async body=>sent.push(body);
+ await run('refreshNotifications()');assert.equal(sent.length,2);assert.equal(sent[0].scope,'personal');assert.equal(sent[1].scope,'99');assert(sent[0].body.includes('Item 1'));assert(sent[0].body.includes('Item 2'));assert(!sent[0].body.includes('Item 3'));
+ assert.deepEqual(n.receipts,['receipt-3']);assert(!/[áéíóöőúüű]/i.test(sent.map(s=>s.title+s.body).join('')));
+ n.receipts=null;w.EveDesktop.notify=async()=>{throw Error('denied');};await run('refreshNotifications()');assert.equal(n.receipts,null);assert.equal(n.items.length,3);
+});
+test('notification settings preserve unsaved preferences while saving moon ownership',async t=>{
+ const {w,d,run,notificationFixture:n}=await setup(null);t.after(()=>w.close());
+ n.moons=[{id:'moon1',name:'Test I - Moon 1'}];n.corporations=[{id:99,name:'Corp A'}];run('openSettingsTab("notifications")');await tick();
+ const prefs=d.querySelector('#notification-preferences');prefs.elements.moon_days.value='7';prefs.dispatchEvent(new w.Event('input',{bubbles:true}));
+ const owner=d.querySelector('[data-notification-moon=moon1]');owner.value='99';owner.dispatchEvent(new w.Event('change',{bubbles:true}));
+ d.querySelector('#notification-moon-owners').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
+ assert.equal(n.preferences.moon_owners.moon1,99);assert.equal(d.querySelector('#notification-preferences').elements.moon_days.value,'7');assert.equal(run('dirty.notification_preferences'),true);
+ prefs.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
+ assert.equal(n.preferences.moon_days,7);assert.equal(run('Object.keys(dirty).length'),0);assert(!/[áéíóöőúüű]/i.test(d.querySelector('#settings-content').textContent));
 });

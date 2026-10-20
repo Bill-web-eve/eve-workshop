@@ -24,6 +24,7 @@
   <script src="/accounts.js" defer></script>
   <script src="/schedule-graph.js" defer></script>
   <script src="/schedule.js" defer></script>
+  <script src="/notifications.js" defer></script>
   <script src="/settings.js" defer></script>
   <script src="/costs.js" defer></script>
   <script src="/prices.js" defer></script>
@@ -36,6 +37,7 @@
     <a class="brand" href="/" aria-label="EVE Műhely kezdőlap"><img src="/app-window-icon.png" alt=""><span>EVE <strong>MŰHELY</strong><small>EVE gyártástervező</small></span></a>
     <div class="nav-label">A TERVED</div>
     <nav aria-label="Főmenü">
+      <button class="nav" data-view="notifications"><span class="nav-icon">⚑</span>Értesítések <span id="notification-count" class="nav-count" hidden></span></button>
       <button class="nav active" data-view="queue"><span class="nav-icon">▤</span>Gyártási terv <span id="queue-count" class="nav-count">–</span></button>
       <button class="nav" data-view="graph"><span class="nav-icon">⑂</span>Gyártási gráf</button>
       <button class="nav" data-view="schedule"><span class="nav-icon">◴</span>Gyártásütemező</button>
@@ -62,6 +64,7 @@
       <div class="nav-group">
         <button class="nav" data-view="settings" aria-expanded="false" aria-controls="settings-submenu"><span class="nav-icon">⚙</span><span>Beállítások</span><span class="nav-chevron" aria-hidden="true">▸</span></button>
         <div id="settings-submenu" class="nav-submenu" hidden>
+          <button data-settings-nav="notifications">Értesítések</button>
           <button data-settings-nav="appearance">Megjelenés és nyelv</button>
           <button data-settings-nav="structures">Struktúrák és bónuszok</button>
           <button data-settings-nav="connection">EVE-kapcsolat <span id="connection-dot" class="dot"></span></button>

@@ -1,0 +1,90 @@
+'use strict';
+let notificationData=null,notificationRequest=null,notificationScope='personal',notificationCategory='all',notificationTimer=null,notificationPermission='unknown',notificationSettingsBusy=false;
+const notificationLabels={skills:'Tanulás',jobs:'Elkészült jobok',pi:'PI-termelés',moons:'Holdkitermelések',data:'Ellenőrizendő adatok'};
+const notificationKinds={training_idle:'Nem tanul',training_soon:'5 napon belül leáll a tanulás',job_ready:'Átvehető job',job_expected:'Várhatóan elkészült job',pi_idle:'A bolygó nem termel',pi_estimated:'Becsült PI-leállás',pi_extractor:'Lejárt kitermelőprogram',moon_soon:'Közelgő holdkitermelés',moon_ready:'A holdkitermelés elkészült',unknown:'Frissítés vagy engedélyezés szükséges'};
+function notificationDate(value){return value==null?'–':EveI18n.date(value*1000,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}
+function notificationMatches(a){return notificationScope==='personal'?!a.corporation_id:notificationScope==='corporations'?!!a.corporation_id:a.corporation_id===Number(notificationScope);}
+async function refreshNotifications(deliver=true){
+  if(notificationRequest)return notificationRequest;
+  notificationRequest=(async()=>{
+    try{
+      notificationData=await api('/api/notifications');
+      const count=notificationData.items.filter(a=>a.category!=='data'&&a.reliable).length;
+      const badge=$('#notification-count');if(badge){badge.textContent=count?fmt(count):notificationData.counts.data?'?':'0';badge.hidden=!count&&!notificationData.counts.data;}
+      if(view==='notifications'||view==='settings'&&settingsTab==='notifications')render();
+      if(deliver&&EveDesktop.active&&notificationData.preferences.os_enabled){
+        const permission=await EveDesktop.notificationStatus();notificationPermission=permission.status;
+        if(permission.status==='authorized')await deliverNotifications();
+        if(notificationData.preferences.auto_refresh&&!notificationData.task.running&&state.characters.length&&Date.now()/1000>=notificationData.next_sync_at){
+          await api('/api/notifications/sync',{});await reloadState();scheduleTaskPoll();
+        }
+      }
+    }catch(e){if(view==='notifications'||view==='settings'&&settingsTab==='notifications')error(e.message);}
+    finally{notificationRequest=null;}
+  })();return notificationRequest;
+}
+function scheduleNotificationMonitor(){
+  clearInterval(notificationTimer);
+  notificationTimer=setInterval(()=>{if(!document.hidden&&!notificationSettingsBusy)void refreshNotifications();},60000);
+}
+async function deliverNotifications(){
+  const data=await api('/api/notifications/claim',{}),groups=new Map();
+  for(const item of data.items){const key=JSON.stringify([item.corporation_id,item.category]);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
+  for(const batch of groups.values()){
+    const first=batch[0],scope=first.corporation_id?first.scope_name:EveI18n.t('Személyes');
+    const body=batch.slice(0,3).map(a=>EveI18n.t(notificationKinds[a.kind])+': '+a.subject+(a.when!=null?' · '+EveI18n.t(notificationDate(a.when)):'')).join('\n')+(batch.length>3?'\n'+EveI18n.t('További {0} jelzés'.replace('{0}',fmt(batch.length-3))):'');
+    try{
+      await EveDesktop.notify({id:'eve.'+first.notification_id,title:'EVE '+EveI18n.t('Műhely')+' · '+scope,body,scope:first.corporation_id?String(first.corporation_id):'personal',category:first.category});
+      await api('/api/notifications/sent',{receipts:batch.map(a=>a.receipt)});
+    }catch(e){notificationPermission='error';if(view==='notifications')error(EveI18n.t('A rendszerértesítés nem küldhető el. A jelzések az alkalmazásban megmaradnak.'));break;}
+  }
+}
+function openNotificationCenter(scope='personal',category='all'){
+  if(!navigate('notifications'))return;
+  notificationScope=scope==='personal'||scope==='corporations'||/^\d+$/.test(String(scope))?String(scope):'personal';
+  notificationCategory=Object.prototype.hasOwnProperty.call(notificationLabels,category)?category:'all';render();
+}
+function renderNotifications(content){
+  setHead('ÁTTEKINTÉS','Értesítések','Tanulás, átvehető jobok, leálló PI-termelés és közelgő holdkitermelések egy helyen.');$('#plan-status').hidden=true;
+  actions('<button class="button compact" id="notification-reload">Összesítés frissítése</button><button class="button primary compact" id="notification-sync">EVE-adatok ellenőrzése</button>');
+  $('#notification-reload').onclick=()=>void refreshNotifications();$('#notification-sync').disabled=!!state.task.running||!state.characters.length;$('#notification-sync').onclick=async()=>{try{await api('/api/notifications/sync',{manual:true});await reloadState();render();scheduleTaskPoll();}catch(e){error(e.message);}};
+  if(!notificationData){content.innerHTML=empty('Értesítések betöltése');void refreshNotifications();return;}
+  const data=notificationData,items=data.items.filter(notificationMatches),corp=notificationScope!=='personal';
+  content.innerHTML=`<div class="shopping-tabs"><button data-notification-scope="personal" aria-pressed="${!corp}">Személyes</button><button data-notification-scope="corporations" aria-pressed="${corp}">Corp</button><button class="text-button" data-open-settings="notifications">Értesítési beállítások</button></div>`;
+  if(corp)content.innerHTML+=`<label class="notification-corp">Corporation<select id="notification-corp"><option value="corporations">Összes corporation</option>${data.corporations.map(c=>`<option data-i18n-skip value="${c.id}">${esc(c.name)}</option>`).join('')}</select></label><p class="footnote">A tanulás és a PI a karakterek személyes adata; ezeket a Személyes fülön találod. Itt kizárólag corp jobok és a corporationhöz rendelt holdak látszanak.</p>`;
+  content.innerHTML+=`<div class="notification-categories">${[['all','Összes'],...Object.entries(notificationLabels)].map(([key,label])=>`<button class="button compact" data-notification-category="${key}" aria-pressed="${notificationCategory===key}">${esc(label)} <span class="badge">${fmt(key==='all'?items.length:items.filter(a=>a.category===key).length)}</span></button>`).join('')}</div>`;
+  const visible=items.filter(a=>notificationCategory==='all'||a.category===notificationCategory);
+  content.innerHTML+=panel('Aktuális jelzések',`${fmt(visible.length)} jelzés`,visible.length?table(['Jelzés','Tétel','Karakter','Időpont','Adat ideje','Állapot','Művelet'],visible.map(a=>`<tr><td><strong>${esc(notificationKinds[a.kind])}</strong><div class="batch-note">${esc(notificationLabels[a.category])}</div></td><td>${['jobs','pi','moons'].includes(a.category)?itemName(a.subject):verbatim(a.subject)}${a.volume!=null?`<div>${fmt(a.volume)} m³${a.estimated?' · <span>Becslés</span>':''}</div>`:''}${a.ownership_unknown?'<div class="batch-note">Nincs corp-hozzárendelés</div>':''}</td><td data-filter-value="${esc(a.character_name||a.category==='skills'&&a.subject||'–')}">${esc(a.character_name||a.category==='skills'&&a.subject||'–')}${a.corporation_id?`<div data-i18n-skip>${esc(a.scope_name)}</div>`:''}</td><td data-sort-value="${a.when??''}">${esc(notificationDate(a.when))}</td><td data-sort-value="${a.checked_at??''}">${esc(notificationDate(a.checked_at))}</td><td><span class="badge ${a.reliable?'warn':''}">${a.reliable?a.estimated||a.kind==='job_expected'?'Becslés':'Jelzett állapot':'Korábbi / nem ellenőrizhető adat'}</span></td><td><button class="text-button" data-notification-open="${esc(a.id)}">Megnyitás</button></td></tr>`),'notification-table'):empty('Nincs ilyen jelzés','Az ismeretlen adatok nem jelentenek igazolt hibamentes működést.'));
+  content.innerHTML+=`<p class="footnote">A lista a helyben betöltött EVE-adatokból és jelölt becslésekből készül. A lejárt, hibás vagy hiányzó adatok külön ellenőrizendők. Holdelőrejelzés: ${fmt(data.preferences.moon_days)} nap. Rendszerértesítés és automatikus ellenőrzés csak futó alkalmazás mellett működik, háttérben is.</p>`;
+  $$('[data-notification-scope]').forEach(b=>b.onclick=()=>{notificationScope=b.dataset.notificationScope;render();});
+  if($('#notification-corp')){$('#notification-corp').value=notificationScope;$('#notification-corp').onchange=e=>{notificationScope=e.target.value;render();};}
+  $$('[data-notification-category]').forEach(b=>b.onclick=()=>{notificationCategory=b.dataset.notificationCategory;render();});
+  $$('[data-notification-open]').forEach(b=>b.onclick=()=>{
+    const a=data.items.find(a=>a.id===b.dataset.notificationOpen);
+    if(a.category==='skills'){skillSelectedId=a.character_id;navigate('skills');}
+    else if(a.category==='pi'){piSelected=`${a.character_id}:${a.planet_id}`;navigate('pi');}
+    else if(a.category==='moons')selectMoonTab('calendar');
+    else if(a.category==='jobs'){if(Object.keys(dirty).length)return;navigate('jobs');void setProductionScope(a.corporation_id||null);}
+    else openSettingsTab('access');
+  });
+}
+function renderNotificationSettings(target){
+  if(!notificationData){target.innerHTML=empty('Értesítések betöltése');void refreshNotifications(false);return;}
+  const p=notificationData.preferences;
+  const status={unknown:'Még nincs ellenőrizve',authorized:'Engedélyezve',denied:'A macOS letiltotta',notDetermined:'Még nincs engedélyezve',unavailable:'Ebben az ablakban nem támogatott',error:'Az értesítés nem küldhető el'};
+  target.innerHTML=panel('Rendszerértesítések','',`<div class="panel-body"><p>A macOS engedélye szükséges. Ugyanazt az eseményt egy aktív időszakban egyszer jelezzük; az újraindítás és az ismételt adatfrissítés nem küldi újra. Több egyidejű jelzést típusonként és tulajdonosonként összevonunk.</p><p>${esc(status[EveDesktop.active?notificationPermission:'unavailable']||status.error)}</p><div class="actions"><button class="button primary" id="notification-permission" ${!EveDesktop.active?'disabled':''}>Rendszerértesítések engedélyezése</button><button class="button" id="notification-test" ${!EveDesktop.active?'disabled':''}>Tesztértesítés</button></div><form id="notification-preferences" class="notification-preferences"><label><input type="checkbox" name="os_enabled" ${p.os_enabled?'checked':''}> Rendszerértesítések bekapcsolva</label><label><input type="checkbox" name="auto_refresh" ${p.auto_refresh?'checked':''}> EVE-adatok automatikus ellenőrzése 4 percenként</label><label><input type="checkbox" name="personal" ${p.personal?'checked':''}> Személyes jelzések</label><label><input type="checkbox" name="corporations" ${p.corporations?'checked':''}> Corp jelzések</label>${Object.entries(notificationLabels).filter(([k])=>k!=='data').map(([key,label])=>`<label><input type="checkbox" name="category-${key}" ${p.categories[key]?'checked':''}> ${esc(label)}</label>`).join('')}<label>Holdelőrejelzés (nap)<input type="number" name="moon_days" min="1" max="30" required value="${p.moon_days}"></label><div class="field-full"><button class="button primary" type="submit">Beállítások mentése</button></div></form><p class="footnote">Bezárt alkalmazás mellett nincs új EVE-ellenőrzés és nincs új rendszerértesítés. A macOS Fókusz módja és rendszerbeállításai befolyásolják a megjelenést. Az EVE gyorsítótárát tiszteletben tartjuk.</p></div>`);
+  if(notificationData.moons.length)target.innerHTML+=panel('Holdak értesítési tulajdonosa','Automatikus: ESI corporation-időzítő alapján; ismeretlen tulajdonos a Személyes fülön marad.',`<form id="notification-moon-owners" class="panel-body">${table(['Hold','Értesítési kör'],notificationData.moons.map(m=>`<tr><td>${verbatim(m.name)}</td><td><select data-notification-moon="${esc(m.id)}"><option value="auto">Automatikus</option><option value="personal">Személyes</option>${notificationData.corporations.map(c=>`<option data-i18n-skip value="${c.id}">${esc(c.name)}</option>`).join('')}</select></td></tr>`))}<button class="button compact" type="submit">Hold-hozzárendelések mentése</button></form>`);
+  $('#notification-preferences').onsubmit=async e=>{e.preventDefault();notificationSettingsBusy=true;try{
+    const form=e.target,body={};for(const key of ['os_enabled','auto_refresh','personal','corporations'])body[key]=form.elements[key].checked;
+    body.moon_days=Number(form.elements.moon_days.value);body.categories=Object.fromEntries(Object.keys(p.categories).map(k=>[k,form.elements['category-'+k].checked]));
+    if(body.os_enabled&&EveDesktop.active){const permission=await EveDesktop.notificationStatus();if(permission.status!=='authorized')throw Error('Előbb engedélyezd a rendszerértesítéseket a fenti gombbal.');}
+    await api('/api/notifications/preferences',body);delete dirty.notification_preferences;await refreshNotifications();toast('Beállítások mentve.');
+  }catch(e){error(e.message);}finally{notificationSettingsBusy=false;}};
+  $('#notification-preferences').oninput=()=>{dirty.notification_preferences=true;};
+  const savePermission=async()=>{notificationSettingsBusy=true;try{const result=await EveDesktop.requestNotifications();notificationPermission=result.status;if(result.status==='authorized'){if(Object.keys(dirty).length){$('#notification-preferences').elements.os_enabled.checked=true;dirty.notification_preferences=true;}else await api('/api/notifications/preferences',{os_enabled:true});}await refreshNotifications();render();}catch(e){error(e.message);}finally{notificationSettingsBusy=false;}};
+  $('#notification-permission').onclick=savePermission;
+  $('#notification-test').onclick=async()=>{try{const result=await EveDesktop.notificationStatus();notificationPermission=result.status;if(result.status!=='authorized')throw Error('Előbb engedélyezd a rendszerértesítéseket a fenti gombbal.');await EveDesktop.notify({id:'eve-test-'+Date.now(),title:'EVE '+EveI18n.t('Műhely'),body:EveI18n.t('A rendszerértesítések működnek.'),scope:'personal',category:'all'});}catch(e){error(e.message);}};
+  $$('[data-notification-moon]').forEach(el=>{const owner=p.moon_owners[el.dataset.notificationMoon];el.value=owner===undefined?'auto':owner===null?'personal':String(owner);el.onchange=()=>dirty.notification_owners=true;});
+  if($('#notification-moon-owners'))$('#notification-moon-owners').onsubmit=async e=>{e.preventDefault();try{const owners={};$$('[data-notification-moon]').forEach(el=>{if(el.value!=='auto')owners[el.dataset.notificationMoon]=el.value==='personal'?null:Number(el.value);});await api('/api/notifications/preferences',{moon_owners:owners});delete dirty.notification_owners;await refreshNotifications();}catch(e){error(e.message);}};
+  if(EveDesktop.active&&notificationPermission==='unknown')void EveDesktop.notificationStatus().then(p=>{notificationPermission=p.status;if(view==='settings'&&settingsTab==='notifications')render();});
+}

@@ -370,8 +370,25 @@ Expand **Settings** in the sidebar for:
 - **Moon calculation settings:** refining implant and recovery, crystal variant, fuel type, manual fuel price and economic parameters.
 - **Calendar sync:** local subscription and ICS export.
 - **Accounts and training:** local account groups, Omega/MCT dates and training-place assignments.
+- **Notifications:** OS permission, alert types, background refresh, moon look-ahead and ownership.
 
 Operational views link to the appropriate settings instead of repeating configuration panels. After authorization, the relevant Settings tab is reopened. Unapplied edits prompt before leaving their view.
+
+## Notifications and macOS alerts
+
+The sidebar **Notifications** menu collects idle characters, queues ending within five days, completed jobs, stopped PI production and moon extractions due within the next **3 days**. Open an alert to visit its related view. The sidebar badge counts reliable current alerts; a question mark means data needs review.
+
+The **Personal** tab contains personal jobs, character training and PI colonies. The **Corp** tab filters corporation jobs and assigned moons by corporation. A corporation job is not duplicated in the personal list. Training and PI remain personal character data. Missing, stale, failed or unauthorized data appears under **Data to review** and does not trigger an OS notification. Characters excluded by Alpha, MCT or manual training-place settings do not receive a false idle-training alert.
+
+Jobs reported ready by EVE are distinguished from jobs expected to have finished based on their end time. Snapshot-based PI stop forecasts are marked as estimates. An alert does not deliver jobs, start production or change inventory.
+
+Under **Settings → Notifications**, choose **Authorize system notifications**, then approve the macOS permission prompt. Use **Test notification** to check display. Configure personal/corporation and category switches, change the moon look-ahead from 1 to 30 days, and enable automatic EVE checks every four minutes. EVE cache expiry is respected. **Check EVE data** also starts a manual refresh.
+
+Moon ownership is inferred from ESI corporation timers. Unknown ownership stays in Personal with a label. In **Moon notification ownership**, choose automatic, personal or a specific corporation. This changes alert classification only.
+
+Each event is sent once per active episode; restarting the app or repeating a refresh does not resend it. Simultaneous alerts are grouped by owner and category. Clicking an OS notification opens its corresponding tab and category. macOS Focus and notification settings can affect presentation.
+
+**Keep the application running**; monitoring also works in the background. A closed app performs no new EVE checks and sends no new OS notifications. OS delivery is available in the local macOS window preview; browser users can use the in-app notification list.
 
 ## Delivered jobs and delayed asset updates
 

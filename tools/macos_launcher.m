@@ -1,9 +1,10 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
+#import <UserNotifications/UserNotifications.h>
 #include <sys/stat.h>
 
 // macOS-only window shell. The Python service and shared UI remain portable.
-@interface EveWindow : NSObject <NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandlerWithReply>
+@interface EveWindow : NSObject <NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandlerWithReply, UNUserNotificationCenterDelegate>
 @property NSWindow *window;
 @property WKWebView *web;
 @property NSURL *origin;
@@ -11,6 +12,9 @@
 @property NSString *language;
 @property NSMenuItem *settingsItem, *quitItem, *reloadItem, *editRoot, *viewRoot;
 @property NSMenu *editMenu;
+@property UNUserNotificationCenter *notificationCenter;
+@property NSTimer *notificationMonitor;
+@property NSDictionary *pendingNotification;
 - (BOOL)localURL:(NSURL *)url;
 - (void)startBackend:(void (^)(BOOL))completion;
 - (void)saveFile:(NSDictionary *)body reply:(void (^)(id, NSString *))reply;
@@ -43,6 +47,52 @@ static BOOL StartService(NSString **logPath) {
     return [url.scheme isEqualToString:@"http"] && [url.host isEqualToString:@"127.0.0.1"] &&
         [url.port isEqual:self.origin.port] && !url.user && !url.password;
 }
+- (NSString *)notificationStatusName:(UNAuthorizationStatus)status {
+    switch(status){
+        case UNAuthorizationStatusAuthorized:case UNAuthorizationStatusProvisional:return @"authorized";
+        case UNAuthorizationStatusDenied:return @"denied";
+        default:return @"notDetermined";
+    }
+}
+- (void)showNotificationTarget:(NSDictionary *)target {
+    self.pendingNotification=target;
+    [self.window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];
+    if(!self.ready)return;
+    self.pendingNotification=nil;
+    [self.web callAsyncJavaScript:@"for(let i=0;i<100&&(typeof state==='undefined'||!state);i++)await new Promise(r=>setTimeout(r,50));if(typeof state!=='undefined'&&state)openNotificationCenter(scope,category);"
+        arguments:@{ @"scope":target[@"scope"]?:@"personal",@"category":target[@"category"]?:@"all" } inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:nil];
+}
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions))done {
+    done(UNNotificationPresentationOptionBanner|UNNotificationPresentationOptionList);
+}
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)(void))done {
+    NSDictionary *target=response.notification.request.content.userInfo;
+    dispatch_async(dispatch_get_main_queue(),^{[self showNotificationTarget:target];done();});
+}
+- (void)notificationAction:(NSDictionary *)body reply:(void (^)(id,NSString *))reply {
+    if(!self.notificationCenter){if([body[@"action"] isEqual:@"notify"])reply(nil,@"A macOS-értesítések nincsenek engedélyezve.");else reply(@{ @"status":@"unavailable" },nil);return;}
+    NSString *action=body[@"action"];
+    if([action isEqual:@"requestNotifications"]){
+        [self.notificationCenter requestAuthorizationWithOptions:UNAuthorizationOptionAlert completionHandler:^(BOOL allowed,NSError *error){
+            [self.notificationCenter getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings){dispatch_async(dispatch_get_main_queue(),^{reply(error?nil:@{ @"status":[self notificationStatusName:settings.authorizationStatus] },error?@"A macOS-értesítések engedélyezése nem sikerült.":nil);});}];
+        }];return;
+    }
+    [self.notificationCenter getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings){
+        if([action isEqual:@"notificationStatus"]){dispatch_async(dispatch_get_main_queue(),^{reply(@{ @"status":[self notificationStatusName:settings.authorizationStatus] },nil);});return;}
+        if(![[self notificationStatusName:settings.authorizationStatus] isEqual:@"authorized"]){dispatch_async(dispatch_get_main_queue(),^{reply(nil,@"A macOS-értesítések nincsenek engedélyezve.");});return;}
+        NSString *identifier=body[@"id"],*title=body[@"title"],*text=body[@"body"],*scope=body[@"scope"],*category=body[@"category"];
+        BOOL valid=[identifier isKindOfClass:NSString.class]&&identifier.length<=128&&identifier.length>0&&
+            [identifier rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._:-"].invertedSet].location==NSNotFound&&
+            [title isKindOfClass:NSString.class]&&title.length<=200&&[text isKindOfClass:NSString.class]&&text.length<=1500&&
+            [scope isKindOfClass:NSString.class]&&scope.length<=20&&([scope isEqual:@"personal"]||[scope rangeOfCharacterFromSet:NSCharacterSet.decimalDigitCharacterSet.invertedSet].location==NSNotFound)&&
+            [@[@"skills",@"jobs",@"pi",@"moons",@"all"] containsObject:category];
+        if(!valid){dispatch_async(dispatch_get_main_queue(),^{reply(nil,@"Hibás rendszerértesítés.");});return;}
+        UNMutableNotificationContent *content=[UNMutableNotificationContent new];content.title=title;content.body=text;
+        content.userInfo=@{ @"scope":scope,@"category":category };
+        UNNotificationRequest *request=[UNNotificationRequest requestWithIdentifier:identifier content:content trigger:nil];
+        [self.notificationCenter addNotificationRequest:request withCompletionHandler:^(NSError *error){dispatch_async(dispatch_get_main_queue(),^{reply(error?nil:@{ @"queued":@YES },error?@"A macOS nem tudta sorba állítani az értesítést.":nil);});}];
+    }];
+}
 - (BOOL)english { return [self.language isEqualToString:@"en"]; }
 - (void)menu {
     NSMenu *menu = [NSMenu new], *app = [NSMenu new], *edit = [NSMenu new], *view = [NSMenu new];
@@ -70,6 +120,13 @@ static BOOL StartService(NSString **logPath) {
 }
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     self.origin = [NSURL URLWithString:@"http://127.0.0.1:8765"]; self.language = @"hu";
+    // Bare CLI smoke tests have no application identity; the installed app does.
+    if(NSBundle.mainBundle.bundleIdentifier){self.notificationCenter=UNUserNotificationCenter.currentNotificationCenter;self.notificationCenter.delegate=self;}
+    __weak EveWindow *weakSelf=self;
+    self.notificationMonitor=[NSTimer scheduledTimerWithTimeInterval:60 repeats:YES block:^(NSTimer *timer){
+        EveWindow *app=weakSelf;
+        if(app.ready&&!app.quitting)[app.web evaluateJavaScript:@"if(typeof refreshNotifications==='function'&&!notificationSettingsBusy)void refreshNotifications()" completionHandler:nil];
+    }];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [self menu];
     self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,1320,860) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
     self.window.title = @"EVE Műhely"; self.window.minSize = NSMakeSize(900,650); self.window.delegate = self;
@@ -94,7 +151,7 @@ static BOOL StartService(NSString **logPath) {
         [self.web loadRequest:[NSURLRequest requestWithURL:self.origin]];
     }];
 }
-- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation { self.ready = [self localURL:webView.URL]; self.startupFailed=NO; }
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation { self.ready = [self localURL:webView.URL]; self.startupFailed=NO;if(self.pendingNotification)[self showNotificationTarget:self.pendingNotification]; }
 - (void)webViewWebContentProcessDidTerminate:(WKWebView *)webView { self.ready=NO;[webView reload]; }
 - (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error {
     if (error.code==NSURLErrorCancelled) return;
@@ -139,6 +196,7 @@ static BOOL StartService(NSString **logPath) {
 - (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)message replyHandler:(void (^)(id, NSString *))reply {
     if (!message.frameInfo.mainFrame || ![self localURL:message.frameInfo.request.URL] || message.webView!=self.web || ![message.body isKindOfClass:NSDictionary.class]) {reply(nil,@"Untrusted origin");return;}
     NSDictionary *body=message.body;NSString *action=body[@"action"];
+    if([@[@"notificationStatus",@"requestNotifications",@"notify"] containsObject:action]){[self notificationAction:body reply:reply];return;}
     if ([action isEqual:@"clipboard"] && [body[@"text"] isKindOfClass:NSString.class] && [body[@"text"] length]<8*1024*1024) {
         [NSPasteboard.generalPasteboard clearContents];[NSPasteboard.generalPasteboard setString:body[@"text"] forType:NSPasteboardTypeString];reply(@YES,nil);
     } else if ([action isEqual:@"save"]) [self saveFile:body reply:reply];

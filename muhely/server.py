@@ -21,7 +21,7 @@ import uuid
 import webbrowser
 
 from . import __version__
-from . import moons, extractions, moon_calendar, accounts, scheduler
+from . import moons, extractions, moon_calendar, accounts, scheduler, notifications
 from .market import Market,validate_ids as market_ids
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
@@ -50,6 +50,7 @@ class App:
         self.cookie = secrets.token_urlsafe(32)
         self.csrf = secrets.token_urlsafe(32)
         self.instance = secrets.token_urlsafe(24)
+        self.notification_sync_at = 0
         self.desktop_auth = {}
         self.desktop_auth_lock = threading.RLock()
         self.task_lock = threading.RLock()
@@ -81,13 +82,13 @@ class App:
             self.task = {'running': True, 'kind': kind, 'message': 'Frissítés folyamatban…', 'results': [], 'finished': None}
         def work():
             try:
-                if kind == 'sync':
+                if kind in ['sync','notifications']:
                     if not self.store.characters():
                         raise PlanningError('Előbb adj hozzá egy karaktert az EVE-kapcsolat oldalon.')
                     result = self.eve.sync()
                     ok = all(r['ok'] for r in result)
                     message = 'Az EVE-adatok frissítve.' if ok else 'Néhány karakter frissítése sikertelen. A részletek az EVE-kapcsolat oldalon láthatók.'
-                    if ok and result and self.store.enable_eve_after_sync():
+                    if kind=='sync' and ok and result and self.store.enable_eve_after_sync():
                         message += ' A terv most a személyes EVE-készlettel és jobkimenetekkel számol.'
                     skill_results=self.eve.sync_skills()
                     missing=sum(not r['ok'] for r in skill_results)
@@ -132,6 +133,12 @@ class App:
                 with self.task_lock:
                     self.task.update(running=False, message=message, finished=time.time(), results=[{'ok': False, 'error': message}])
         threading.Thread(target=work, daemon=True).start()
+
+    def notification_data(self):
+        with self.catalog.lock:
+            data=notifications.collect(self.store,self.catalog)
+        data.update(task=copy.deepcopy(self.task),next_sync_at=self.notification_sync_at+240)
+        return data
 
     def update_catalog(self):
         url = 'https://developers.eveonline.com/static-data/tranquility/latest.jsonl'
@@ -560,7 +567,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -580,6 +587,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(200, moon_calendar.export(self.app.store, self.app.catalog, query.get('lang', ['en'])[0]), 'text/calendar; charset=utf-8')
             if not self.authorized():
                 return self.send(403, {'error': 'Nyisd meg az alkalmazás kezdőlapját.'})
+            if path == '/api/notifications':
+                return self.send(200,self.app.notification_data())
             if path == '/api/desktop/auth':
                 with self.app.desktop_auth_lock:
                     item = self.app.desktop_auth.get(query.get('ticket',[''])[0])
@@ -757,6 +766,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200,self.app.desktop_auth_start(url) if data.get('desktop') is True else {'url':url})
             elif path == '/api/characters/remove':
                 self.app.eve.forget(integer(data.get('id'), 'Karakter', 2**53-1, 1))
+            elif path == '/api/notifications/preferences':
+                return self.send(200,notifications.save_preferences(self.app.store,data))
+            elif path == '/api/notifications/claim':
+                with self.app.task_lock:
+                    items=[] if self.app.task['running'] else notifications.claim(self.app.store,self.app.notification_data())
+                return self.send(200,{'items':items})
+            elif path == '/api/notifications/sent':
+                notifications.acknowledge(self.app.store,data.get('receipts'))
+                return self.send(200,{'ok':True})
+            elif path == '/api/notifications/sync':
+                with self.app.task_lock:
+                    now=time.time()
+                    if not self.app.task['running'] and (data.get('manual') is True or now>=self.app.notification_sync_at+240):
+                        self.app.notification_sync_at=now
+                        self.app.start_task('notifications')
+                return self.send(200,{'ok':True,'next_sync_at':self.app.notification_sync_at+240})
             elif path == '/api/sync':
                 self.app.start_task('sync')
             elif path == '/api/skills/sync':

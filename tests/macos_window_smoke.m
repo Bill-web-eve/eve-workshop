@@ -6,14 +6,18 @@ static NSString *TestOrigin, *TestOutput;
 @property NSMutableArray *savedFiles;
 @property NSString *copied;
 @property BOOL passed;
+@property NSMutableArray *testNotifications;
 @end
 @implementation WindowSmoke
 - (void)fail:(NSString *)why {fprintf(stderr,"Native window smoke failed: %s\n",why.UTF8String);exit(1);}
-- (void)startBackend:(void (^)(BOOL))completion {self.origin=[NSURL URLWithString:TestOrigin];self.savedFiles=[NSMutableArray new];completion(YES);}
+- (void)startBackend:(void (^)(BOOL))completion {self.origin=[NSURL URLWithString:TestOrigin];self.savedFiles=[NSMutableArray new];self.testNotifications=[NSMutableArray new];completion(YES);}
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task willPerformHTTPRedirection:(NSHTTPURLResponse *)response newRequest:(NSURLRequest *)request completionHandler:(void (^)(NSURLRequest *))completion {completion(nil);}
 - (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)message replyHandler:(void (^)(id,NSString *))reply {
     if (![self localURL:message.frameInfo.request.URL] || !message.frameInfo.mainFrame) {[super userContentController:controller didReceiveScriptMessage:message replyHandler:reply];return;}
     NSDictionary *body=message.body;
+    if ([body[@"action"] isEqual:@"notificationStatus"]) {reply(@{ @"status":@"authorized" },nil);return;}
+    if ([body[@"action"] isEqual:@"notify"]) {[self.testNotifications addObject:body];reply(@{ @"queued":@YES },nil);return;}
+    if ([body[@"action"] isEqual:@"requestNotifications"]) {[self fail:@"Unexpected OS permission request"];return;}
     if ([body[@"action"] isEqual:@"clipboard"]) {self.copied=body[@"text"];reply(@YES,nil);return;}
     if ([body[@"action"] isEqual:@"save"]) {[self.savedFiles addObject:body];reply(@{ @"saved":@YES },nil);return;}
     if ([body[@"action"] isEqual:@"external"]) {
@@ -45,7 +49,11 @@ static NSString *TestOrigin, *TestOutput;
     "const a=document.createElement('a');a.href='/api/moons/calendar.ics?lang=en';a.download='eve-moons.ics';document.body.append(a);a.click();await wait(100);a.remove();"
     "sessionStorage.setItem('eve-muhely-auth-return','settings:connection');const auth=await api('/api/auth/start',{});await openEveAuthorization(auth);"
     "if(view!=='settings'||settingsTab!=='connection')throw Error('Authorization return');"
-    "openSettingsTab('appearance');await wait(100);return {native:EveDesktop.active,language:EveI18n.language,theme:EveTheme.theme,characters:state.characters.length};";
+    "await refreshNotifications(false);openNotificationCenter('personal','skills');await wait(50);if(!$('.notification-table')||!$('#view-content').textContent.includes('Test Pilot 2'))throw Error('Personal notifications');"
+    "openNotificationCenter('99','jobs');await wait(50);if(!$('.notification-table')||!$('#view-content').textContent.includes('Inquisitor'))throw Error('Corp notifications');if($('#view-content').textContent.includes('Megnyitás'))throw Error('Untranslated notification action');"
+    "await api('/api/notifications/preferences',{os_enabled:true,auto_refresh:false});await refreshNotifications();await refreshNotifications();"
+    "openSettingsTab('notifications');await wait(50);if(!$('#notification-test')||document.querySelector('#view-content').textContent.includes('Értesítések'))throw Error('Notification settings/language');"
+    "$('#notification-test').click();await wait(100);return {native:EveDesktop.active,language:EveI18n.language,theme:EveTheme.theme,characters:state.characters.length};";
     [web callAsyncJavaScript:script arguments:@{} inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id result,NSError *error){
         if(error){[self fail:error.description];return;}
         if(![self.copied isEqual:@"Ferrofluid"] || self.savedFiles.count!=2){[self fail:@"Copy/export bridge"];return;}
@@ -55,6 +63,8 @@ static NSString *TestOrigin, *TestOutput;
         NSDictionary *csv=self.savedFiles[0],*ics=self.savedFiles[1];
         NSString *text=[[NSString alloc] initWithData:[[NSData alloc] initWithBase64EncodedString:csv[@"base64"] options:0] encoding:NSUTF8StringEncoding];
         if(![csv[@"filename"] isEqual:@"eve-native-test.csv"]||![text containsString:@"Ferrofluid"]||![ics[@"filename"] isEqual:@"eve-moons.ics"]){[self fail:@"Export contents"];return;}
+        if(self.testNotifications.count!=3){[self fail:[NSString stringWithFormat:@"Expected two alert groups and a test, got %lu",(unsigned long)self.testNotifications.count]];return;}
+        [self showNotificationTarget:@{ @"scope":@"99",@"category":@"jobs" }];
         [web takeSnapshotWithConfiguration:nil completionHandler:^(NSImage *image,NSError *error){
             if(error){[self fail:error.description];return;}
             NSBitmapImageRep *bitmap=[[NSBitmapImageRep alloc] initWithData:image.TIFFRepresentation];
@@ -64,7 +74,7 @@ static NSString *TestOrigin, *TestOutput;
     }];
 }
 - (void)applicationWillTerminate:(NSNotification *)notification {
-    NSDictionary *report=@{ @"native_webkit":@(self.passed),@"settings_language_and_theme":@(self.passed),@"copy":@(self.copied!=nil),@"exports":@(self.savedFiles.count),@"oauth_return":@(self.passed),@"quit_service":@YES };
+    NSDictionary *report=@{ @"native_webkit":@(self.passed),@"notification_bridge_submissions":@(self.testNotifications.count),@"notification_deep_links":@(self.passed),@"settings_language_and_theme":@(self.passed),@"copy":@(self.copied!=nil),@"exports":@(self.savedFiles.count),@"oauth_return":@(self.passed),@"quit_service":@YES };
     [[NSJSONSerialization dataWithJSONObject:report options:NSJSONWritingPrettyPrinted error:NULL] writeToFile:TestOutput atomically:YES];
 }
 @end

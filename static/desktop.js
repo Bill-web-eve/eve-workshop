@@ -58,6 +58,6 @@ globalThis.EveDesktop=(()=>{
     window.addEventListener('eve-theme-change',preferences);window.addEventListener('eve-language-change',preferences);
     document.addEventListener('DOMContentLoaded',preferences,{once:true});
   }
-  return {active,saveBlob,authorize,prepareQuit,shutdown,quit:()=>send('stopped')};
+  return {active,saveBlob,authorize,prepareQuit,shutdown,notificationStatus:()=>send('notificationStatus'),requestNotifications:()=>send('requestNotifications'),notify:content=>send('notify',content),quit:()=>send('stopped')};
 })();
 async function openEveAuthorization(auth){return EveDesktop.authorize(auth);}

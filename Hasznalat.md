@@ -329,6 +329,22 @@ A feliratkozás csak ezen a gépen működik, futó app mellett. Felhős naptár
 
 Az **ICS letöltése** egy egyszer importálható fájlt ad. Ez nem frissül automatikusan; ismételt importáláskor a naptárkliens duplikálhat eseményeket. A feliratkozás ajánlott a folyamatos frissítéshez.
 
+## Értesítések és macOS-jelzések
+
+A bal oldali **Értesítések** menü összegyűjti a nem tanuló és az 5 napon belül kiürülő sorú karaktereket, az átvehető jobokat, a leállt PI-termelést és a következő **3 napban** esedékes holdkitermeléseket. A jelzésből megnyitható a hozzá tartozó nézet. Az oldalsáv száma a megbízható aktuális jelzések számát mutatja; a kérdőjel ellenőrizendő adatot jelez.
+
+A **Személyes** fülön a személyes jobok, a karakterek tanulása és PI-bolygói látszanak. A **Corp** fülön corporationenként szűrhetők a corp jobok és a hozzájuk rendelt holdak. A corp job nem szerepel másodszor a személyes listán. A tanulás és a PI karakteradat, ezért a Személyes fülön marad. A jogosultság nélküli, lejárt vagy hibás adat külön **Ellenőrizendő adatok** jelzés, és nem küld rendszerértesítést. Az Alpha-, MCT- vagy kézi tanulásihely-beállítás miatt kizárt karakterek nem kapnak indokolatlan „Nem tanul” jelzést.
+
+Az EVE által átvehetőnek jelzett jobot és az időpont alapján várhatóan elkészült jobot külön megjelöljük. A PI-leállás dátumhoz kötött előrejelzése becslésként szerepel. Az értesítés nem vesz át jobot, nem indít termelést, és nem változtat a készleten.
+
+A **Beállítások → Értesítések** alatt válaszd a **Rendszerértesítések engedélyezése** gombot, majd hagyd jóvá a macOS kérését. A **Tesztértesítés** gombbal ellenőrizheted a megjelenést. Itt kapcsolhatod a személyes/corp és típusonkénti jelzéseket, módosíthatod a holdelőrejelzést 1–30 napra, valamint engedélyezheted az EVE-adatok 4 percenkénti háttérellenőrzését. A CCP gyorsítótárát figyelembe vesszük. Az **EVE-adatok ellenőrzése** gomb kézzel is elindítja a frissítést.
+
+A hold tulajdonosát az ESI corporation-időzítője azonosítja. Ismeretlen tulajdonosnál a hold a Személyes fülön marad, ezt felirat jelzi. A **Holdak értesítési tulajdonosa** táblázatban választhatsz automatikus, személyes vagy konkrét corporation-hozzárendelést. Ez csak az értesítési besorolást módosítja.
+
+Ugyanazt az eseményt egy aktív időszakban egyszer küldjük; az újraindítás vagy ismételt frissítés nem ismétli meg. Több egyidejű jelzést tulajdonosonként és típusonként összevonunk. A rendszerértesítésre kattintva a megfelelő fül és típus nyílik meg. A macOS Fókusz módja és értesítési beállításai módosíthatják a megjelenést.
+
+**Az alkalmazásnak futnia kell**, háttérben is működik. Bezárt alkalmazás mellett nincs új EVE-ellenőrzés és nincs új rendszerértesítés. A rendszerértesítések a helyi macOS-ablakos változatban érhetők el; a böngészős nézetben az értesítési lista használható.
+
 ## Közös beállítások
 
 A bal oldali **Settings / Beállítások** menü lenyitható, és az alábbi részeket fogja össze:
@@ -339,6 +355,7 @@ A bal oldali **Settings / Beállítások** menü lenyitható, és az alábbi ré
 - **Moon calculation settings / Holdak számítási beállításai:** finomítás, implant, kristályváltozat, üzemanyagtípus, kézi üzemanyagár és gazdasági paraméterek.
 - **Calendar sync / Naptárszinkron:** helyi naptárfeliratkozás és ICS-letöltés. A meglévő feliratkozások változatlanul működnek.
 - **Accounts and training / Accountok és tanulás:** accountcsoportok, Omega- és MCT-lejáratok, tanulási helyek.
+- **Notifications / Értesítések:** rendszerengedély, jelzéstípusok, háttérfrissítés, holdelőrejelzés és holdak értesítési tulajdonosa.
 
 A műveleti nézeteken a hozzáférési és beállítási panelek helyett rövid hivatkozások mutatnak az új helyre. Az EVE-engedélyezés után a megfelelő Beállítások lap nyílik meg. A még nem mentett értékekre lapváltáskor figyelmeztetünk.
 
