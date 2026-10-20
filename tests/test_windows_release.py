@@ -153,6 +153,26 @@ class WindowsDistributionTests(unittest.TestCase):
                 struct.pack_into('<I',data,512+16,flags);path.write_bytes(data)
                 with self.subTest(flags=flags),self.assertRaises(ValueError):pe_info(path)
 
+    def test_x64_package_preserves_loader_search_directories_without_foreign_binaries(self):
+        from tools.build_windows_release import trim_other_architectures
+        with tempfile.TemporaryDirectory() as folder:
+            packages=Path(folder)
+            for arch in ['win-arm64','win-x86','win-x64']:
+                path=packages/'webview/lib/runtimes'/arch/'native';path.mkdir(parents=True)
+                (path/'WebView2Loader.dll').write_bytes(arch.encode())
+            trim_other_architectures(packages)
+            for arch in ['win-arm64','win-x86']:
+                native=packages/'webview/lib/runtimes'/arch/'native'
+                self.assertTrue(native.is_dir());self.assertTrue((native/'README.txt').is_file())
+                self.assertFalse((native/'WebView2Loader.dll').exists())
+            self.assertTrue((packages/'webview/lib/runtimes/win-x64/native/WebView2Loader.dll').is_file())
+            archive=packages/'test.zip'
+            with zipfile.ZipFile(archive,'w') as z:
+                for path in packages.rglob('README.txt'):z.write(path,path.relative_to(packages))
+            with zipfile.ZipFile(archive) as z:
+                self.assertIn('webview/lib/runtimes/win-arm64/native/README.txt',z.namelist())
+                self.assertIn('webview/lib/runtimes/win-x86/native/README.txt',z.namelist())
+
     def test_catalog_read_connections_are_closed_for_windows_file_replacement(self):
         connect=sqlite3.connect;connections=[]
         def track(*args,**kwargs):

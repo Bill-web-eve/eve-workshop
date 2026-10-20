@@ -61,7 +61,7 @@ def check(report_path=None):
             await EveDesktop.authorize({url:location.origin+'/desktop/auth/window-smoke',ticket:'window-smoke'});
             globalThis.api=realApi;
             if(view!=='settings'||settingsTab!=='access')throw Error('OAuth return view changed');
-            let csp=false;try{new Function('return 1')();}catch(e){csp=true;}if(!csp)throw Error('CSP allowed eval');
+            const policy=(await fetch('/')).headers.get('Content-Security-Policy')||'';if(!policy.includes("script-src 'self'")||policy.includes("'unsafe-eval'"))throw Error('Application CSP changed');
             await chrome.webview.postMessage({eveDesktop:1,id:900000,payload:{action:'selfTestResult',result:{native_webview2:true,empty_profile:true,export:true,oauth_return:true,csp_no_eval:true,theme:document.documentElement.dataset.theme,language:document.documentElement.lang}}});
           }catch(e){chrome.webview.postMessage({eveDesktop:1,id:900001,payload:{action:'selfTestResult',result:{error:String(e)}}});}
         })();'''

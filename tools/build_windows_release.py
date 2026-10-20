@@ -93,6 +93,11 @@ def trim_other_architectures(packages):
                  'clr_loader/ffi/dlls/x86']:
         path=packages/name
         if path.exists():shutil.rmtree(path)
+    # pywebview enumerates all loader directories during import, including other
+    # architectures. Keep inert placeholders so ZIP extraction preserves them.
+    for arch in ['win-arm64','win-x86']:
+        native=packages/'webview/lib/runtimes'/arch/'native';native.mkdir(parents=True,exist_ok=True)
+        (native/'README.txt').write_text('Directory required by WebView2 discovery. No non-x64 binary is distributed.\n')
     for name in ['WebBrowserInterop.x86.dll','WebBrowserInterop.x64.dll']:
         (packages/'webview/lib'/name).unlink(missing_ok=True)
 
