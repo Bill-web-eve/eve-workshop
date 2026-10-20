@@ -10,7 +10,7 @@
 @property NSURL *origin;
 @property BOOL ready, quitting, stopped, startupFailed;
 @property NSString *language;
-@property NSMenuItem *settingsItem, *quitItem, *reloadItem, *editRoot, *viewRoot;
+@property NSMenuItem *settingsItem, *quitItem, *reloadItem, *editRoot, *viewRoot, *windowRoot, *minimizeItem, *zoomItem, *frontItem;
 @property NSMenu *editMenu;
 @property UNUserNotificationCenter *notificationCenter;
 @property NSTimer *notificationMonitor;
@@ -50,6 +50,10 @@ static BOOL StartService(NSString **logPath) {
 
 @implementation EveWindow
 - (BOOL)managedWeb:(WKWebView *)web {return web==self.web || [self.intelViews.allValues containsObject:web];}
+- (void)registerWindow:(NSWindow *)window {
+    window.excludedFromWindowsMenu=NO;window.tabbingMode=NSWindowTabbingModeDisallowed;
+    [NSApp addWindowsItem:window title:window.title filename:NO];
+}
 - (void)openExternalURL:(NSURL *)url {[NSWorkspace.sharedWorkspace openURL:url];}
 - (BOOL)openIntelWindow:(NSString *)kind options:(NSDictionary *)options {
     if(![@[@"map",@"chat"] containsObject:kind]||!self.ready)return NO;
@@ -67,7 +71,7 @@ static BOOL StartService(NSString **logPath) {
     WKWebViewConfiguration *config=[WKWebViewConfiguration new];config.websiteDataStore=self.web.configuration.websiteDataStore;config.processPool=self.web.configuration.processPool;
     [config.userContentController addScriptMessageHandlerWithReply:self contentWorld:WKContentWorld.pageWorld name:@"eveDesktop"];
     WKWebView *web=[[WKWebView alloc] initWithFrame:window.contentView.bounds configuration:config];web.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;web.navigationDelegate=self;web.UIDelegate=self;window.contentView=web;
-    self.intelWindows[kind]=window;self.intelViews[kind]=web;[window center];[window setFrameAutosaveName:[@"EVEWorkshopIntel-" stringByAppendingString:kind]];[window makeKeyAndOrderFront:nil];[web loadRequest:[NSURLRequest requestWithURL:url.URL]];return YES;
+    self.intelWindows[kind]=window;self.intelViews[kind]=web;[self registerWindow:window];[window center];[window setFrameAutosaveName:[@"EVEWorkshopIntel-" stringByAppendingString:kind]];[window makeKeyAndOrderFront:nil];[web loadRequest:[NSURLRequest requestWithURL:url.URL]];return YES;
 }
 - (BOOL)localURL:(NSURL *)url {
     return [url.scheme isEqualToString:@"http"] && [url.host isEqualToString:@"127.0.0.1"] &&
@@ -134,6 +138,12 @@ static BOOL StartService(NSString **logPath) {
     NSMenuItem *viewRoot = [[NSMenuItem alloc] initWithTitle:@"View" action:nil keyEquivalent:@""]; viewRoot.submenu = view; [menu addItem:viewRoot];
     self.reloadItem = [view addItemWithTitle:@"Újratöltés" action:@selector(reload:) keyEquivalent:@"r"]; self.reloadItem.target = self;
     self.editRoot=editRoot;self.viewRoot=viewRoot;self.editMenu=edit;NSApp.mainMenu = menu;
+    NSMenu *windows=[[NSMenu alloc] initWithTitle:@"Ablak"];
+    self.windowRoot=[[NSMenuItem alloc] initWithTitle:@"Ablak" action:nil keyEquivalent:@""];self.windowRoot.submenu=windows;[menu addItem:self.windowRoot];NSApp.windowsMenu=windows;
+    self.minimizeItem=[windows addItemWithTitle:@"Kis méret" action:@selector(performMiniaturize:) keyEquivalent:@"m"];
+    self.zoomItem=[windows addItemWithTitle:@"Nagyítás" action:@selector(performZoom:) keyEquivalent:@""];
+    [windows addItem:NSMenuItem.separatorItem];
+    self.frontItem=[windows addItemWithTitle:@"Összes ablak előre" action:@selector(arrangeInFront:) keyEquivalent:@""];
 }
 - (void)settings:(id)sender { [self.web evaluateJavaScript:@"openSettingsTab('appearance')" completionHandler:nil]; }
 - (void)reload:(id)sender {
@@ -158,6 +168,7 @@ static BOOL StartService(NSString **logPath) {
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [self menu];
     self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,1320,860) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
     self.window.title = @"EVE Műhely"; self.window.minSize = NSMakeSize(900,650); self.window.delegate = self;
+    [self registerWindow:self.window];
     self.window.backgroundColor = [NSColor colorWithSRGBRed:0.071 green:0.137 blue:0.192 alpha:1];
     self.window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
     [self.window center]; [self.window setFrameAutosaveName:@"EVEWorkshopMainWindow"];
@@ -237,7 +248,9 @@ static BOOL StartService(NSString **logPath) {
     else if ([action isEqual:@"preferences"]) {
         self.language=[body[@"language"] isEqual:@"en"]?@"en":@"hu";
         self.window.appearance=[NSAppearance appearanceNamed:[body[@"theme"] isEqual:@"light"]?NSAppearanceNameAqua:NSAppearanceNameDarkAqua];
-        for(NSString *key in self.intelWindows){NSWindow *window=self.intelWindows[key];window.appearance=self.window.appearance;BOOL map=[key isEqual:@"map"];window.title=[self english]?(map?@"EVE Workshop · System map":@"EVE Workshop · Intel chat"):(map?@"EVE Műhely · Rendszertérkép":@"EVE Műhely · Intelchat");}
+        for(NSString *key in self.intelWindows){NSWindow *window=self.intelWindows[key];window.appearance=self.window.appearance;BOOL map=[key isEqual:@"map"];window.title=[self english]?(map?@"EVE Workshop · System map":@"EVE Workshop · Intel chat"):(map?@"EVE Műhely · Rendszertérkép":@"EVE Műhely · Intelchat");[NSApp changeWindowsItem:window title:window.title filename:NO];}
+        self.windowRoot.title=[self english]?@"Window":@"Ablak";NSApp.windowsMenu.title=self.windowRoot.title;
+        self.minimizeItem.title=[self english]?@"Minimize":@"Kis méret";self.zoomItem.title=[self english]?@"Zoom":@"Nagyítás";self.frontItem.title=[self english]?@"Bring All to Front":@"Összes ablak előre";
         self.editRoot.title=[self english]?@"Edit":@"Szerkesztés";self.viewRoot.title=[self english]?@"View":@"Nézet";
         NSArray *labels=[self english]?@[@"Undo",@"Cut",@"Copy",@"Paste",@"Select All"]:@[@"Visszavonás",@"Kivágás",@"Másolás",@"Beillesztés",@"Összes kijelölése"];
         for(NSUInteger i=0;i<labels.count;i++)[self.editMenu itemAtIndex:i].title=labels[i];
@@ -273,6 +286,7 @@ static BOOL StartService(NSString **logPath) {
 }
 - (BOOL)windowShouldClose:(NSWindow *)window {if(window!=self.window)return YES;[NSApp terminate:nil];return NO;}
 - (void)windowWillClose:(NSNotification *)note {
+    [NSApp removeWindowsItem:note.object];
     for(NSString *key in [self.intelWindows.allKeys copy])if(self.intelWindows[key]==note.object){WKWebView *web=self.intelViews[key];[web stopLoading];[web.configuration.userContentController removeScriptMessageHandlerForName:@"eveDesktop"];web.navigationDelegate=nil;web.UIDelegate=nil;[self.intelViews removeObjectForKey:key];[self.intelWindows removeObjectForKey:key];break;}
 }
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)app hasVisibleWindows:(BOOL)visible { [self.window makeKeyAndOrderFront:nil];return YES; }

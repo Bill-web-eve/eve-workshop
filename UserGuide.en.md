@@ -474,7 +474,7 @@ Distance uses the shortest route across the full public CCP SDE stargate network
 
 ## Activity cards, ship icons and zKillboard
 
-Small cards beside reported systems show pilots, ships and the report age. Larger cards scroll internally. Ship icons use the official CCP image service. A generic “shuttle” or unrecognized ship name does not receive a guessed type ID or a fabricated type icon.
+Small cards beside reported systems show pilots, ships and the report age. Each report disappears from its card three minutes after the message timestamp; the card closes when no recent reports remain. The original messages remain in chat and report history, and the configured activity/alert lifetime is unchanged. Larger cards scroll internally. Ship icons use the official CCP image service. A generic “shuttle” or unrecognized ship name does not receive a guessed type ID or a fabricated type icon.
 
 Identified pilot names open the default browser at `https://zkillboard.com/character/<ID>/`. The example for Steve Hluskan is `https://zkillboard.com/character/359618261/`. A name inferred from text remains an inference even when ESI confirms that a character of that name exists. Names without a resolved ID are marked **ID not yet identified**, with no fabricated link.
 
@@ -487,6 +487,8 @@ A report listing multiple pilots and ships is labelled **Multiple pilots · shar
 **Open map window** opens an independent, resizable Mac window with the full region, activity cards and range highlighting. **Open intel chat window** opens a game-like feed combining all selected intel channels. Each line shows its local time, channel, reporter and message. Identified pilot names link to zKillboard; selecting a system opens or focuses the map window there.
 
 The separate map window contains only the system map, zoom controls and legend. Choose the character, region and intel options on the main Intel map page; Open map window also applies that selection to an already open map window.
+
+On Mac, the Window menu and the app icon’s Dock context menu list the individual windows. Each window can be minimized and restored independently; automatic tab grouping is disabled.
 
 The chat is **read-only** and never sends messages to EVE. Disable **Auto-scroll**, or scroll upwards, to retain your reading position. Returning to the bottom resumes following new messages. Messages are chronological, oldest first, with up to 500 entries from the last 24 hours. Unchanged rows are retained during background checks.
 

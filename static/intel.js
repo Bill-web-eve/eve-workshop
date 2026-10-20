@@ -7,6 +7,8 @@ const intelLabels={contact:'Bejelentett aktivitás',clear:'Clear · tiszta',quer
 const intelAge=at=>at==null?'–':EveI18n.t('{0} perce').replace('{0}',fmt(Math.max(0,Math.floor((Date.now()/1000-at)/60))));
 const intelSource=p=>p.source==='manual'?'Kézi referencia':p.source==='esi'?p.online===false?'ESI · offline':p.alertable?'ESI · élő helyzet':'ESI · korábbi adat':p.source==='local'?'Local napló · utolsó ismert hely':'Nincs helyzetadat';
 const intelPilotUrl=p=>Number.isSafeInteger(p.id)&&p.id>0?'https://zkillboard.com/character/'+p.id+'/':null;
+const intelCardLifetime=180000;
+let intelCardTimer=null;
 function intelPilotName(p){const url=intelPilotUrl(p);return url?`<a class="intel-pilot-link" data-intel-pilot href="${url}" target="_blank" rel="noopener noreferrer" data-i18n-skip>${esc(p.name)}</a>`:`<span class="intel-pilot-unresolved" data-i18n-skip>${esc(p.name)}</span><span class="intel-id-note"> · <span>Azonosító még nem ismert</span></span>`;}
 function intelShips(ships=[]){return ships.length?ships.map(s=>`<span class="intel-ship">${Number.isSafeInteger(s.type_id)&&s.type_id>0?`<img src="https://images.evetech.net/types/${s.type_id}/icon?size=32" alt="" data-intel-image loading="lazy" referrerpolicy="no-referrer">`:'<span class="intel-ship-placeholder" aria-hidden="true">◇</span>'}${verbatim(s.name)}</span>`).join(''):'<span class="muted">Nincs megadott hajó</span>';}
 async function refreshIntel(background=false){
@@ -94,9 +96,13 @@ function intelCard(node){
   return `<div xmlns="http://www.w3.org/1999/xhtml" class="intel-activity-card ${node.state==='old'?'old':''}"><div class="intel-card-header">${verbatim(node.name)}<span>${node.distance==null?'–':node.distance+'j'}</span></div><div class="intel-card-body">${rows}</div></div>`;
 }
 function drawIntelMap(){
+  clearTimeout(intelCardTimer);intelCardTimer=null;
   const target=$('#intel-map'),d=intelData;if(!target)return;
+  const now=Date.now(),visibleNodes=d.nodes.map(n=>({...n,contacts:(n.contacts||[]).filter(r=>Number.isFinite(r.timestamp)&&now>=r.timestamp*1000&&now<r.timestamp*1000+intelCardLifetime)}));
+  const expiries=visibleNodes.flatMap(n=>n.contacts.map(r=>r.timestamp*1000+intelCardLifetime));
+  if(expiries.length){const expire=()=>{if(intelMapDragging){intelCardTimer=setTimeout(expire,100);return;}drawIntelMap();};intelCardTimer=setTimeout(expire,Math.max(1,Math.ceil(Math.min(...expiries)-now)));}
   const box=target.getBoundingClientRect();intelViewportHeight=box.width>0&&box.height>0?Math.max(260,Math.min(1100,1200*box.height/box.width)):720;
-  const size={width:1200,height:intelViewportHeight},nodes=EveIntelMap.layout(d.nodes,size),byId=new Map(nodes.map(n=>[n.id,n])),cards=EveIntelMap.callouts(nodes,size);
+  const size={width:1200,height:intelViewportHeight},nodes=EveIntelMap.layout(visibleNodes,size),byId=new Map(nodes.map(n=>[n.id,n])),cards=EveIntelMap.callouts(nodes,size);
   target.innerHTML=nodes.length?`<svg viewBox="0 0 1200 ${intelViewportHeight}" role="group" aria-label="${esc(EveI18n.t('Inteltérkép'))}"><g id="intel-map-transform">${d.edges.map(([a,b])=>byId.has(a)&&byId.has(b)?`<line class="intel-gate ${byId.get(a).in_range&&byId.get(b).in_range?'in-range':''}" x1="${byId.get(a).lx}" y1="${byId.get(a).ly}" x2="${byId.get(b).lx}" y2="${byId.get(b).ly}"/>`:'').join('')}${nodes.map(n=>`<g class="intel-node ${n.state} ${n.in_range?'in-range':''} ${n.characters.length?'own':''} ${n.id===intelSelected?'selected':''}" role="button" tabindex="0" data-intel-system="${n.id}" aria-label="${esc(n.name+' · '+(n.distance==null?'–':n.distance)+' jump · '+EveI18n.t(intelLabels[n.state]))}" transform="translate(${n.lx},${n.ly})"><title>${esc([n.name,...n.characters,...n.pilots].join(' · '))}</title>${n.in_range?'<circle class="intel-range-halo" r="15"/>':''}${n.characters.length?'<circle class="intel-own-ring" r="10"/>':''}<circle class="intel-system-dot" r="5"/><text data-i18n-skip x="10" y="3">${esc(n.name)}</text>${n.distance!=null&&n.in_range?`<text class="intel-jump-label" x="10" y="15">${n.distance}j</text>`:''}</g>`).join('')}${cards.map(c=>`<line class="intel-callout-line" x1="${c.node.lx}" y1="${c.node.ly}" x2="${c.x}" y2="${c.y+18}"/><foreignObject x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}">${intelCard(c.node)}</foreignObject>`).join('')}</g></svg>`:empty('Nincs kiválasztott rendszer','Válassz karaktert vagy kattints egy intelüzenet rendszerére.');
   applyIntelTransform();const svg=target.querySelector('svg');if(!svg)return;
   let drag=null,moved=false;

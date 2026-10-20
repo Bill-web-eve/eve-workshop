@@ -490,9 +490,13 @@ Több pilóta és több hajó közös bejelentésénél az app nem állít bizto
 
 ## Külön térkép- és intelchat-ablak
 
+A térképes kártyákból a jelentések az üzenet időpontjától számított 3 perc után eltűnnek; üres kártya nem marad. Az eredeti üzenet a chatben és az előzményekben továbbra is olvasható, a beállított aktivitási és riasztási élettartam nem változik.
+
 Az **Inteltérkép** tetején a **Térkép külön ablakban** gomb önálló, átméretezhető Mac-ablakot nyit a régiótérképpel, a kártyákkal és a körzetjelöléssel. A **Intelchat külön ablakban** egy másik ablakban, játékon belüli chathez hasonló sorokban mutatja az összes kiválasztott intelcsatornát együtt. Minden sorban látszik az időpont, a csatorna, a bejelentő és az üzenet; az időpontok az alkalmazás helyi idejét követik. Az ismert pilótanevek itt is zKillboard-linkek, a rendszernévre kattintás a külön térképablakra visz.
 
 A külön térképablak csak a rendszertérképet, annak nagyítási vezérlőit és jelmagyarázatát mutatja. A karaktert, a régiót és az intelbeállításokat a fő alkalmazás Inteltérkép oldalán válaszd ki; a Térkép külön ablakban gomb a már megnyitott ablakra is alkalmazza a választást.
+
+A Mac az önálló ablakokat az Ablak menüben és a Dock appikonjára jobb kattintva is felsorolja. Az ablakok külön kis méretre tehetők és visszahozhatók; nem egyesülnek automatikusan lapokká.
 
 A chat **csak olvasható**: nem küld üzenetet a játékba. Az **Automatikus görgetés** kapcsolóval a legújabb sor követése leállítható. Felfelé görgetve az app megőrzi az olvasási helyet; az alsó szélre visszatérve a követés folytatódik. A bejegyzéseket időrendben, legrégebbitől a legújabbig mutatja, legfeljebb az utolsó 24 óra 500 sorával. A változatlan sorok nem épülnek újra minden ellenőrzésnél.
 

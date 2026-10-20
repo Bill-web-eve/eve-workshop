@@ -9,7 +9,7 @@ async function fixture(mode=null){
  const intel={preferences:prefs,manual_system_names:{'1':'J5A-IX'},status:{checked:1800000000,files:1,done:1},characters:[position],center:300001,universe_build:1,regions:[[10,'Test Region']],nodes:[{id:300001,name:'J5A-IX',x:0,y:0,state:'contact',characters:['Own Pilot'],pilots:['Reported Pilot'],distance:0,in_range:true,contacts:[{timestamp:1800000000,pilots:[{id:359618261,name:'Reported Pilot'}],ships:[{name:'Buzzard',type_id:11192}]}]}],edges:[],alerts:[],reports:[{id:'report',timestamp:1800000000,channel:'Test Intel',systems:[300001],system_names:['J5A-IX'],pilots:[{name:'Reported Pilot',verified:false}],state:'contact',reporter:'Reporter',message:'J5A-IX Reported Pilot <script>fake</script>',historical:true}]};
  const state={csrf:'test',version:'1.0.0',characters:[{id:1,name:'Own Pilot'}],corporations:[],production_characters:[],plans:[],jobs:[],settings:{source:'manual'},task:{running:false},sde:{buildNumber:1},recipe_count:1};
  const notifications={items:[],counts:{data:0},task:{running:false},corporations:[],moons:[],preferences:{os_enabled:false,categories:{intel:true}}};
- w.localStorage.setItem('eve-muhely-language','en');w.confirm=()=>true;
+ w.localStorage.setItem('eve-muhely-language','en');w.confirm=()=>true;w.Date.now=()=>1800000000000;
  w.fetch=async (url,opts)=>{calls.push(url);const value=url==='/api/state'?state:url==='/api/notifications'?notifications:url==='/api/intel/alerts'?{enabled:true,items:intel.alerts}:url==='/api/intel/preferences'?Object.assign(prefs,JSON.parse(opts.body)):url.startsWith('/api/intel?')?intel:url.startsWith('/api/intel/channels?')?{channels:['Test Intel','Other Intel']}:url.startsWith('/api/intel/systems?')?[{id:300002,name:'L-A5XP',region:'Test Region'}]:url==='/api/intel/claim'?{items:intel.alerts}:null;if(value===null)throw Error('Unexpected '+url);return {ok:true,json:async()=>value};};
  for(const tag of d.querySelectorAll('script[src]'))run(fs.readFileSync(path.join(root,tag.getAttribute('src')),'utf8'));
  await tick();await tick();run('error("Old production error");navigate("intel")');await tick();await tick();return {w,d,run,calls,intel,notifications};
@@ -85,4 +85,16 @@ test('detached map contains only the live system map and its navigation controls
  intel.characters[0].alertable=false;intel.reference=intel.characters[0];await run('refreshIntel(true)');
  assert(content.querySelector('.intel-map-provenance'));assert(content.querySelector('.intel-range-stale'));
  intel.nodes[0].state='clear';await run('refreshIntel(true)');assert(d.querySelector('.intel-node.clear'));
+});
+
+test('report cards expire at three minutes without a refresh, preserve reports and accept new intel',async t=>{
+ const {w,d,run,intel}=await fixture('map');t.after(()=>w.close());
+ const origin=1800000000000,timers=[];let now=origin;w.Date.now=()=>now;
+ w.setTimeout=(fn,delay)=>{timers.push({fn,delay});return timers.length;};w.clearTimeout=()=>{};
+ intel.nodes[0].contacts.push({...intel.nodes[0].contacts[0],timestamp:1800000010,pilots:[{name:'Next report'}]});
+ run('drawIntelMap()');assert.equal(timers.at(-1).delay,180000);assert(!d.querySelector('.intel-card-body').textContent.includes('Next report'));
+ now=origin+179999;run('drawIntelMap()');assert(d.querySelector('.intel-activity-card'));assert.equal(timers.at(-1).delay,1);
+ now=origin+180000;timers.at(-1).fn();assert(d.querySelector('.intel-activity-card'));assert(!d.querySelector('.intel-card-body').textContent.includes('Reported Pilot'));assert(d.querySelector('.intel-card-body').textContent.includes('Next report'));assert.equal(timers.at(-1).delay,10000);
+ now=origin+190000;timers.at(-1).fn();assert.equal(d.querySelector('.intel-activity-card'),null);assert.equal(intel.reports.length,1);assert(d.querySelector('.intel-node.contact'));
+ intel.nodes[0].contacts.push({...intel.nodes[0].contacts[0],timestamp:now/1000});run('drawIntelMap()');assert(d.querySelector('.intel-activity-card'));
 });

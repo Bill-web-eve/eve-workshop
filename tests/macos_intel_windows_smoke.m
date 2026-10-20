@@ -23,7 +23,7 @@ static NSString *PreviewOrigin,*PreviewOutput;
     [chat callAsyncJavaScript:script arguments:@{} inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id result,NSError *error){
         if(error){[self fail:[@"Chat: " stringByAppendingString:error.description]];return;}self.results[@"chat"]=result;
         [self snapshot:chat suffix:@".chat.png" done:^{
-            NSWindow *map=self.intelWindows[@"map"];[map performClose:nil];if(self.intelViews.count!=1||self.quitting){[self fail:@"Closing map stopped the application"];return;}
+            NSWindow *map=self.intelWindows[@"map"];NSString *closedTitle=map.title;[map performClose:nil];if([NSApp.windowsMenu.itemArray filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"title == %@",closedTitle]].count){[self fail:@"Closed window still in native menu"];return;}if(self.intelViews.count!=1||self.quitting){[self fail:@"Closing map stopped the application"];return;}
             [self.web callAsyncJavaScript:@"if(!(await (await fetch('/health')).json()).app)throw Error('Service stopped');EveTheme.setTheme('light');await new Promise(r=>setTimeout(r,150));if(intelWindowMode)throw Error('Main window replaced');return true;" arguments:@{} inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id result,NSError *error){
                 if(error){[self fail:error.description];return;}
                 if(![self.intelWindows[@"chat"].appearance.name isEqual:NSAppearanceNameAqua]){[self fail:@"Theme did not propagate"];return;}
@@ -42,7 +42,9 @@ static NSString *PreviewOrigin,*PreviewOutput;
 - (void)webView:(WKWebView *)web didFinishNavigation:(WKNavigation *)navigation {
     [super webView:web didFinishNavigation:navigation];if(web!=self.web)return;
     NSString *script=@"const wait=ms=>new Promise(r=>setTimeout(r,ms));for(let i=0;i<100&&(typeof state==='undefined'||!state);i++)await wait(40);EveI18n.setLanguage('en');EveTheme.setTheme('dark');navigate('intel');await refreshIntel();await EveDesktop.openIntelWindow('map',{character_id:1});await EveDesktop.openIntelWindow('chat',{character_id:1});await EveDesktop.openIntelWindow('map',{character_id:1});let rejected=false;try{await EveDesktop.openIntelWindow('bad')}catch{rejected=true}if(!rejected)throw Error('Window kind not validated');return true;";
-    [web callAsyncJavaScript:script arguments:@{} inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id result,NSError *error){if(error){[self fail:[@"Main: " stringByAppendingString:error.description]];return;}if(self.intelViews.count!=2){[self fail:@"Did not create or reuse separate windows"];return;}[self checkMap];}];
+    [web callAsyncJavaScript:script arguments:@{} inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id result,NSError *error){if(error){[self fail:[@"Main: " stringByAppendingString:error.description]];return;}if(self.intelViews.count!=2){[self fail:@"Did not create or reuse separate windows"];return;}
+        for(NSWindow *window in @[self.window,self.intelWindows[@"map"],self.intelWindows[@"chat"]]){if(window.excludedFromWindowsMenu||window.tabbingMode!=NSWindowTabbingModeDisallowed||![NSApp.windowsMenu.itemArray filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"title == %@",window.title]].count){[self fail:@"Missing native window menu entry"];return;}}
+        self.results[@"native_window_menu"]=@YES;[self checkMap];}];
 }
 @end
 int main(int argc,const char *argv[]){@autoreleasepool{
