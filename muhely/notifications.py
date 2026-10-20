@@ -63,12 +63,12 @@ def collect(store,catalog,now=None):
         alerts[key]={'id':key,'domain':domain,'category':category,'kind':kind,'subject':subject,'corporation_id':scope,
                      'scope_name':corps.get(scope,str(scope)) if scope else 'Személyes',
                      'when':when,'checked_at':checked,'reliable':reliable,**details}
-    def unknown(key,domain,subject,scope=None,checked=None):
-        add('data:'+key,domain,'data','unknown',subject,scope,checked=checked,reliable=False)
+    def unknown(key,domain,subject,scope=None,checked=None,**details):
+        add('data:'+key,domain,'data','unknown',subject,scope,checked=checked,reliable=False,**details)
     sd=skills.dashboard(store,catalog,now)
     for c in sd['characters']:
         domain='skills:'+str(c['id'])
-        if c['status']=='unknown':unknown(domain,domain,c['name'],checked=c['queue_as_of']);continue
+        if c['status']=='unknown':unknown(domain,domain,c['name'],checked=c['queue_as_of'],source_category='skills',character_id=c['id'],character_name=c['name']);continue
         observed.add(domain)
         if c['status'] in ['idle','soon']:
             add(domain+':'+c['status'],domain,'skills','training_'+c['status'],c['name'],when=c['stops_at'],checked=c['queue_as_of'],character_id=c['id'])
@@ -81,7 +81,7 @@ def collect(store,catalog,now=None):
     def jobs(rows,snapshot,domain,scope=None,char=None,error=False):
         valid=fresh(snapshot,now,error)
         if valid:observed.add(domain)
-        else:unknown(domain,domain,corps[scope] if scope else char['name'],scope,(snapshot or {}).get('fetched'))
+        else:unknown(domain,domain,corps[scope] if scope else char['name'],scope,(snapshot or {}).get('fetched'),source_category='jobs',character_id=(char or {}).get('id'),character_name=(char or {}).get('name'))
         for j in rows:
             if scope is None and j['job_id'] in corporate_ids:continue
             end=stamp(j.get('end_date'));status=j.get('status')
@@ -98,13 +98,13 @@ def collect(store,catalog,now=None):
         jobs(snap['data'] if snap else [],snap,'jobs:corp:'+str(corp['id']),corp['id'],error=bool(corp['error']) or not authorized)
     pd=pi.dashboard(store,catalog,now=now)
     for c in pd['characters']:
-        if c['status']=='unknown':unknown('pi:'+str(c['id']),'pi:'+str(c['id']),c['name'],checked=c['checked_at'])
+        if c['status']=='unknown':unknown('pi:'+str(c['id']),'pi:'+str(c['id']),c['name'],checked=c['checked_at'],source_category='pi',character_id=c['id'],character_name=c['name'])
     for c in pd['colonies']:
         domain=f"pi:{c['character_id']}:{c['id']}";projection=c.get('projection') or {}
         computed=projection.get('available') and not c['cached']
         known=not c['cached'] and (c['status']!='unknown' or computed)
         if known:observed.add(domain)
-        else:unknown(domain,domain,c['name'],checked=c['checked_at'])
+        else:unknown(domain,domain,c['name'],checked=c['checked_at'],source_category='pi',character_id=c['character_id'],character_name=c['character_name'],planet_id=c['id'])
         stopped=[f for f in projection.get('factories',[]) if not f['running_now'] and not f['products_next_period']] if computed else []
         expired=[e for e in c['extractors'] if e.get('program_end') is not None and e['program_end']<=now]
         kind='pi_estimated' if stopped else 'pi_extractor' if expired and not c['cached'] else 'pi_idle' if c['status']=='alert' and not c['cached'] else None

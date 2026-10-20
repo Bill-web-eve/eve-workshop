@@ -3,6 +3,7 @@
 globalThis.EveEnglish={
   "Értesítések": "Notifications",
   "Megnyitás": "Open",
+  "Nem tanul": "Not training",
   "Tanulás": "Training",
   "Elkészült jobok": "Completed jobs",
   "PI-termelés": "PI production",

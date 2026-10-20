@@ -127,9 +127,10 @@ function notificationItem(id,corp=null,kind='job_ready'){
 }
 test('the notification hub keeps personal and corporation alerts separate from the production scope',async t=>{
  const {w,d,run,notificationFixture:n}=await setup(null);t.after(()=>w.close());
- n.items=[notificationItem(1),notificationItem(2,99)];n.corporations=[{id:99,name:'Corp A'}];n.counts.jobs=2;
+ n.items=[notificationItem(1),notificationItem(2,99),{...notificationItem(3),category:'skills',kind:'training_idle',subject:'Test Pilot'},{...notificationItem(4),category:'skills',kind:'training_soon',subject:'Test Pilot'},{...notificationItem(5),category:'pi',kind:'pi_idle',subject:'Planet'},{...notificationItem(6),category:'pi',kind:'pi_estimated',subject:'Planet'},{...notificationItem(7),category:'pi',kind:'pi_extractor',subject:'Planet'},{...notificationItem(8),category:'moons',kind:'moon_soon',subject:'Moon'}];n.corporations=[{id:99,name:'Corp A'}];n.counts.jobs=2;
  run('corporationId=99;openNotificationCenter()');await tick();
  assert.equal(d.querySelector('#page-title').textContent,'Notifications');assert(d.querySelector('[data-notification-open="job:1"]'));assert.equal(d.querySelector('[data-notification-open="job:2"]'),null);
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('#view-content').textContent));
  d.querySelector('[data-notification-scope=corporations]').click();await tick();
  assert(d.querySelector('[data-notification-open="job:2"]'));assert.equal(d.querySelector('[data-notification-open="job:1"]'),null);assert.equal(run('corporationId'),99);
  assert(!/[áéíóöőúüű]/i.test(d.querySelector('#view-content').textContent));

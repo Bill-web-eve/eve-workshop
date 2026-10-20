@@ -75,3 +75,9 @@ class NotificationTests(unittest.TestCase):
         for bad in [{'moon_days':0},{'moon_days':31},{'moon_days':True},{'os_enabled':1},{'categories':{'bad':True}},{'moon_owners':{'missing':99}}]:
             with self.assertRaises(PlanningError):n.save_preferences(self.s,bad)
         self.enable(categories={'skills':False});self.assertEqual(n.claim(self.s,self.data(),NOW),[])
+
+    def test_unknown_pi_rows_keep_the_character_and_resource_identifiable(self):
+        self.pd['characters']=[{'id':1,'name':'Pilot 1','status':'unknown','checked_at':NOW}]
+        self.pd['colonies']=[{'id':10,'name':'Planet','character_id':2,'character_name':'Pilot 2','checked_at':NOW,'cached':True,'status':'unknown','extractors':[],'last_update':NOW}]
+        rows=[a for a in self.data()['items'] if a.get('source_category')=='pi']
+        self.assertEqual({a['character_name'] for a in rows},{'Pilot 1','Pilot 2'});self.assertTrue(all(not a['reliable'] for a in rows))
