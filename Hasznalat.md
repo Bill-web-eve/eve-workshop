@@ -463,7 +463,7 @@ A friss ESI-adatból online állapot és rendszer is kell a közelségi riasztá
 A rendszer teljes rendszerneveket és egyértelmű, legalább három karakteres, számot vagy kötőjelet tartalmazó nagybetűs rövidítéseket ismer fel. A rövidítések régiója szűkíthető. A több rendszerre egyszerre utaló bizonytalan üzenetet jelöli, és nem riaszt belőle; egyértelmű nyíllal megadott útvonálnál a célrendszert használja.
 
 - `J5A-IX Pilot Name` egy rendszerhez rendelt bejelentés. A bejelentő neve külön oszlopban marad; nem kerül automatikusan a jelentett pilóták közé.
-- A karakter showinfo-hivatkozásából származó név azonosítóval rendelkezik. Szabad szövegből felismert nevet külön jelöl az app; elírás, szokatlan hajórövidítés vagy beszélgetés téves felismerést okozhat. Az eredeti üzenetet mindig ellenőrizheted, a rendszer nem kér le külső szolgáltatást a szöveg ellenőrzésére.
+- A karakter showinfo-hivatkozásából származó név azonosítóval rendelkezik. Szabad szövegből felismert nevet külön jelöl az app; elírás, szokatlan hajórövidítés vagy beszélgetés téves felismerést okozhat. Az eredeti üzenetet mindig ellenőrizheted. A felismert karakternevek pontos azonosítóját a nyilvános ESI névfeloldás ellenőrzi; a teljes üzenetszöveg nem kerül elküldésre.
 - `J5A-IX clr` és `J5A-IX clear` egyaránt tisztára jelöli a rendszert, és megszünteti az ott korábban bejelentett aktív intel közelségi jelzését.
 - `J5A-IX clr?` vagy `clear?` kérdés; nem törli a korábbi bejelentést. A „not clear” sem clear.
 - A lejárt bejelentésből nincs közelségi riasztás. Egy pilóta újabb, egyértelmű rendszerbejelentése felváltja a korábbit.
@@ -472,8 +472,26 @@ A program a különböző saját karakterek logjaiban szereplő azonos csatorna�
 
 ## Az inteltérkép használata
 
-A **Karakter** mező választja ki a követett saját karaktert. A **Térkép környezete** a megjelenített körzetet szabályozza, a riasztási távolságtól függetlenül. A **Régió** egy teljes régiót mutat; a **Karakter követése** visszatér a saját karakter környezetéhez. Mozgasd húzással a térképet, nagyíts a görgővel vagy a +/− gombokkal; a **Teljes nézet** visszaállítja a kezdeti keretezést.
+A **Karakter** mező választja ki a követett saját karaktert. A térkép alapértelmezetten a kiválasztott karakter helyének teljes régióját mutatja. A **Régió** listából másik teljes régió választható; a **Karakter követése** visszatér a saját karakter régiójához. Az 5 jumpos, illetve az Intelbeállításokban megadott más távolságon belüli rendszereket és kapukat kék kiemelés jelöli. Ez kapugráf szerinti távolság, nem geometriai kör. A rendszerek elhelyezése az olvashatósághoz igazított sematikus régiórajz; a kapukapcsolatok a CCP adatait követik. A távolság mindig a kiválasztott saját karakter helyétől számolódik, akkor is, ha egy másik rendszerre kattintasz. Korábbi Local-helyzetnél a körzet szaggatott és figyelmeztetés jelzi, hogy nincs megbízható élő pozíció. Mozgasd húzással a térképet, nagyíts a görgővel vagy a +/− gombokkal; a **Teljes nézet** visszaállítja a kezdeti keretezést.
 
 Piros jelölés: aktív bejelentés, zöld: clear, arany: bekapcsolt előzménynézetben lejárt intel. Kék gyűrű: saját karakter beolvasott vagy rögzített helye, a forrásjelzés figyelembevételével. A rendszer melletti nevek a jelentett pilóták. Kattintás vagy billentyűzetes Enter kijelöli a rendszert, alatta az eredeti bejelentések olvashatók. Az **Intelüzenetek** tábla az utolsó 24 órából legfeljebb 500 bejegyzést mutat, a közös rendezési és szűrési lehetőségekkel.
 
-A távolság a nyilvános CCP SDE teljes csillagkapu-hálózatának legrövidebb útja; Ansiblex, wormhole és cyno nem része. A térkép legfeljebb 400 rendszert rajzol, a riasztás továbbra is a teljes hálózatból számol. A nyilvános rendszer- és kapuadat a receptadatbázis frissítésével frissülhet. A chatlog szövege és az intelbeállítások a saját helyi adatprofilban maradnak, a csomagba nem kerülnek. Az app az eredeti naplókat nem módosítja. A naplóforgatást, új fájlokat, UTF-16 kódolást és félkész sorokat kezeli.
+A távolság a nyilvános CCP SDE teljes csillagkapu-hálózatának legrövidebb útja; Ansiblex, wormhole és cyno nem része. A kiválasztott régió összes rendszerét megjeleníti, az útvonal- és közelségszámítás a teljes hálózatot használja. A nyilvános rendszer- és kapuadat a receptadatbázis frissítésével frissülhet. A chatlog szövege és az intelbeállítások a saját helyi adatprofilban maradnak, a csomagba nem kerülnek. Az app az eredeti naplókat nem módosítja. A naplóforgatást, új fájlokat, UTF-16 kódolást és félkész sorokat kezeli.
+
+## Intelaktivitás-kártyák és zKillboard
+
+A bejelentett aktivitás mellett kis kártya mutatja a jelentett pilótákat, hajókat és a bejelentés korát. A nagyobb kártyák belseje görgethető. A hajó neve mellett a CCP hivatalos képszolgáltatásából származó ikon látható. Ha csak általános „shuttle” vagy ismeretlen hajónév szerepel, az app nem talál ki hajótípus-azonosítót; ilyenkor nincs konkrét típusikon.
+
+Az ismert karakterazonosítóval rendelkező pilótanév kattintható: az alapértelmezett böngészőben a `https://zkillboard.com/character/<azonosító>/` oldal nyílik meg. Steve Hluskan mintája: `https://zkillboard.com/character/359618261/`. A szabad szövegből felismert név továbbra is következtetés, akkor is, ha az ESI ilyen nevű karaktert igazolt. A még fel nem oldott nevet **Azonosító még nem ismert** jelzés kíséri; ehhez nem készül kitalált link.
+
+A háttérben csak a felismert karakternevek mennek a CCP nyilvános ESI névfeloldásához, bejelentkezési token nélkül. A teljes chatüzenet nem. A név–azonosító találatok helyben, 30 napra gyorsítótárazódnak, a nem talált nevek egy óráig nem kérődnek újra. Hálózati hiba nem állítja le a chatlogfigyelést vagy a térképet. A **Pilótaazonosítók frissítése** gomb elindítja a szükséges ellenőrzéseket, a gyorsítótár figyelembevételével. A zKillboard csak kattintáskor nyílik meg; az app nem tölt le killboard-adatokat.
+
+Több pilóta és több hajó közös bejelentésénél az app nem állít biztos pilóta–hajó párosítást. A kártyán ez **Több pilóta · közös hajójelentés** jelzést kap. A hajófelismerés a nyilvános EVE-adatokban szereplő nevekre és néhány szokásos rövidítésre épül. Az eredeti üzenet ellenőrizhető.
+
+## Külön térkép- és intelchat-ablak
+
+Az **Inteltérkép** tetején a **Térkép külön ablakban** gomb önálló, átméretezhető Mac-ablakot nyit a régiótérképpel, a kártyákkal és a körzetjelöléssel. A **Intelchat külön ablakban** egy másik ablakban, játékon belüli chathez hasonló sorokban mutatja az összes kiválasztott intelcsatornát együtt. Minden sorban látszik az időpont, a csatorna, a bejelentő és az üzenet; az időpontok az alkalmazás helyi idejét követik. Az ismert pilótanevek itt is zKillboard-linkek, a rendszernévre kattintás a külön térképablakra visz.
+
+A chat **csak olvasható**: nem küld üzenetet a játékba. Az **Automatikus görgetés** kapcsolóval a legújabb sor követése leállítható. Felfelé görgetve az app megőrzi az olvasási helyet; az alsó szélre visszatérve a követés folytatódik. A bejegyzéseket időrendben, legrégebbitől a legújabbig mutatja, legfeljebb az utolsó 24 óra 500 sorával. A változatlan sorok nem épülnek újra minden ellenőrzésnél.
+
+Egy térkép- és egy chatablak lehet nyitva; az ismételt megnyitás a meglévőt hozza elő. A mellékablak bezárása nem állítja le az appot és a másik ablakot. A főablak bezárása vagy az alkalmazás kiléptetése minden ablakot és a helyi figyelést leállítja. A nyelv és a sötét/világos téma közös az ablakokban. Az OS-értesítéseket továbbra is a főablak kezeli, így a több ablak nem küld ismételt értesítést.

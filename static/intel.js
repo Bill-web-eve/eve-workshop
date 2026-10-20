@@ -1,74 +1,133 @@
 'use strict';
-let intelFingerprint=null,intelData=null,intelRequest=null,intelEnabled=null,intelAlertBusy=false,intelTick=null,intelCharacter=null,intelCenter=null,intelRegion=null,intelRadius=5,intelHistory=false,intelSelected=null,intelZoom=1,intelPan={x:0,y:0},intelMapDragging=false,intelDiscovered=[],intelSettingsDraft=null;
+const intelParams=new URLSearchParams(location.search),intelWindowMode=['map','chat'].includes(intelParams.get('intel_window'))?intelParams.get('intel_window'):null;
+if(intelWindowMode)document.documentElement.dataset.intelWindow=intelWindowMode;
+let intelFingerprint=null,intelData=null,intelRequest=null,intelEnabled=null,intelAlertBusy=false,intelTick=null,intelCharacter=Number(intelParams.get('character_id'))||null,intelCenter=Number(intelParams.get('center'))||null,intelRegion=Number(intelParams.get('region'))||null,intelHistory=intelParams.get('history')==='1',intelSelected=null,intelZoom=1,intelPan={x:0,y:0},intelMapDragging=false,intelDiscovered=[],intelChatAuto=true,intelViewportHeight=720,intelResizeObserver=null;
 const intelDate=at=>at?date(at):'–';
 const intelLabels={contact:'Bejelentett aktivitás',clear:'Clear · tiszta',query:'Kérdés',unparsed:'Nem értelmezett',old:'Lejárt intel',quiet:'Nincs friss bejelentés'};
 const intelAge=at=>at==null?'–':EveI18n.t('{0} perce').replace('{0}',fmt(Math.max(0,Math.floor((Date.now()/1000-at)/60))));
 const intelSource=p=>p.source==='manual'?'Kézi referencia':p.source==='esi'?p.online===false?'ESI · offline':p.alertable?'ESI · élő helyzet':'ESI · korábbi adat':p.source==='local'?'Local napló · utolsó ismert hely':'Nincs helyzetadat';
+const intelPilotUrl=p=>Number.isSafeInteger(p.id)&&p.id>0?'https://zkillboard.com/character/'+p.id+'/':null;
+function intelPilotName(p){const url=intelPilotUrl(p);return url?`<a class="intel-pilot-link" data-intel-pilot href="${url}" target="_blank" rel="noopener noreferrer" data-i18n-skip>${esc(p.name)}</a>`:`<span class="intel-pilot-unresolved" data-i18n-skip>${esc(p.name)}</span><span class="intel-id-note"> · <span>Azonosító még nem ismert</span></span>`;}
+function intelShips(ships=[]){return ships.length?ships.map(s=>`<span class="intel-ship">${Number.isSafeInteger(s.type_id)&&s.type_id>0?`<img src="https://images.evetech.net/types/${s.type_id}/icon?size=32" alt="" data-intel-image loading="lazy" referrerpolicy="no-referrer">`:'<span class="intel-ship-placeholder" aria-hidden="true">◇</span>'}${verbatim(s.name)}</span>`).join(''):'<span class="muted">Nincs megadott hajó</span>';}
 async function refreshIntel(background=false){
   if(intelRequest)return intelRequest;
   intelRequest=(async()=>{try{
-    const pos=intelData?.characters.find(c=>c.id===intelCharacter);const center=intelCenter||pos?.system_id;
-    intelData=await api('/api/intel?radius='+intelRadius+(center?'&center='+center:'')+(intelRegion?'&region='+intelRegion:'')+(intelHistory?'&history=1':'')+(background?'&background=1':''));intelEnabled=intelData.preferences.enabled;
-    if(intelCharacter===null&&intelData.characters.length)intelCharacter=intelData.characters[0].id;
-    const fingerprint=JSON.stringify([intelData.preferences,intelData.characters,intelData.nodes,intelData.reports,intelData.edges,intelData.status.error,intelData.status.file_errors,intelData.status.files,Math.floor(Date.now()/60000)]);
-    if((view==='intel'&&!intelMapDragging)||(view==='settings'&&settingsTab==='intel')){
+    intelData=await api('/api/intel?'+new URLSearchParams({...(intelCenter?{center:intelCenter}:{}),...(intelCharacter?{character_id:intelCharacter}:{}),...(intelRegion?{region:intelRegion}:{}),...(intelHistory?{history:'1'}:{}),...(background?{background:'1'}:{})}));intelEnabled=intelData.preferences.enabled;
+    if(!intelData.characters.some(c=>c.id===intelCharacter)&&intelData.characters.length)intelCharacter=intelData.reference?.id||intelData.characters[0].id;
+    const fingerprint=JSON.stringify([intelData.preferences,intelData.characters,intelData.nodes,intelData.reports,intelData.edges,intelData.status.error,intelData.status.file_errors,intelData.status.files,intelData.status.resolving_characters,intelData.status.names_error,Math.floor(Date.now()/60000)]);
+    if(intelWindowMode==='chat'){
+      if(!$('#intel-chat-feed'))render();else updateIntelChat();
+    }else if((view==='intel'&&!intelMapDragging)||(view==='settings'&&settingsTab==='intel')){
       if(!background||fingerprint!==intelFingerprint){render();intelFingerprint=fingerprint;}
-      else if($('#intel-watcher-time'))$('#intel-watcher-time').textContent=intelDate(intelData.status.checked);
+      else updateIntelStatus();
     }
   }catch(e){if(view==='intel'||view==='settings'&&settingsTab==='intel')error(e.message);}finally{intelRequest=null;}})();return intelRequest;
 }
+function updateIntelStatus(){if($('#intel-watcher-time'))$('#intel-watcher-time').textContent=intelDate(intelData.status.checked);}
 async function pollIntelAlerts(){
+  if(intelWindowMode){if(state&&!intelMapDragging)await refreshIntel(true);return;}
   if(!state||intelEnabled===false||intelAlertBusy)return;intelAlertBusy=true;
   try{
     const data=await api('/api/intel/alerts');intelEnabled=data.enabled;
     const badge=$('#intel-count');if(badge){badge.textContent=fmt(data.items.length);badge.hidden=!data.items.length;}
-    if(data.enabled&&EveDesktop.active&&notificationData?.preferences.os_enabled&&notificationData.preferences.categories.intel!==false){
-      const status=await EveDesktop.notificationStatus();if(status.status==='authorized')await deliverNotifications('/api/intel/claim');
-    }
+    if(data.enabled&&EveDesktop.active&&notificationData?.preferences.os_enabled&&notificationData.preferences.categories.intel!==false){const status=await EveDesktop.notificationStatus();if(status.status==='authorized')await deliverNotifications('/api/intel/claim');}
     if(view==='intel'&&!intelMapDragging&&!Object.keys(dirty).length)await refreshIntel(true);
   }catch(e){if(view==='intel')error(e.message);}finally{intelAlertBusy=false;}
 }
 function startIntelMonitor(){clearInterval(intelTick);intelTick=setInterval(()=>{if(!document.hidden)void pollIntelAlerts();},2000);void pollIntelAlerts();}
 function resetIntelMap(){intelZoom=1;intelPan={x:0,y:0};}
-function showIntelSystem(id){intelCenter=Number(id);intelRegion=null;intelSelected=Number(id);resetIntelMap();if(view!=='intel')navigate('intel');void refreshIntel();}
+function showIntelSystem(id){intelCenter=Number(id);intelRegion=null;intelSelected=Number(id);resetIntelMap();if(intelWindowMode==='chat'){void openIntelWindow('map',{center:intelCenter});return;}if(view!=='intel')navigate('intel');void refreshIntel();}
+async function openIntelWindow(kind,overrides={}){
+  try{await EveDesktop.openIntelWindow(kind,{character_id:intelCharacter||0,region:intelRegion||0,center:intelCenter||0,history:intelHistory,...overrides});}catch(e){error(e.message);}
+}
+async function applyIntelWindowOptions(options){
+  for(const key of ['character_id','region','center'])if(options[key]!==undefined){const value=Number(options[key]);if(!Number.isSafeInteger(value)||value<0)return;}
+  if(options.character_id!==undefined)intelCharacter=Number(options.character_id)||null;if(options.region!==undefined)intelRegion=Number(options.region)||null;if(options.center!==undefined){intelCenter=Number(options.center)||null;intelSelected=intelCenter;}if(options.history!==undefined)intelHistory=options.history===true;resetIntelMap();await refreshIntel();
+}
+function intelStatusBanner(){const d=intelData,p=d.preferences,s=d.status;return `<div class="banner ${s.error?'error':''}"><strong>${p.enabled?'Chatlogfigyelés bekapcsolva':'Chatlogfigyelés kikapcsolva'}</strong><span> · ${fmt(s.done||0)} / ${fmt(s.files||0)} <span>napló</span> · <span>Utolsó ellenőrzés:</span> <span id="intel-watcher-time">${intelDate(s.checked)}</span></span>${s.error?'<div>'+esc(s.error)+'</div>':''}${s.file_errors?'<p>Legalább egy naplófájl nem olvasható; ellenőrizd a mappa és a fájlok hozzáférését.</p>':''}<div data-i18n-skip>${esc(p.channels.join(' · '))}</div></div>`;}
 function renderIntel(content){
-  setHead('HELYI INTEL','Inteltérkép','Helyi chatlogok, bejelentett pilóták és csillagkapu-alapú távolságriasztás.');$('#plan-status').hidden=true;
-  actions('<button class="button compact" id="intel-refresh">Állapot frissítése</button><button class="button compact" data-open-settings="intel">Intelbeállítások</button>');$('#intel-refresh').onclick=()=>void refreshIntel();
+  if(intelWindowMode==='chat')return renderIntelChat(content);
+  setHead('HELYI INTEL','Inteltérkép','Teljes régiótérkép, jelölt jumptávolság és jelentett pilóták hajóadatokkal.');$('#plan-status').hidden=true;
+  actions(`<button class="button compact" id="intel-refresh">Állapot frissítése</button>${intelWindowMode?'':'<button class="button compact" data-intel-window="map">Térkép külön ablakban</button>'}<button class="button compact" data-intel-window="chat">Intelchat külön ablakban</button>${intelWindowMode?'':'<button class="button compact" data-open-settings="intel">Intelbeállítások</button>'}`);
+  $('#intel-refresh').onclick=()=>void refreshIntel();bindIntelLinks();
   if(!intelData){content.innerHTML=empty('Inteladatok betöltése');void refreshIntel();return;}
-  const d=intelData,p=d.preferences,current=d.characters.find(c=>c.id===intelCharacter),status=d.status;
-  content.innerHTML=`<div class="banner ${status.error?'error':''}"><strong>${p.enabled?'Chatlogfigyelés bekapcsolva':'Chatlogfigyelés kikapcsolva'}</strong><span> · ${fmt(status.done||0)} / ${fmt(status.files||0)} <span>napló</span> · <span>Utolsó ellenőrzés:</span> <span id="intel-watcher-time">${intelDate(status.checked)}</span></span>${status.error?'<div>'+esc(status.error)+'</div>':''}${status.file_errors?'<p>Legalább egy naplófájl nem olvasható; ellenőrizd a mappa és a fájlok hozzáférését.</p>':''}<div data-i18n-skip>${esc(p.channels.join(' · '))}</div></div>`;
-  if(!p.enabled)content.innerHTML+=settingsShortcut('Az intel használatához válassz mappát és csatornákat, majd kapcsold be a figyelést.','intel');
-  if(current&&!current.alertable)content.innerHTML+=settingsShortcut('A kiválasztott karakterhez nincs megbízható helyzet. Engedélyezd az ESI-helyzetet vagy válassz kézi referenciarendszert. A régi helyzet nem igazolja a jelenlegi közelséget.','intel');
+  const d=intelData,p=d.preferences,current=d.reference||d.characters.find(c=>c.id===intelCharacter);
+  content.innerHTML=intelStatusBanner();
+  if(!p.enabled)content.innerHTML+=intelWindowMode?empty('Chatlogfigyelés kikapcsolva'):settingsShortcut('Az intel használatához válassz mappát és csatornákat, majd kapcsold be a figyelést.','intel');
+  if(current&&!current.alertable)content.innerHTML+=`<div class="banner"><span>A körzet az utolsó ismert helyet mutatja; ebből nem indul élő közelségi riasztás.</span>${intelWindowMode?'':' <button class="text-button" data-open-settings="intel">Beállítások megnyitása</button>'}</div>`;
   if(d.alerts.length)content.innerHTML+=`<div class="banner intel-danger" role="alert"><strong>Közeli intel</strong>${d.alerts.map(a=>`<div>${verbatim(a.character_name)} · ${esc(fmt(a.jumps))} jump · <button class="text-button" data-intel-locate="${a.system_id}">${verbatim(a.subject)}</button></div>`).join('')}</div>`;
-  content.innerHTML+=`<div class="panel panel-body intel-toolbar"><label>Karakter<select id="intel-character">${d.characters.map(c=>`<option data-i18n-skip value="${c.id}">${esc(c.name)}</option>`).join('')}</select></label><label>Térkép környezete<select id="intel-radius">${[1,2,3,4,5,6,8,10,12].map(n=>`<option value="${n}">${n} jump</option>`).join('')}</select></label><label>Régió<select id="intel-region"><option value="">A karakter környezete</option>${d.regions.map(([id,name])=>`<option data-i18n-skip value="${id}">${esc(name)}</option>`).join('')}</select></label><label class="intel-history"><input type="checkbox" id="intel-history" ${intelHistory?'checked':''}> Korábbi intel a térképen</label><button class="button compact" id="intel-follow">Karakter követése</button></div>`;
+  content.innerHTML+=`<div class="panel panel-body intel-toolbar"><label>Karakter<select id="intel-character">${d.characters.map(c=>`<option data-i18n-skip value="${c.id}">${esc(c.name)}</option>`).join('')}</select></label><label>Régió<select id="intel-region"><option value="">A kiválasztott hely régiója</option>${d.regions.map(([id,name])=>`<option data-i18n-skip value="${id}">${esc(name)}</option>`).join('')}</select></label><label class="intel-history"><input type="checkbox" id="intel-history" ${intelHistory?'checked':''}> Korábbi intel a térképen</label><button class="button compact" id="intel-follow">Karakter követése</button><span class="intel-region-summary">${verbatim(d.region_name||'–')} · ${fmt(d.nodes.length)} <span>rendszer</span> · <strong>≤ ${p.jumps} jump</strong></span></div>`;
   if(current)content.innerHTML+=`<p class="footnote">${verbatim(current.name)} · <span>${esc(intelSource(current))}</span> · ${verbatim(current.system_name||'–')} · ${intelDate(current.as_of)} · <span>Riasztási távolság:</span> ${p.jumps} jump</p>`;
-  content.innerHTML+=panel('Rendszertérkép',`SDE ${d.universe_build}`,`<div class="intel-map-controls"><button class="button compact" id="intel-zoom-in" aria-label="Nagyítás">＋</button><button class="button compact" id="intel-zoom-out" aria-label="Kicsinyítés">−</button><button class="button compact" id="intel-fit">Teljes nézet</button><span>Húzás: mozgatás · görgetés: nagyítás</span></div><div id="intel-map" class="intel-map"></div><div class="panel-body intel-legend"><span class="intel-dot contact"></span> Bejelentett aktivitás <span class="intel-dot clear"></span> Clear · tiszta <span class="intel-dot old"></span> Lejárt intel <span class="intel-dot own"></span> Saját karakter</div>${d.clipped?'<p class="warning-text panel-body">A térkép legfeljebb 400 rendszert mutat. A riasztás a teljes csillagkapu-gráffal számol.</p>':''}<p class="footnote panel-body">A távolság a legrövidebb csillagkapu-út. Ansiblex, wormhole és cyno nincs beleszámítva. A bejelentés nem igazolja, hogy a pilóta még mindig ott van.</p>`);
-  const selected=intelSelected||d.center;const reports=d.reports.filter(r=>r.systems.includes(selected));
-  content.innerHTML+=panel('Kijelölt rendszer','',reports.length?intelReportTable(reports,'intel-selected'):empty('Nincs bejelentés a kijelölt rendszerhez'));
-  content.innerHTML+=panel('Intelüzenetek','Legfeljebb 24 óra · a bejelentő nem a jelentett pilóta',d.reports.length?intelReportTable(d.reports,'intel-feed'):empty('Még nincs feldolgozott intelüzenet','Az új üzenetek a kiválasztott csatornák naplóiból jelennek meg.'));
+  content.innerHTML+=panel('Rendszertérkép',d.region_name||'',`<div class="intel-map-controls"><button class="button compact" id="intel-zoom-in" aria-label="Nagyítás">＋</button><button class="button compact" id="intel-zoom-out" aria-label="Kicsinyítés">−</button><button class="button compact" id="intel-fit">Teljes nézet</button><button class="text-button" id="intel-resolve">Pilótaazonosítók frissítése</button><span id="intel-resolve-status">${d.status.resolving_characters?'Pilótaazonosítók ellenőrzése…':d.status.names_error||'Húzás: mozgatás · görgetés: nagyítás'}</span></div><div id="intel-map" class="intel-map ${current?.alertable?'':'intel-range-stale'}"></div><div class="panel-body intel-legend"><span class="intel-dot contact"></span> Bejelentett aktivitás <span class="intel-dot clear"></span> Clear · tiszta <span class="intel-dot old"></span> Lejárt intel <span class="intel-dot own"></span> Saját karakter <span class="intel-range-key"></span><span>Jelölt körzet:</span> ≤ ${p.jumps} jump</div><p class="footnote panel-body">A jelölés kaputávolságot mutat, nem geometriai kört. A teljes régió látható; a távolság a teljes kapuhálózaton számolódik.</p>`);
+  if(!intelWindowMode){
+    const selected=intelSelected||d.center;const reports=d.reports.filter(r=>r.systems.includes(selected));
+    content.innerHTML+=panel('Kijelölt rendszer','',reports.length?intelReportTable(reports,'intel-selected'):empty('Nincs bejelentés a kijelölt rendszerhez'));
+    content.innerHTML+=panel('Intelüzenetek','Legfeljebb 24 óra · a bejelentő nem a jelentett pilóta',d.reports.length?intelReportTable(d.reports,'intel-feed'):empty('Még nincs feldolgozott intelüzenet','Az új üzenetek a kiválasztott csatornák naplóiból jelennek meg.'));
+  }
   $('#intel-character').value=String(intelCharacter||'');$('#intel-character').onchange=e=>{intelCharacter=Number(e.target.value);intelCenter=null;intelRegion=null;resetIntelMap();void refreshIntel();};
-  $('#intel-radius').value=String(intelRadius);$('#intel-radius').onchange=e=>{intelRadius=Number(e.target.value);resetIntelMap();void refreshIntel();};
   $('#intel-region').value=intelRegion||'';$('#intel-region').onchange=e=>{intelRegion=Number(e.target.value)||null;resetIntelMap();void refreshIntel();};
   $('#intel-history').onchange=e=>{intelHistory=e.target.checked;void refreshIntel();};$('#intel-follow').onclick=()=>{intelCenter=null;intelRegion=null;resetIntelMap();void refreshIntel();};
-  $('#intel-fit').onclick=()=>{resetIntelMap();applyIntelTransform();};$('#intel-zoom-in').onclick=()=>{intelZoom=Math.min(4,intelZoom*1.25);applyIntelTransform();};$('#intel-zoom-out').onclick=()=>{intelZoom=Math.max(.25,intelZoom/1.25);applyIntelTransform();};
-  $$('[data-intel-locate]').forEach(b=>b.onclick=()=>showIntelSystem(b.dataset.intelLocate));drawIntelMap();
+  $('#intel-fit').onclick=()=>{resetIntelMap();applyIntelTransform();};$('#intel-zoom-in').onclick=()=>{intelZoom=Math.min(5,intelZoom*1.25);applyIntelTransform();};$('#intel-zoom-out').onclick=()=>{intelZoom=Math.max(.25,intelZoom/1.25);applyIntelTransform();};
+  $('#intel-resolve').onclick=async()=>{try{await api('/api/intel/characters',{});await refreshIntel();}catch(e){error(e.message);}};
+  drawIntelMap();bindIntelLinks();
+}
+function bindIntelLinks(){
+  $$('[data-intel-window]').forEach(b=>b.onclick=()=>void openIntelWindow(b.dataset.intelWindow));
+  $$('[data-intel-locate]').forEach(b=>b.onclick=()=>showIntelSystem(b.dataset.intelLocate));
+  if(EveDesktop.active)$$('[data-intel-pilot]').forEach(a=>a.onclick=e=>{e.preventDefault();void EveDesktop.openExternal(a.href).catch(e=>error(e.message));});
+  $$('img[data-intel-image]').forEach(img=>img.onerror=()=>{img.hidden=true;});
 }
 function intelReportTable(rows,key){
-  return table(['Időpont','Csatorna','Rendszer','Jelentett pilóták','Állapot','Bejelentő','Eredeti üzenet','Művelet'],rows.map(r=>`<tr><td data-sort-value="${r.timestamp}">${intelDate(r.timestamp)}<div>${intelAge(r.timestamp)}</div></td><td>${verbatim(r.channel)}</td><td>${r.system_names.map(verbatim).join(', ')}</td><td>${r.pilots.map(p=>verbatim(p.name)+(p.verified?'':' <span class="badge">Szövegből felismert</span>')).join('<br>')||'–'}</td><td><span class="badge ${r.state==='clear'?'good':r.state==='contact'?'warn':''}">${esc(intelLabels[r.state])}</span>${r.historical?'<div class="batch-note">Korábbi naplóbejegyzés</div>':''}${r.ambiguous?'<div class="batch-note">Több rendszer említve · ellenőrizd a forrást</div>':''}</td><td>${verbatim(r.reporter)}</td><td class="intel-raw" data-i18n-skip>${esc(r.message)}</td><td>${r.systems.map((sid,i)=>`<button class="text-button" data-intel-locate="${sid}">${verbatim(r.system_names[i])}</button>`).join('')}</td></tr>`),key);
+  return table(['Időpont','Csatorna','Rendszer','Jelentett pilóták','Hajók','Állapot','Bejelentő','Eredeti üzenet','Művelet'],rows.map(r=>`<tr><td data-sort-value="${r.timestamp}">${intelDate(r.timestamp)}<div>${intelAge(r.timestamp)}</div></td><td>${verbatim(r.channel)}</td><td>${r.system_names.map(verbatim).join(', ')}</td><td>${r.pilots.map(p=>intelPilotName(p)+(p.verified?'':' <span class="badge">Szövegből felismert</span>')).join('<br>')||'–'}</td><td>${intelShips(r.ships)}</td><td><span class="badge ${r.state==='clear'?'good':r.state==='contact'?'warn':''}">${esc(intelLabels[r.state])}</span>${r.historical?'<div class="batch-note">Korábbi naplóbejegyzés</div>':''}${r.ambiguous?'<div class="batch-note">Több rendszer említve · ellenőrizd a forrást</div>':''}</td><td>${verbatim(r.reporter)}</td><td class="intel-raw" data-i18n-skip>${esc(r.message)}</td><td>${r.systems.map((sid,i)=>`<button class="text-button" data-intel-locate="${sid}">${verbatim(r.system_names[i])}</button>`).join('')}</td></tr>`),key);
 }
 function applyIntelTransform(){const group=$('#intel-map-transform');if(group)group.setAttribute('transform',`translate(${intelPan.x} ${intelPan.y}) scale(${intelZoom})`);}
+function intelCard(node){
+  const contacts=node.contacts||[],rows=contacts.map(r=>`<div class="intel-card-report"><div>${r.pilots.length?r.pilots.map(intelPilotName).join('<br>'):'<span>Nem megnevezett pilóta</span>'}</div><div class="intel-card-ships">${intelShips(r.ships)}</div>${r.pilots.length>1&&(r.ships||[]).length?'<small>Több pilóta · közös hajójelentés</small>':''}<small>${intelAge(r.timestamp)}${r.ambiguous?' · <span>Bizonytalan helyszín</span>':''}</small></div>`).join('');
+  return `<div xmlns="http://www.w3.org/1999/xhtml" class="intel-activity-card ${node.state==='old'?'old':''}"><div class="intel-card-header">${verbatim(node.name)}<span>${node.distance==null?'–':node.distance+'j'}</span></div><div class="intel-card-body">${rows}</div></div>`;
+}
 function drawIntelMap(){
   const target=$('#intel-map'),d=intelData;if(!target)return;
-  const nodes=EveIntelMap.layout(d.nodes),byId=new Map(nodes.map(n=>[n.id,n]));
-  target.innerHTML=nodes.length?`<svg viewBox="0 0 1200 720" role="group" aria-label="${esc(EveI18n.t('Inteltérkép'))}"><g id="intel-map-transform">${d.edges.map(([a,b])=>byId.has(a)&&byId.has(b)?`<line class="intel-gate" x1="${byId.get(a).lx}" y1="${byId.get(a).ly}" x2="${byId.get(b).lx}" y2="${byId.get(b).ly}"/>`:'').join('')}${nodes.map(n=>`<g class="intel-node ${n.state} ${n.characters.length?'own':''} ${n.id===intelSelected?'selected':''}" role="button" tabindex="0" data-intel-system="${n.id}" aria-label="${esc(n.name+' · '+n.distance+' jump · '+EveI18n.t(intelLabels[n.state]))}" transform="translate(${n.lx},${n.ly})"><title>${esc([n.name,...n.characters,...n.pilots].join(' · '))}</title>${n.characters.length?'<circle class="intel-own-ring" r="11"/>':''}<circle r="6"/><text data-i18n-skip x="10" y="3">${esc(n.name)}</text>${n.pilots.length?`<text class="intel-pilot-label" data-i18n-skip x="10" y="17">${esc(n.pilots.slice(0,2).join(', '))}${n.pilots.length>2?' +'+(n.pilots.length-2):''}</text>`:''}</g>`).join('')}</g></svg>`:empty('Nincs kiválasztott rendszer','Válassz karaktert vagy kattints egy intelüzenet rendszerére.');
+  const box=target.getBoundingClientRect();intelViewportHeight=box.width>0&&box.height>0?Math.max(260,Math.min(1100,1200*box.height/box.width)):720;
+  const size={width:1200,height:intelViewportHeight},nodes=EveIntelMap.layout(d.nodes,size),byId=new Map(nodes.map(n=>[n.id,n])),cards=EveIntelMap.callouts(nodes,size);
+  target.innerHTML=nodes.length?`<svg viewBox="0 0 1200 ${intelViewportHeight}" role="group" aria-label="${esc(EveI18n.t('Inteltérkép'))}"><g id="intel-map-transform">${d.edges.map(([a,b])=>byId.has(a)&&byId.has(b)?`<line class="intel-gate ${byId.get(a).in_range&&byId.get(b).in_range?'in-range':''}" x1="${byId.get(a).lx}" y1="${byId.get(a).ly}" x2="${byId.get(b).lx}" y2="${byId.get(b).ly}"/>`:'').join('')}${nodes.map(n=>`<g class="intel-node ${n.state} ${n.in_range?'in-range':''} ${n.characters.length?'own':''} ${n.id===intelSelected?'selected':''}" role="button" tabindex="0" data-intel-system="${n.id}" aria-label="${esc(n.name+' · '+(n.distance==null?'–':n.distance)+' jump · '+EveI18n.t(intelLabels[n.state]))}" transform="translate(${n.lx},${n.ly})"><title>${esc([n.name,...n.characters,...n.pilots].join(' · '))}</title>${n.in_range?'<circle class="intel-range-halo" r="15"/>':''}${n.characters.length?'<circle class="intel-own-ring" r="10"/>':''}<circle class="intel-system-dot" r="5"/><text data-i18n-skip x="10" y="3">${esc(n.name)}</text>${n.distance!=null&&n.in_range?`<text class="intel-jump-label" x="10" y="15">${n.distance}j</text>`:''}</g>`).join('')}${cards.map(c=>`<line class="intel-callout-line" x1="${c.node.lx}" y1="${c.node.ly}" x2="${c.x}" y2="${c.y+18}"/><foreignObject x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}">${intelCard(c.node)}</foreignObject>`).join('')}</g></svg>`:empty('Nincs kiválasztott rendszer','Válassz karaktert vagy kattints egy intelüzenet rendszerére.');
   applyIntelTransform();const svg=target.querySelector('svg');if(!svg)return;
   let drag=null,moved=false;
-  svg.onpointerdown=e=>{if(e.button!==0)return;drag={x:e.clientX,y:e.clientY,px:intelPan.x,py:intelPan.y,node:e.target.closest('[data-intel-system]')};moved=false;intelMapDragging=true;svg.setPointerCapture?.(e.pointerId);};
-  svg.onpointermove=e=>{if(!drag)return;const scale=1200/svg.getBoundingClientRect().width,dx=(e.clientX-drag.x)*scale,dy=(e.clientY-drag.y)*scale;if(Math.abs(dx)+Math.abs(dy)>4)moved=true;intelPan={x:drag.px+dx,y:drag.py+dy};applyIntelTransform();};
+  svg.onpointerdown=e=>{if(e.button!==0||e.target.closest('.intel-activity-card'))return;drag={x:e.clientX,y:e.clientY,px:intelPan.x,py:intelPan.y,node:e.target.closest('[data-intel-system]')};moved=false;intelMapDragging=true;svg.setPointerCapture?.(e.pointerId);};
+  svg.onpointermove=e=>{if(!drag)return;const rect=svg.getBoundingClientRect(),scale=Math.max(1200/rect.width,intelViewportHeight/rect.height),dx=(e.clientX-drag.x)*scale,dy=(e.clientY-drag.y)*scale;if(Math.abs(dx)+Math.abs(dy)>4)moved=true;intelPan={x:drag.px+dx,y:drag.py+dy};applyIntelTransform();};
   svg.onpointerup=e=>{const node=drag?.node;drag=null;intelMapDragging=false;svg.releasePointerCapture?.(e.pointerId);if(!moved&&node){intelSelected=Number(node.dataset.intelSystem);render();}};svg.onpointercancel=()=>{drag=null;intelMapDragging=false;};
-  svg.addEventListener('wheel',e=>{e.preventDefault();const old=intelZoom;intelZoom=Math.max(.25,Math.min(4,intelZoom*(e.deltaY<0?1.12:1/1.12)));const rect=svg.getBoundingClientRect(),x=(e.clientX-rect.left)*1200/rect.width,y=(e.clientY-rect.top)*720/rect.height;intelPan={x:x-(x-intelPan.x)*intelZoom/old,y:y-(y-intelPan.y)*intelZoom/old};applyIntelTransform();},{passive:false});
-  $$('[data-intel-system]').forEach(node=>{const select=()=>{intelSelected=Number(node.dataset.intelSystem);render();};node.onkeydown=e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();select();}};});
+  svg.addEventListener('wheel',e=>{if(e.target.closest('.intel-activity-card'))return;e.preventDefault();const old=intelZoom;intelZoom=Math.max(.25,Math.min(5,intelZoom*(e.deltaY<0?1.12:1/1.12)));const rect=svg.getBoundingClientRect(),scale=Math.min(rect.width/1200,rect.height/intelViewportHeight),x=(e.clientX-rect.left-(rect.width-1200*scale)/2)/scale,y=(e.clientY-rect.top-(rect.height-intelViewportHeight*scale)/2)/scale;intelPan={x:x-(x-intelPan.x)*intelZoom/old,y:y-(y-intelPan.y)*intelZoom/old};applyIntelTransform();},{passive:false});
+  $$('[data-intel-system]').forEach(node=>{node.onkeydown=e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();intelSelected=Number(node.dataset.intelSystem);render();}};});
+  bindIntelLinks();intelResizeObserver?.disconnect();if(globalThis.ResizeObserver){intelResizeObserver=new ResizeObserver(entries=>{const r=entries[0]?.contentRect;if(r&&(Math.abs(r.width-box.width)>2||Math.abs(r.height-box.height)>2))drawIntelMap();});intelResizeObserver.observe(target);}
 }
+function intelChatMessage(r){
+  const text=r.message.replace(/<[^>]*>/g,''),tokens=[];
+  for(const p of r.pilots){if(intelPilotUrl(p))tokens.push({text:p.name,html:intelPilotName(p)});}
+  r.systems.forEach((id,index)=>tokens.push({text:r.system_names[index],html:`<button class="intel-chat-system" data-intel-locate="${id}">${verbatim(r.system_names[index])}</button>`}));
+  const matches=[],lower=text.toLocaleLowerCase('en');
+  for(const token of tokens){let at=0;while(token.text&&(at=lower.indexOf(token.text.toLocaleLowerCase('en'),at))!==-1){const end=at+token.text.length;if(!/[\wÀ-ž-]/.test(text[at-1]||' ')&&!/[\wÀ-ž-]/.test(text[end]||' '))matches.push({at,end,html:token.html});at=end;}}
+  matches.sort((a,b)=>a.at-b.at||b.end-a.end);let out='',last=0;for(const m of matches){if(m.at<last)continue;out+=esc(text.slice(last,m.at))+m.html;last=m.end;}return out+esc(text.slice(last));
+}
+function renderIntelChat(content){
+  setHead('HELYI INTEL','Összevont intelchat','A kiválasztott csatornák közös, csak olvasható üzenetfolyama.');$('#plan-status').hidden=true;
+  actions('<button class="button compact" data-intel-window="map">Térkép külön ablakban</button><button class="button compact" id="intel-refresh">Állapot frissítése</button>');$('#intel-refresh').onclick=()=>void refreshIntel();bindIntelLinks();
+  if(!intelData){content.innerHTML=empty('Inteladatok betöltése');void refreshIntel();return;}
+  content.innerHTML=`<div class="intel-chat-toolbar"><div data-i18n-skip>${esc(intelData.preferences.channels.join(' · '))}</div><label><input id="intel-chat-auto" type="checkbox" ${intelChatAuto?'checked':''}> Automatikus görgetés</label></div><div id="intel-chat-feed" class="intel-chat-feed" role="log" aria-live="polite" aria-relevant="additions"></div><div class="intel-chat-status"><span id="intel-chat-count"></span><span id="intel-chat-state"></span> · <span>Utolsó ellenőrzés:</span> <span id="intel-watcher-time"></span></div>`;
+  $('#intel-chat-auto').onchange=e=>{intelChatAuto=e.target.checked;if(intelChatAuto){const feed=$('#intel-chat-feed');feed.scrollTop=feed.scrollHeight;}};
+  $('#intel-chat-feed').onscroll=()=>{const feed=$('#intel-chat-feed');intelChatAuto=feed.scrollHeight-feed.scrollTop-feed.clientHeight<40;$('#intel-chat-auto').checked=intelChatAuto;};updateIntelChat();
+}
+function updateIntelChat(){
+  const feed=$('#intel-chat-feed');if(!feed||!intelData)return;
+  const anchor=[...feed.children].find(r=>r.getBoundingClientRect().bottom>feed.getBoundingClientRect().top),anchorTop=anchor?.getBoundingClientRect().top;
+  const rows=[...intelData.reports].sort((a,b)=>a.timestamp-b.timestamp||a.id.localeCompare(b.id)),known=new Map([...feed.children].map(el=>[el.dataset.reportId,el])),keep=new Set(rows.map(r=>r.id));
+  for(const [id,el] of known)if(!keep.has(id))el.remove();
+  for(const r of rows){let el=known.get(r.id);const signature=JSON.stringify([r,EveI18n.language]);
+    if(!el){el=document.createElement('div');el.className='intel-chat-line '+r.state;el.dataset.reportId=r.id;feed.append(el);}
+    if(el.dataset.signature!==signature){el.dataset.signature=signature;el.innerHTML=`<time>${EveI18n.date(r.timestamp*1000,{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</time><span class="intel-chat-channel" data-i18n-skip>[${esc(r.channel)}]</span><span class="intel-chat-reporter" data-i18n-skip>${esc(r.reporter)} &gt;</span><span class="intel-chat-message" data-i18n-skip>${intelChatMessage(r)}</span>${r.ships?.length?'<span class="intel-chat-ships">'+intelShips(r.ships)+'</span>':''}`;}
+  }
+  if(intelChatAuto)feed.scrollTop=feed.scrollHeight;else if(anchor?.isConnected)feed.scrollTop+=anchor.getBoundingClientRect().top-anchorTop;
+  $('#intel-chat-count').textContent=EveI18n.t('{0} üzenet').replace('{0}',fmt(rows.length));$('#intel-chat-state').textContent=EveI18n.t(intelData.status.error||(!intelData.preferences.enabled?'Chatlogfigyelés kikapcsolva':'Chatlogfigyelés bekapcsolva'));updateIntelStatus();bindIntelLinks();
+}
+
 function bindIntelSystemInput(input){
   let timer,revision=0;const box=document.createElement('div');box.className='intel-system-results';box.hidden=true;input.after(box);
   input.oninput=()=>{input.dataset.systemId='';const rev=++revision;clearTimeout(timer);if(!input.value.trim()){box.hidden=true;return;}timer=setTimeout(async()=>{try{const rows=await api('/api/intel/systems?q='+encodeURIComponent(input.value));if(rev!==revision||!input.isConnected)return;box.innerHTML=rows.map(s=>`<button type="button" data-system-id="${s.id}">${verbatim(s.name)} <small>${verbatim(s.region)}</small></button>`).join('');box.hidden=!rows.length;box.querySelectorAll('button').forEach(b=>b.onclick=()=>{revision++;input.dataset.systemId=b.dataset.systemId;input.value=rows.find(s=>s.id===Number(b.dataset.systemId)).name;box.hidden=true;input.dispatchEvent(new Event('change',{bubbles:true}));});}catch(e){error(e.message);}},180);};

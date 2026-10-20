@@ -575,7 +575,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'no-referrer')
         self.send_header('X-Frame-Options', 'DENY')
-        self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://images.evetech.net; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         if cookie:
             self.send_header('Set-Cookie', f'eve_session={self.app.cookie}; HttpOnly; SameSite=Lax; Path=/')
         for key, value in (headers or {}).items():
@@ -627,7 +627,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/intel':
                 center=integer(int(query.get('center',['0'])[0]),'Rendszer',2**31-1,0) or None
                 radius=integer(int(query.get('radius',['5'])[0]),'Jump',12,1)
-                return self.send(200,self.app.intel.dashboard(center,radius,query.get('history',['0'])[0]=='1',region=integer(int(query.get('region',['0'])[0]),'Régió',2**31-1,0) or None))
+                return self.send(200,self.app.intel.dashboard(center,radius,query.get('history',['0'])[0]=='1',region=integer(int(query.get('region',['0'])[0]),'Régió',2**31-1,0) or None,character_id=integer(int(query.get('character_id',['0'])[0]),'Karakter',2**31-1,0) or None))
             if path == '/api/intel/channels':return self.send(200,{'channels':self.app.intel.channels(query.get('folder',[''])[0])})
             if path == '/api/intel/systems':
                 q=query.get('q',[''])[0].strip().casefold()
@@ -731,6 +731,8 @@ class Handler(BaseHTTPRequestHandler):
             query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             corporation_id=self.app.scope_id(query.get('corporation_id',[None])[0])
             if path == '/api/intel/preferences':return self.send(200,self.app.intel.configure(data))
+            elif path == '/api/intel/characters':
+                self.app.intel.request_characters();return self.send(200,{'intel':dict(self.app.intel.status)})
             elif path == '/api/intel/locations':
                 self.app.intel.request_locations();return self.send(200,{'intel':dict(self.app.intel.status)})
             elif path == '/api/intel/claim':return self.send(200,{'items':notifications.claim(self.app.store,intel.collect_alerts(self.app.store,self.app.intel.universe))})

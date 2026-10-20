@@ -16,7 +16,12 @@
 @property NSTimer *notificationMonitor;
 @property NSTimer *intelMonitor;
 @property NSDictionary *pendingNotification;
+@property NSMutableDictionary<NSString *,NSWindow *> *intelWindows;
+@property NSMutableDictionary<NSString *,WKWebView *> *intelViews;
 - (BOOL)localURL:(NSURL *)url;
+- (BOOL)managedWeb:(WKWebView *)web;
+- (BOOL)openIntelWindow:(NSString *)kind options:(NSDictionary *)options;
+- (void)openExternalURL:(NSURL *)url;
 - (void)startBackend:(void (^)(BOOL))completion;
 - (void)saveFile:(NSDictionary *)body reply:(void (^)(id, NSString *))reply;
 @end
@@ -44,6 +49,26 @@ static BOOL StartService(NSString **logPath) {
 }
 
 @implementation EveWindow
+- (BOOL)managedWeb:(WKWebView *)web {return web==self.web || [self.intelViews.allValues containsObject:web];}
+- (void)openExternalURL:(NSURL *)url {[NSWorkspace.sharedWorkspace openURL:url];}
+- (BOOL)openIntelWindow:(NSString *)kind options:(NSDictionary *)options {
+    if(![@[@"map",@"chat"] containsObject:kind]||!self.ready)return NO;
+    if(!self.intelWindows){self.intelWindows=[NSMutableDictionary new];self.intelViews=[NSMutableDictionary new];}
+    NSURLComponents *url=[NSURLComponents componentsWithURL:self.origin resolvingAgainstBaseURL:NO];
+    NSMutableArray<NSURLQueryItem *> *query=[NSMutableArray arrayWithObject:[NSURLQueryItem queryItemWithName:@"intel_window" value:kind]];
+    NSMutableDictionary *safe=[NSMutableDictionary new];
+    for(NSString *key in @[@"character_id",@"center",@"region"]){id value=options[key];if([value isKindOfClass:NSNumber.class]&&[value longLongValue]>=0&&[value longLongValue]<=INT32_MAX&&[value doubleValue]==[value longLongValue]){safe[key]=value;if([value longLongValue]>0)[query addObject:[NSURLQueryItem queryItemWithName:key value:[value stringValue]]];}}
+    safe[@"history"]=@([options[@"history"] isEqual:@YES]);if([safe[@"history"] boolValue])[query addObject:[NSURLQueryItem queryItemWithName:@"history" value:@"1"]];
+    if(self.intelWindows[kind]){[self.intelViews[kind] callAsyncJavaScript:@"if(typeof applyIntelWindowOptions==='function')await applyIntelWindowOptions(options)" arguments:@{ @"options":safe } inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:nil];[self.intelWindows[kind] makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];return YES;}
+    url.queryItems=query;
+    BOOL map=[kind isEqual:@"map"];
+    NSWindow *window=[[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,map?1280:750,map?880:680) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
+    window.title=[self english]?(map?@"EVE Workshop · System map":@"EVE Workshop · Intel chat"):(map?@"EVE Műhely · Rendszertérkép":@"EVE Műhely · Intelchat");window.minSize=NSMakeSize(map?720:440,400);window.delegate=self;window.releasedWhenClosed=NO;window.appearance=self.window.appearance;window.backgroundColor=self.window.backgroundColor;
+    WKWebViewConfiguration *config=[WKWebViewConfiguration new];config.websiteDataStore=self.web.configuration.websiteDataStore;config.processPool=self.web.configuration.processPool;
+    [config.userContentController addScriptMessageHandlerWithReply:self contentWorld:WKContentWorld.pageWorld name:@"eveDesktop"];
+    WKWebView *web=[[WKWebView alloc] initWithFrame:window.contentView.bounds configuration:config];web.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;web.navigationDelegate=self;web.UIDelegate=self;window.contentView=web;
+    self.intelWindows[kind]=window;self.intelViews[kind]=web;[window center];[window setFrameAutosaveName:[@"EVEWorkshopIntel-" stringByAppendingString:kind]];[window makeKeyAndOrderFront:nil];[web loadRequest:[NSURLRequest requestWithURL:url.URL]];return YES;
+}
 - (BOOL)localURL:(NSURL *)url {
     return [url.scheme isEqualToString:@"http"] && [url.host isEqualToString:@"127.0.0.1"] &&
         [url.port isEqual:self.origin.port] && !url.user && !url.password;
@@ -129,7 +154,7 @@ static BOOL StartService(NSString **logPath) {
         EveWindow *app=weakSelf;
         if(app.ready&&!app.quitting)[app.web evaluateJavaScript:@"if(typeof refreshNotifications==='function'&&!notificationSettingsBusy)void refreshNotifications()" completionHandler:nil];
     }];
-    self.intelMonitor=[NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer){EveWindow *app=weakSelf;if(app.ready&&!app.quitting)[app.web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts()" completionHandler:nil];}];
+    self.intelMonitor=[NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer){EveWindow *app=weakSelf;if(app.ready&&!app.quitting){[app.web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts()" completionHandler:nil];for(WKWebView *web in app.intelViews.allValues)[web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts()" completionHandler:nil];}}];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [self menu];
     self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,1320,860) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
     self.window.title = @"EVE Műhely"; self.window.minSize = NSMakeSize(900,650); self.window.delegate = self;
@@ -154,23 +179,23 @@ static BOOL StartService(NSString **logPath) {
         [self.web loadRequest:[NSURLRequest requestWithURL:self.origin]];
     }];
 }
-- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation { self.ready = [self localURL:webView.URL]; self.startupFailed=NO;if(self.pendingNotification)[self showNotificationTarget:self.pendingNotification]; }
-- (void)webViewWebContentProcessDidTerminate:(WKWebView *)webView { self.ready=NO;[webView reload]; }
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {if(webView==self.web){self.ready = [self localURL:webView.URL]; self.startupFailed=NO;if(self.pendingNotification)[self showNotificationTarget:self.pendingNotification];}}
+- (void)webViewWebContentProcessDidTerminate:(WKWebView *)webView {if(webView==self.web)self.ready=NO;[webView reload]; }
 - (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error {
     if (error.code==NSURLErrorCancelled) return;
-    self.startupFailed=YES;
+    if(webView==self.web)self.startupFailed=YES;
     NSAlert *alert=[NSAlert new];alert.messageText=@"A felület nem tölthető be / Could not load the interface";alert.informativeText=@"Indítsd újra az EVE Műhely alkalmazást / Restart EVE Workshop.";[alert runModal];
 }
 - (void)webView:(WKWebView *)web decidePolicyForNavigationAction:(WKNavigationAction *)action decisionHandler:(void (^)(WKNavigationActionPolicy))decide {
     NSURL *url=action.request.URL;
     if ([self localURL:url]) { decide(WKNavigationActionPolicyAllow); return; }
     decide(WKNavigationActionPolicyCancel);
-    if ([@[@"https",@"http",@"webcal"] containsObject:url.scheme.lowercaseString]) [NSWorkspace.sharedWorkspace openURL:url];
+    if ([@[@"https",@"http",@"webcal"] containsObject:url.scheme.lowercaseString]) [self openExternalURL:url];
 }
 - (WKWebView *)webView:(WKWebView *)web createWebViewWithConfiguration:(WKWebViewConfiguration *)config forNavigationAction:(WKNavigationAction *)action windowFeatures:(WKWindowFeatures *)features {
     NSURL *url=action.request.URL;
     if ([self localURL:url]) [self.web loadRequest:action.request];
-    else if ([@[@"https",@"http",@"webcal"] containsObject:url.scheme.lowercaseString]) [NSWorkspace.sharedWorkspace openURL:url];
+    else if ([@[@"https",@"http",@"webcal"] containsObject:url.scheme.lowercaseString]) [self openExternalURL:url];
     return nil;
 }
 - (void)webView:(WKWebView *)web runJavaScriptConfirmPanelWithMessage:(NSString *)message initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(BOOL))done {
@@ -197,8 +222,10 @@ static BOOL StartService(NSString **logPath) {
     }];
 }
 - (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)message replyHandler:(void (^)(id, NSString *))reply {
-    if (!message.frameInfo.mainFrame || ![self localURL:message.frameInfo.request.URL] || message.webView!=self.web || ![message.body isKindOfClass:NSDictionary.class]) {reply(nil,@"Untrusted origin");return;}
+    if (!message.frameInfo.mainFrame || ![self localURL:message.frameInfo.request.URL] || ![self managedWeb:message.webView] || ![message.body isKindOfClass:NSDictionary.class]) {reply(nil,@"Untrusted origin");return;}
     NSDictionary *body=message.body;NSString *action=body[@"action"];
+    if(message.webView!=self.web && ![@[@"clipboard",@"preferences",@"external",@"activate",@"openIntelWindow"] containsObject:action]){reply(nil,@"Main window action required");return;}
+    if([action isEqual:@"openIntelWindow"]){BOOL opened=[self openIntelWindow:body[@"kind"] options:[body[@"options"] isKindOfClass:NSDictionary.class]?body[@"options"]:@{}];reply(opened?@{ @"opened":@YES }:nil,opened?nil:@"Hibás intelablak.");return;}
     if([@[@"notificationStatus",@"requestNotifications",@"notify"] containsObject:action]){[self notificationAction:body reply:reply];return;}
     if ([action isEqual:@"clipboard"] && [body[@"text"] isKindOfClass:NSString.class] && [body[@"text"] length]<8*1024*1024) {
         [NSPasteboard.generalPasteboard clearContents];[NSPasteboard.generalPasteboard setString:body[@"text"] forType:NSPasteboardTypeString];reply(@YES,nil);
@@ -210,13 +237,14 @@ static BOOL StartService(NSString **logPath) {
     else if ([action isEqual:@"preferences"]) {
         self.language=[body[@"language"] isEqual:@"en"]?@"en":@"hu";
         self.window.appearance=[NSAppearance appearanceNamed:[body[@"theme"] isEqual:@"light"]?NSAppearanceNameAqua:NSAppearanceNameDarkAqua];
+        for(NSString *key in self.intelWindows){NSWindow *window=self.intelWindows[key];window.appearance=self.window.appearance;BOOL map=[key isEqual:@"map"];window.title=[self english]?(map?@"EVE Workshop · System map":@"EVE Workshop · Intel chat"):(map?@"EVE Műhely · Rendszertérkép":@"EVE Műhely · Intelchat");}
         self.editRoot.title=[self english]?@"Edit":@"Szerkesztés";self.viewRoot.title=[self english]?@"View":@"Nézet";
         NSArray *labels=[self english]?@[@"Undo",@"Cut",@"Copy",@"Paste",@"Select All"]:@[@"Visszavonás",@"Kivágás",@"Másolás",@"Beillesztés",@"Összes kijelölése"];
         for(NSUInteger i=0;i<labels.count;i++)[self.editMenu itemAtIndex:i].title=labels[i];
         self.settingsItem.title=[self english]?@"Settings…":@"Beállítások…";self.quitItem.title=[self english]?@"Quit EVE Workshop":@"EVE Műhely bezárása";self.reloadItem.title=[self english]?@"Reload":@"Újratöltés";reply(@YES,nil);
     } else if ([action isEqual:@"external"] && [body[@"url"] isKindOfClass:NSString.class]) {
         NSURL *url=[NSURL URLWithString:body[@"url"]];BOOL allowed=[url.scheme isEqual:@"https"] || ([self localURL:url] && [url.path hasPrefix:@"/desktop/auth/"]);
-        if(allowed)reply(@([NSWorkspace.sharedWorkspace openURL:url]),nil);else reply(nil,@"Blocked URL");
+        if(allowed){[self openExternalURL:url];reply(@YES,nil);}else reply(nil,@"Blocked URL");
     } else if ([action isEqual:@"activate"]) {[self.window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];reply(@YES,nil);}
     else if ([action isEqual:@"print"]) {[[self.web printOperationWithPrintInfo:NSPrintInfo.sharedPrintInfo] runOperationModalForWindow:self.window delegate:nil didRunSelector:NULL contextInfo:NULL];reply(@YES,nil);}
     else if ([action isEqual:@"quitCheck"] && self.quitting) {
@@ -243,7 +271,10 @@ static BOOL StartService(NSString **logPath) {
     [self.web evaluateJavaScript:@"void EveDesktop.prepareQuit()" completionHandler:^(id value,NSError *error){if(error){self.quitting=NO;[NSApp replyToApplicationShouldTerminate:NO];}}];
     return NSTerminateLater;
 }
-- (BOOL)windowShouldClose:(NSWindow *)window { [NSApp terminate:nil];return NO; }
+- (BOOL)windowShouldClose:(NSWindow *)window {if(window!=self.window)return YES;[NSApp terminate:nil];return NO;}
+- (void)windowWillClose:(NSNotification *)note {
+    for(NSString *key in [self.intelWindows.allKeys copy])if(self.intelWindows[key]==note.object){WKWebView *web=self.intelViews[key];[web stopLoading];[web.configuration.userContentController removeScriptMessageHandlerForName:@"eveDesktop"];web.navigationDelegate=nil;web.UIDelegate=nil;[self.intelViews removeObjectForKey:key];[self.intelWindows removeObjectForKey:key];break;}
+}
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)app hasVisibleWindows:(BOOL)visible { [self.window makeKeyAndOrderFront:nil];return YES; }
 @end
 

@@ -84,6 +84,11 @@ class ConnectionTests(unittest.TestCase):
             http.request('https://login.eveonline.com/.well-known/oauth-authorization-server')
             self.assertIsNone(http.opener.open.call_args.args[0].get_header('X-compatibility-date'))
 
+    def test_transport_can_send_public_json_name_lookup_without_a_token(self):
+        http=Transport();response=Mock();response.read.return_value=b'{"characters":[]}';response.headers={};http.opener=Mock();http.opener.open.return_value.__enter__=Mock(return_value=response);http.opener.open.return_value.__exit__=Mock(return_value=False)
+        http.request('https://esi.evetech.net/universe/ids/',json_body=['Steve Hluskan'])
+        request=http.opener.open.call_args.args[0];self.assertEqual(request.get_method(),'POST');self.assertEqual(json.loads(request.data),['Steve Hluskan']);self.assertEqual(request.get_header('Content-type'),'application/json');self.assertIsNone(request.get_header('Authorization'))
+
     def test_successful_callback_stores_only_encrypted_tokens(self):
         url=self.eve.start('browser','http://127.0.0.1:8765/callback')
         state=urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)['state'][0]

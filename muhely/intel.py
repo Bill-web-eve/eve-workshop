@@ -23,6 +23,7 @@ def schema(store):
         CREATE INDEX IF NOT EXISTS intel_report_time ON intel_reports(ts);
         CREATE TABLE IF NOT EXISTS intel_local_positions(character_id INTEGER PRIMARY KEY,data TEXT);
         CREATE TABLE IF NOT EXISTS intel_status(id INTEGER PRIMARY KEY,data TEXT);
+        CREATE TABLE IF NOT EXISTS intel_characters(name TEXT PRIMARY KEY,id INTEGER,canonical TEXT,checked REAL,retry_at REAL);
     ''')
 
 
@@ -101,7 +102,22 @@ def parse_message(line,universe,channel,channel_id,now=None,regions=()):
     pilots=list({p['name'].casefold():p for p in linked+candidates}.values())[:12] if state=='contact' else []
     count=re.search(r'(?:\+|\bspike\s+)(\d{1,5})\b',plain,re.I)
     key='\0'.join([channel_id or channel.casefold(),date,reporter,body]);identity=hashlib.sha256(key.encode()).hexdigest()
-    return {'id':identity,'timestamp':at,'channel':channel,'reporter':reporter,'message':body,'systems':ids,'pilots':pilots,'state':state,'count':min(10000,int(count[1])) if count else len(pilots) or None,'ambiguous':len(ids)>1,'abbreviated':any(short for _,_,short in mentions)}
+    return {'id':identity,'timestamp':at,'channel':channel,'reporter':reporter,'message':body,'systems':ids,'pilots':pilots,'ships':universe.reported_ships(html.unescape(re.sub('<[^>]+>','',LINK.sub(' ',body)))),'state':state,'count':min(10000,int(count[1])) if count else len(pilots) or None,'ambiguous':len(ids)>1,'abbreviated':any(short for _,_,short in mentions)}
+
+
+def enrich_reports(store,universe,reports):
+    """Resolve exact names locally from the cache; never wait for network in a map request."""
+    with store.db() as db:known={r['name']:dict(r) for r in db.execute('SELECT * FROM intel_characters WHERE id IS NOT NULL')}
+    own={c['name'].casefold():c for c in store.characters()}
+    for row in reports:
+        row['ships']=row.get('ships',universe.reported_ships(html.unescape(re.sub('<[^>]+>','',LINK.sub(' ',row['message'])))))
+        for ship in row['ships']:
+            if ship.get('type_id') is None:ship['type_id']=universe.ship_types.get(ship['name'].casefold())
+        for pilot in row['pilots']:
+            entry=known.get(pilot['name'].casefold());char=own.get(pilot['name'].casefold())
+            if not pilot.get('id') and (entry or char):pilot['id']=entry['id'] if entry else char['id'];pilot['identified']=True
+            pilot['zkill_url']=f"https://zkillboard.com/character/{pilot['id']}/" if type(pilot.get('id')) is int and pilot['id']>0 else None
+    return reports
 
 
 def selected_characters(store,p):return [c for c in store.characters() if p['character_ids'] is None or c['id'] in p['character_ids']]
@@ -175,7 +191,9 @@ def collect_alerts(store,universe=None,now=None):
 class IntelMonitor:
     def __init__(self,store,catalog,eve,universe=None):
         self.store=store;self.catalog=catalog;self.eve=eve;self.universe=universe or intel_universe.load(store)
-        self.lock=threading.RLock();self.stop_event=threading.Event();self.refresh_event=threading.Event();self.thread=None;self.headers={};self.started=time.time();self.last_locations=0;self.location_thread=None;self.closed=False
+        if catalog and isinstance(getattr(catalog,'types',None),dict):
+            self.universe.ship_types.update({t['name'].casefold():t['id'] for t in catalog.types.values() if t['name'].casefold() in self.universe.ship_names})
+        self.lock=threading.RLock();self.stop_event=threading.Event();self.refresh_event=threading.Event();self.thread=None;self.headers={};self.started=time.time();self.last_locations=0;self.location_thread=None;self.closed=False;self.names_thread=None;self.last_names=0
         self.status={'running':False,'scanning':False,'checked':None,'files':0,'done':0,'new_messages':0,'error':None,'file_errors':0}
         schema(store)
         if preferences(store)['enabled']:self.start()
@@ -196,6 +214,39 @@ class IntelMonitor:
         return p
     def request_locations(self):
         self.refresh_event.set();self._start_locations(preferences(self.store))
+    def request_characters(self):
+        with self.lock:
+            if self.names_thread and self.names_thread.is_alive() or self.closed or time.time()<self.status.get('names_retry_at',0):return
+            self.status['resolving_characters']=True;self.status['names_done']=0;self.status['names_total']=0
+            def work():
+                try:self.resolve_characters()
+                finally:
+                    with self.lock:self.status['resolving_characters']=False
+            self.names_thread=threading.Thread(target=work,daemon=True,name='EVE-intel-names');self.names_thread.start()
+    def resolve_characters(self,now=None):
+        now=time.time() if now is None else now;p=preferences(self.store);reports=read_reports(self.store,p,now)
+        own={c['name'].casefold() for c in self.store.characters()}
+        names={pilot['name'].casefold():pilot['name'] for row in reports for pilot in row['pilots'] if not pilot.get('id') and 3<=len(pilot['name'])<=64 and pilot['name'].casefold() not in own}
+        with self.store.db() as db:cache={r['name']:dict(r) for r in db.execute('SELECT * FROM intel_characters')}
+        names=[name for key,name in names.items() if key not in cache or cache[key]['retry_at']<=now]
+        with self.lock:self.status.update(names_total=len(names),names_done=0,names_error=None)
+        for start in range(0,len(names),100):
+            if self.closed:return
+            batch=names[start:start+100]
+            try:
+                result,_=self.eve.http.request(ESI+'/universe/ids/',json_body=batch)
+                if not isinstance(result,dict) or not isinstance(result.get('characters',[]),list):raise EsiError('A pilótaazonosítók most nem ellenőrizhetők.')
+                requested={name.casefold() for name in batch};found={}
+                for char in result.get('characters',[]):
+                    if isinstance(char,dict) and isinstance(char.get('name'),str) and char['name'].casefold() in requested and type(char.get('id')) is int and char['id']>0:found[char['name'].casefold()]=char
+                if self.closed:return
+                with self.store.db() as db:
+                    for name in batch:
+                        entry=found.get(name.casefold());db.execute('INSERT OR REPLACE INTO intel_characters VALUES(?,?,?,?,?)',(name.casefold(),entry['id'] if entry else None,entry['name'] if entry else name,now,now+(30*86400 if entry else 3600)))
+                with self.lock:self.status['names_done']=min(start+100,len(names))
+            except EsiError:
+                with self.lock:self.status.update(names_error='A pilótaazonosítók most nem ellenőrizhetők.',names_retry_at=now+60)
+                return
     def _start_locations(self,p):
         with self.lock:
             if self.location_thread and self.location_thread.is_alive():return
@@ -215,6 +266,8 @@ class IntelMonitor:
                 p=preferences(self.store)
                 if not p['enabled']:break
                 self.scan(p)
+                if time.time()-self.last_names>=30 or self.status['new_messages']:
+                    self.last_names=time.time();self.request_characters()
                 if time.time()-self.last_locations>=15 or self.refresh_event.is_set():
                     self.refresh_event.clear();self.last_locations=time.time();self._start_locations(p)
             except Exception as error:
@@ -324,12 +377,16 @@ class IntelMonitor:
                 parts['intel_position']={'data':{**parts['intel_location']['data'],'online':parts['intel_online']['data']['online']},'fetched':min(r['fetched'] for r in parts.values()),'expires':min(r['expires'] for r in parts.values()),'etag':None}
                 if not self.closed:self.store.save_snapshots(char['id'],parts,domain='intel_location')
             except (EsiError,ValueError) as error:self.store.resource_error(char['id'],'intel_location',str(error) if isinstance(error,EsiError) else 'Hiányos EVE-helyzetadat.',isinstance(error,AuthenticationError))
-    def dashboard(self,center=None,radius=5,history=False,now=None,region=None):
-        now=time.time() if now is None else now;p=preferences(self.store);universe=self.universe;pos=positions(self.store,universe,p,now);reports=read_reports(self.store,p,now)
+    def dashboard(self,center=None,radius=5,history=False,now=None,region=None,character_id=None):
+        now=time.time() if now is None else now;p=preferences(self.store);universe=self.universe;pos=positions(self.store,universe,p,now);reports=enrich_reports(self.store,universe,read_reports(self.store,p,now))
         active,cleared=active_state(reports,now,p['ttl_minutes']*60,{c['name'].casefold() for c in self.store.characters()})
-        if center not in universe.systems:center=next((c['system_id'] for c in pos if c['system_id'] in universe.systems),next((r['systems'][0] for r in reports if r['systems']),None))
-        distance=universe.distances(center);ids={sid for sid,s in universe.systems.items() if s['region_id']==region} if region else {sid for sid,d in distance.items() if d<=radius};clipped=len(ids)>400
-        if clipped:ids=set(sorted(ids,key=lambda sid:(distance.get(sid,float('inf')),universe.systems[sid]['name']))[:400])
+        reference=next((c for c in pos if c['id']==character_id),None) or next((c for c in pos if c['alertable']),None) or next((c for c in pos if c['system_id'] in universe.systems),None) or next(iter(pos),None)
+        origin=reference['system_id'] if reference else None
+        if center not in universe.systems:center=origin if origin in universe.systems else next((r['systems'][0] for r in reports if r['systems']),None)
+        regions={s['region_id']:s['region'] for s in universe.systems.values()}
+        if region is not None and region not in regions:raise PlanningError('Ismeretlen intelrégió.')
+        region=region or universe.systems.get(center,{}).get('region_id')
+        distance=universe.distances(origin);ids={sid for sid,s in universe.systems.items() if s['region_id']==region};clipped=False
         by_sid=defaultdict(list)
         for row in active:by_sid[row['system_id']].append(row)
         last={}
@@ -339,9 +396,10 @@ class IntelMonitor:
         for sid in ids:
             rows=by_sid[sid];recent=last.get(sid);clear=cleared.get(sid)
             pilots=sorted({p['name'] for row in rows for p in row['pilots']});state='contact' if rows else 'clear' if clear and now-clear<=min(600,p['ttl_minutes']*60) else 'old' if history and recent else 'quiet'
-            nodes.append({**universe.systems[sid],'distance':distance.get(sid),'state':state,'pilots':pilots,'reported_at':max(r['timestamp'] for r in rows) if rows else clear if state=='clear' else recent['timestamp'] if recent and state=='old' else None,'characters':[c['name'] for c in pos if c['system_id']==sid],'reports':[r['id'] for r in rows]})
+            contacts=rows or ([recent] if state=='old' and recent['state']=='contact' else [])
+            nodes.append({**universe.systems[sid],'distance':distance.get(sid),'in_range':distance.get(sid) is not None and distance[sid]<=p['jumps'],'state':state,'pilots':pilots,'contacts':[{'id':r['id'],'timestamp':r['timestamp'],'pilots':r['pilots'],'ships':r.get('ships',[]),'count':r.get('count'),'ambiguous':r['ambiguous'],'historical':r.get('historical',False)} for r in contacts],'reported_at':max(r['timestamp'] for r in rows) if rows else clear if state=='clear' else recent['timestamp'] if recent and state=='old' else None,'characters':[c['name'] for c in pos if c['system_id']==sid],'reports':[r['id'] for r in rows]})
         for report in reports:report['system_names']=[universe.systems[sid]['name'] for sid in report['systems']]
         manual_names={cid:universe.systems[sid]['name'] for cid,sid in p['manual_locations'].items() if sid in universe.systems}
         with self.lock:status=dict(self.status)
         alerts=collect_alerts(self.store,universe,now)['items']
-        return {'preferences':p,'manual_system_names':manual_names,'status':status,'characters':pos,'center':center,'nodes':nodes,'edges':[[a,b] for a,b in universe.edges if a in ids and b in ids],'reports':reports[:500],'alerts':alerts,'clipped':clipped,'universe_build':universe.build,'regions':sorted({(s['region_id'],s['region']) for s in universe.systems.values()},key=lambda r:r[1]),'calculated_at':now}
+        return {'preferences':p,'manual_system_names':manual_names,'status':status,'characters':pos,'reference':reference,'region_id':region,'region_name':regions.get(region),'center':center,'nodes':nodes,'edges':[[a,b] for a,b in universe.edges if a in ids and b in ids],'reports':reports[:500],'alerts':alerts,'clipped':clipped,'universe_build':universe.build,'regions':sorted(regions.items(),key=lambda r:r[1]),'calculated_at':now}

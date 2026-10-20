@@ -40,3 +40,8 @@ test('a rejected shutdown does not silently quit the native window',async t=>{
  w.fetch=async path=>({ok:path!=='/api/shutdown',json:async()=>({csrf:'test'})});
  await w.EveDesktop.shutdown();assert(messages.some(m=>m.action==='quitFailed'));assert(!messages.some(m=>m.action==='stopped'));
 });
+
+test('desktop windows are limited to map/chat and include only public view options',async t=>{
+ const {w,messages}=fixture();t.after(()=>w.close());await w.EveDesktop.openIntelWindow('map',{character_id:123,region:10000001});const call=messages.find(m=>m.action==='openIntelWindow');assert(call);assert.equal(call.kind,'map');
+ await assert.rejects(w.EveDesktop.openIntelWindow('settings'));
+});

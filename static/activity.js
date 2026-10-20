@@ -7,7 +7,7 @@ globalThis.EveActivity=(()=>{
   const detailText=value=>Array.isArray(value)?value.map(p=>p.raw?p.text:t(p.text,...(p.args||[]))).join(' · '):t(value);
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const labels={
-    '/api/intel':'Inteladatok betöltése','/api/intel/channels':'Intelcsatornák keresése','/api/intel/locations':'ESI-helyzetek frissítése',
+    '/api/intel/characters':'Pilótaazonosítók ellenőrzése…','/api/intel':'Inteladatok betöltése','/api/intel/channels':'Intelcsatornák keresése','/api/intel/locations':'ESI-helyzetek frissítése',
     '/api/state':'Műhelyadatok betöltése','/api/plan':'Gyártási terv számítása','/api/schedule':'Gyártás ütemezése','/api/search':'Termékkeresés',
     '/api/skills':'Skilladatok összesítése','/api/pi':'PI-adatok összesítése','/api/moons':'Holdadatok összesítése','/api/moons/systems':'Rendszerkeresés',
     '/api/prices':'Jita-árak ellenőrzése','/api/prices/refresh':'Jita-árak frissítése','/api/industry':'Ipari költségadatok ellenőrzése','/api/industry/refresh':'Ipari költségadatok frissítése','/api/industry/estimate':'Gyártási költség számítása','/api/industry/system':'Rendszerindex ellenőrzése',
@@ -94,9 +94,10 @@ globalThis.EveActivity=(()=>{
     background('industry','Ipari költségadatok frissítése',data.running,detail,{done:data.done||0,total:2},Object.keys(data.errors||{}).length?'warning':'success');if(data.running)pollSoon();
   }
   function intel(data){
+    background('intel-names','Pilótaazonosítók ellenőrzése…',!!data.resolving_characters,[part('Ellenőrizve: {0} / {1}',data.names_done||0,data.names_total||0)],data.names_total?{done:data.names_done||0,total:data.names_total}:null,data.names_error?'warning':'success');if(data.resolving_characters)pollSoon();
     background('intel','ESI-helyzetek frissítése',!!data.location_refreshing,data.location_character?[{text:data.location_character,raw:true}]:[part('Helyzetadatok ellenőrzése')]);if(data.location_refreshing)pollSoon();
   }
-  function monitoring(){return [...active.keys()].some(key=>key==='intel'||key==='market'||key==='industry'||key==='pending:task'||key.startsWith('task:'));}
+  function monitoring(){return [...active.keys()].some(key=>key==='intel-names'||key==='intel'||key==='market'||key==='industry'||key==='pending:task'||key.startsWith('task:'));}
   function pollSoon(delay=700){if(!pollTimer&&!polling)pollTimer=setTimeout(()=>{pollTimer=null;void poll();},delay);}
   async function poll(){
     if(polling)return;polling=true;

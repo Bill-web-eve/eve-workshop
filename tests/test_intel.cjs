@@ -2,11 +2,11 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {JSDOM}=require('jsdom'),layout=require('../static/intel-map.js').layout;
 const root=path.join(__dirname,'../static'),tick=()=>new Promise(r=>setImmediate(r));
-async function fixture(){
- const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://127.0.0.1:8765',runScripts:'outside-only'}),w=dom.window,d=w.document,run=s=>vm.runInContext(s,dom.getInternalVMContext()),calls=[];
+async function fixture(mode=null){
+ const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://127.0.0.1:8765'+(mode?'/?intel_window='+mode:''),runScripts:'outside-only'}),w=dom.window,d=w.document,run=s=>vm.runInContext(s,dom.getInternalVMContext()),calls=[];
  const prefs={enabled:true,folder:'/test/logs',channels:['Test Intel'],character_ids:null,manual_locations:{'1':300001},jumps:5,ttl_minutes:20,cooldown_seconds:20,region_ids:[],allow_local_alerts:false,sound:false};
  const position={id:1,name:'Own Pilot',system_id:300001,system_name:'J5A-IX',source:'manual',alertable:true};
- const intel={preferences:prefs,manual_system_names:{'1':'J5A-IX'},status:{checked:1800000000,files:1,done:1},characters:[position],center:300001,universe_build:1,regions:[[10,'Test Region']],nodes:[{id:300001,name:'J5A-IX',x:0,y:0,state:'contact',characters:['Own Pilot'],pilots:['Reported Pilot'],distance:0}],edges:[],alerts:[],reports:[{id:'report',timestamp:1800000000,channel:'Test Intel',systems:[300001],system_names:['J5A-IX'],pilots:[{name:'Reported Pilot',verified:false}],state:'contact',reporter:'Reporter',message:'J5A-IX Reported Pilot <script>fake</script>',historical:true}]};
+ const intel={preferences:prefs,manual_system_names:{'1':'J5A-IX'},status:{checked:1800000000,files:1,done:1},characters:[position],center:300001,universe_build:1,regions:[[10,'Test Region']],nodes:[{id:300001,name:'J5A-IX',x:0,y:0,state:'contact',characters:['Own Pilot'],pilots:['Reported Pilot'],distance:0,in_range:true,contacts:[{timestamp:1800000000,pilots:[{id:359618261,name:'Reported Pilot'}],ships:[{name:'Buzzard',type_id:11192}]}]}],edges:[],alerts:[],reports:[{id:'report',timestamp:1800000000,channel:'Test Intel',systems:[300001],system_names:['J5A-IX'],pilots:[{name:'Reported Pilot',verified:false}],state:'contact',reporter:'Reporter',message:'J5A-IX Reported Pilot <script>fake</script>',historical:true}]};
  const state={csrf:'test',version:'1.0.0',characters:[{id:1,name:'Own Pilot'}],corporations:[],production_characters:[],plans:[],jobs:[],settings:{source:'manual'},task:{running:false},sde:{buildNumber:1},recipe_count:1};
  const notifications={items:[],counts:{data:0},task:{running:false},corporations:[],moons:[],preferences:{os_enabled:false,categories:{intel:true}}};
  w.localStorage.setItem('eve-muhely-language','en');w.confirm=()=>true;
@@ -46,4 +46,22 @@ test('background status checks keep the map DOM stable when no intel changed',as
  const {w,d,run,intel}=await fixture();t.after(()=>w.close());const svg=d.querySelector('#intel-map svg'),table=d.querySelector('.intel-feed');
  intel.status.checked+=1;await run('refreshIntel(true)');await tick();assert.equal(d.querySelector('#intel-map svg'),svg);assert.equal(d.querySelector('.intel-feed'),table);
  intel.reports[0].state='clear';await run('refreshIntel(true)');await tick();assert.notEqual(d.querySelector('#intel-map svg'),svg);
+});
+
+test('activity cards display exact zKillboard links, ship icons and range highlighting',async t=>{
+ const {w,d}=await fixture();t.after(()=>w.close());
+ const card=d.querySelector('.intel-activity-card');assert(card);assert.equal(card.querySelector('a').href,'https://zkillboard.com/character/359618261/');assert.equal(card.querySelector('img').src,'https://images.evetech.net/types/11192/icon?size=32');
+ assert(d.querySelector('.intel-range-halo'));assert.equal(d.querySelector('#intel-radius'),null);assert(d.querySelector('[data-intel-window=map]'));assert(d.querySelector('[data-intel-window=chat]'));
+});
+test('detached chat aggregates selected channels, keeps source text safe and does not send OS alerts',async t=>{
+ const {w,d,run,intel,calls}=await fixture('chat');t.after(()=>w.close());
+ assert.equal(d.documentElement.dataset.intelWindow,'chat');assert.equal(d.querySelector('#page-title').textContent,'Combined intel chat');assert(!d.querySelector('#intel-chat-feed script'));assert.equal(d.querySelectorAll('.intel-chat-line').length,1);
+ const feed=d.querySelector('#intel-chat-feed'),first=feed.firstElementChild;await run('refreshIntel(true)');assert.equal(feed.firstElementChild,first);
+ intel.reports.push({...intel.reports[0],id:'second',channel:'Second Intel',timestamp:1800000001,pilots:[{id:359618261,name:'Steve Hluskan'}],message:'J5A-IX Steve Hluskan',ships:[{type_id:11192,name:'Buzzard'}]});await run('refreshIntel(true)');await tick();
+ assert.equal(d.querySelectorAll('.intel-chat-line').length,2);assert(feed.textContent.includes('Second Intel'));assert(feed.querySelector('a[href="https://zkillboard.com/character/359618261/"]'));assert.equal(d.querySelectorAll('#intel-chat-feed input, #intel-chat-feed textarea').length,0);assert(!calls.includes('/api/notifications/claim'));
+ d.querySelector('#intel-chat-auto').checked=false;d.querySelector('#intel-chat-auto').dispatchEvent(new w.Event('change'));await run('refreshIntel(true)');assert.equal(run('intelChatAuto'),false);
+});
+test('contact callouts stay within the viewport and avoid identical placement',()=>{
+ const nodes=[{id:1,lx:5,ly:5,contacts:[{pilots:[{name:'One'}],ships:[]}]},{id:2,lx:1195,ly:710,contacts:[{pilots:[{name:'Two'}],ships:[]}]}];
+ const cards=require('../static/intel-map.js').callouts(nodes);assert.equal(cards.length,2);assert(cards.every(c=>c.x>=0&&c.y>=0&&c.x+c.width<=1200&&c.y+c.height<=720));
 });

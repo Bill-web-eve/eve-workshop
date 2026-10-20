@@ -83,7 +83,7 @@ class Transport:
         self.opener = urllib.request.build_opener(NoRedirect())
         self.blocked_until = 0
 
-    def request(self, url, token=None, form=None, headers=None):
+    def request(self, url, token=None, form=None, headers=None, json_body=None):
         parsed = urllib.parse.urlsplit(url)
         if parsed.scheme != 'https' or parsed.hostname not in ['esi.evetech.net', 'login.eveonline.com'] or parsed.port not in [None, 443]:
             raise EsiError('Nem engedélyezett EVE-végpont.')
@@ -95,6 +95,10 @@ class Transport:
         if token:
             h['Authorization'] = 'Bearer '+token
         body = None
+        if form is not None and json_body is not None:raise EsiError('Hibás EVE-kérés.')
+        if json_body is not None:
+            body=json.dumps(json_body,ensure_ascii=False,allow_nan=False).encode('utf-8')
+            h['Content-Type']='application/json'
         if form is not None:
             body = urllib.parse.urlencode(form).encode()
             h['Content-Type'] = 'application/x-www-form-urlencoded'

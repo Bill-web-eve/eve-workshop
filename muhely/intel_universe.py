@@ -14,8 +14,9 @@ def build(archive,target,build_number=None):
         systems={r['_key']:{'id':r['_key'],'name':r['name']['en'],'region_id':r['regionID'],'region':regions.get(r['regionID'],''),'security':r.get('securityStatus',0),'x':r.get('position2D',{}).get('x',r['position']['x'])/1e16,'y':r.get('position2D',{}).get('y',-r['position']['z'])/1e16} for r in rows('mapSolarSystems.jsonl')}
         edges=sorted({tuple(sorted((r['solarSystemID'],r['destination']['solarSystemID']))) for r in rows('mapStargates.jsonl') if r['solarSystemID'] in systems and r['destination']['solarSystemID'] in systems and r['solarSystemID']!=r['destination']['solarSystemID']})
         groups={r['_key'] for r in rows('groups.jsonl') if r.get('categoryID')==6}
-        ships=sorted({r['name']['en'] for r in rows('types.jsonl') if r.get('groupID') in groups and r.get('published') and 'en' in r.get('name',{})})
-        data={'schema':1,'build':build_number,'source':'https://developers.eveonline.com/docs/services/static-data/','systems':list(systems.values()),'edges':edges,'ships':ships}
+        ship_types={r['name']['en']:r['_key'] for r in rows('types.jsonl') if r.get('groupID') in groups and r.get('published') and 'en' in r.get('name',{})}
+        ships=sorted(ship_types)
+        data={'schema':2,'build':build_number,'source':'https://developers.eveonline.com/docs/services/static-data/','systems':list(systems.values()),'edges':edges,'ships':ships,'ship_types':ship_types}
         assert len(systems)>5000 and len(edges)>5000
         p=Path(target);p.parent.mkdir(parents=True,exist_ok=True);temp=p.with_suffix('.building.json');temp.write_text(json.dumps(data,separators=(',',':'),ensure_ascii=False));temp.replace(p)
         return True
@@ -29,8 +30,19 @@ class Universe:
         for name,sid in self.names.items():
             for size in range(3,len(name)):self.prefix[name[:size]].add(sid)
         self.pattern=re.compile(r'(?<![\w-])(?:'+('|'.join(re.escape(r['name']) for r in sorted(self.systems.values(),key=lambda r:-len(r['name']))))+r')(?![\w-])',re.I)
-        ships=sorted(set(data.get('ships',[]))|{'shuttle','caracal NI','caracal navy','carcacal','loki','dscan','pod','capsule','ships','fleet','gang','neuts','neutral','neutrals','hostile','hostiles'},key=lambda s:-len(s))
+        self.ship_names={name.casefold():name for name in data.get('ships',[])}
+        self.ship_types={name.casefold():tid for name,tid in data.get('ship_types',{}).items()}
+        self.ship_aliases={'caracal ni':'Caracal Navy Issue','caracal navy':'Caracal Navy Issue','carcacal':'Caracal','carcacal ni':'Caracal Navy Issue','vni':'Vexor Navy Issue','cheeta':'Cheetah','drek':'Drekavac','hecates':'Hecate',"hecate's":'Hecate','pod':'Capsule'}
+        ships=sorted(set(data.get('ships',[]))|set(self.ship_aliases)|{'shuttle','loki','dscan','capsule','ships','fleet','gang','neuts','neutral','neutrals','hostile','hostiles'},key=lambda s:-len(s))
         self.ship_pattern=re.compile(r'(?<![\w-])(?:'+'|'.join(map(re.escape,ships))+r')(?![\w-])',re.I)
+    def reported_ships(self,text):
+        found={}
+        for match in self.ship_pattern.finditer(text):
+            key=match.group().casefold();name=self.ship_aliases.get(key) or self.ship_names.get(key)
+            if not name and key=='shuttle':name='Shuttle'
+            if not name:continue
+            tid=self.ship_types.get(name.casefold());found[name]={'name':name,'type_id':tid}
+        return list(found.values())
     def resolve(self,value):return self.names.get(value.strip().casefold())
     def mentions(self,text,regions=()):
         found=[(self.names[m.group().casefold()],m.span(),False) for m in self.pattern.finditer(text)]

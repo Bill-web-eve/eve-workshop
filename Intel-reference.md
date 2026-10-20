@@ -15,7 +15,7 @@ Ellenőrizve: 2026. október 20. Ez a dokumentum a forrásokban ténylegesen meg
 
 Ezek a fenti megoldásokból és a helyi logok formátumából levont tervezési következtetések, nem egy külső termék kötelező specifikációja.
 
-1. **Helyben maradó adat:** csak kiválasztott csatornák és saját Local-helyzet olvasása, az eredeti fájlok módosítása nélkül. Nincs feltöltött chatszöveg, webes névfeloldás vagy rejtett játékautomatizálás.
+1. **Helyben maradó adat:** csak kiválasztott csatornák és saját Local-helyzet olvasása, az eredeti fájlok módosítása nélkül. A teljes chatszöveg nem kerül feltöltésre. A felismert karakterneveket a CCP nyilvános ESI névfeloldása ellenőrizheti; a hajóikon a CCP képszolgáltatásából jön, zKillboard csak kattintáskor nyílik. Nincs rejtett játékautomatizálás.
 2. **Növekményes olvasás:** UTF-16, több karakter azonos bejelentéseinek összevonása, tartós kurzor, új fájl és forgatás, félkész sor visszatartása. Régi logok visszajátszásából nincs új riasztás.
 3. **Ellenőrizhető értelmezés:** bejelentő és jelentett pilóta külön; szabad szöveges név bizonytalanként jelölve. Többértelmű helyből nincs közelségi riasztás. Az eredeti sor és idő látható.
 4. **Clear:** `clr` = `clear`; kérdés és tagadás nem clear. Régi vagy clearrel feloldott bejelentésből nincs aktív riasztás.
@@ -27,3 +27,9 @@ Ezek a fenti megoldásokból és a helyi logok formátumából levont tervezési
 ## Az első változat határai
 
 Nincs több üzenetre kiterjedő beszélgetésértelmezés, standings szerinti minősítés, killboard, automatikus játékművelet, Ansiblex vagy wormhole útvonal. Egy pilótanév szövegbeli felismerése heurisztikus. A legrövidebb kapuút nem biztonsági útvonalajánlás. A teljes használati útmutató az app Dokumentáció menüjében magyarul és angolul is szerepel.
+
+## Régiótérkép és ablakok
+
+A térkép most a teljes kiválasztott régiót rajzolja. A saját karaktertől mért kaputávolságot halo és kapuszínezés jelzi. A bejelentés melletti kártyák azonosított pilótákhoz pontos zKillboard-linket és felismert hajókhoz típusalapú ikont adnak. A Mac-app külön térkép- és összevont chatablakot kezel, közös helyi profillal, külön nézeti állapottal és egyetlen OS-értesítési kezelővel.
+
+[CCP Image Server dokumentáció](https://developers.eveonline.com/docs/services/image-server/) · [ESI API Explorer](https://developers.eveonline.com/api-explorer)

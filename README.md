@@ -205,3 +205,5 @@ The local SQLite event ledger leases pending events and acknowledges only submis
 ## Local intel
 
 Intel map monitors selected EVE Chatlogs channels locally, recognizes system/pilot reports and `clr`/`clear`, and offers configurable stargate-jump alerts with explicit ESI, Local-log or manual location provenance. Enable in Settings → Intel settings. See [research and design notes](Intel-reference.md), [Hungarian guide](Hasznalat.md) and [English guide](UserGuide.en.md). Public topology is rebuilt with `tools/build_intel_universe.py` from the official JSONL SDE; private logs and preferences are never bundled.
+
+Intel windows: the complete selected region is shown with shortest-stargate-distance highlighting from the selected own character. Activity cards include exact-ID zKillboard links and CCP ship icons. Public ESI name resolution receives inferred names only, with positive/negative local caching; full chat text stays local. The Mac shell opens separate map and aggregated read-only chat windows sharing cookies/theme/language while keeping OS delivery in the main window. Child windows close independently.

@@ -113,6 +113,32 @@ class IntelStoreTests(unittest.TestCase):
         for data in [{'enabled':'yes'},{'jumps':31},{'character_ids':[999]},{'manual_locations':{'11':999}},{'channels':'Intel'},{'bogus':1}]:
             with self.subTest(data=data),self.assertRaises(PlanningError):i.save_preferences(self.store,data,self.u)
         self.assertEqual({x['id'] for x in self.monitor.dashboard(now=NOW,region=20)['nodes']},{3,4,6})
+    def test_entire_region_is_visible_and_range_is_measured_from_character(self):
+        self.p=i.save_preferences(self.store,{'jumps':1},self.u)
+        data=self.monitor.dashboard(now=NOW,center=3,region=10,character_id=11)
+        self.assertEqual({n['id'] for n in data['nodes']},{1,2,5})
+        self.assertEqual({n['id'] for n in data['nodes'] if n['in_range']},{1,2})
+        self.assertEqual(next(n for n in data['nodes'] if n['id']==5)['distance'],2)
+        large=u.Universe({'systems':[{'id':x,'name':'Sys-'+str(x),'region_id':1,'region':'Full','x':x,'y':0} for x in range(1,502)],'edges':[[x,x+1] for x in range(1,501)]})
+        self.monitor.universe=large;data=self.monitor.dashboard(now=NOW,center=1)
+        self.assertEqual(len(data['nodes']),501);self.assertFalse(data['clipped'])
+    def test_exact_character_lookup_is_cached_and_does_not_resolve_corporations_as_pilots(self):
+        self.write_log(line('L-A5XP Steve Hluskan')+'\n');self.scan()
+        self.eve.http.request.return_value=({'characters':[{'id':359618261,'name':'Steve Hluskan'},{'id':999,'name':'Unrequested Name'}],'corporations':[{'id':333,'name':'Steve Hluskan'}]}, {})
+        self.monitor.resolve_characters(NOW);self.eve.http.request.assert_called_once_with(i.ESI+'/universe/ids/',json_body=['Steve Hluskan'])
+        row=self.monitor.dashboard(now=NOW)['reports'][0];self.assertEqual(row['pilots'][0]['zkill_url'],'https://zkillboard.com/character/359618261/');self.assertFalse(row['pilots'][0]['verified'])
+        self.monitor.resolve_characters(NOW+10);self.assertEqual(self.eve.http.request.call_count,1)
+        with self.store.db() as db:self.assertEqual(db.execute('SELECT count(*) FROM intel_characters').fetchone()[0],1)
+    def test_failed_lookup_keeps_intel_and_unknown_names_have_no_fake_link(self):
+        self.write_log(line('L-A5XP Unknown Pilot')+'\n');self.scan();self.eve.http.request.side_effect=i.EsiError('offline');self.monitor.resolve_characters(NOW)
+        data=self.monitor.dashboard(now=NOW);self.assertEqual(len(data['reports']),1);self.assertIsNone(data['reports'][0]['pilots'][0]['zkill_url']);self.assertIsNotNone(data['status']['names_error']);self.assertIsNone(data['status']['error'])
+        self.eve.http.request.side_effect=None;self.eve.http.request.return_value=({'characters':[]},{})
+        self.monitor.resolve_characters(NOW);self.monitor.resolve_characters(NOW+100);self.assertEqual(self.eve.http.request.call_count,2)
+    def test_contact_cards_include_ship_ids_and_keep_report_association(self):
+        self.u.ship_types['buzzard']=11192;self.write_log(line('L-A5XP <url=showinfo:1373//999>Visitor</url> Buzzard')+'\n');self.scan()
+        node=next(n for n in self.monitor.dashboard(now=NOW)['nodes'] if n['id']==2)
+        card=node['contacts'][0];self.assertEqual(card['ships'],[{'name':'Buzzard','type_id':11192}]);self.assertEqual(card['pilots'][0]['zkill_url'],'https://zkillboard.com/character/999/')
+
     def test_intel_authorization_preserves_other_feature_grants(self):
         (self.root/'vault').mkdir();self.store.save_settings({'client_id':'client'});key=Fernet.generate_key();vault=Vault(self.root/'vault',key_provider=lambda:key);vault.set(11,{'scopes':SCOPES+MOON_SCOPES,'expires_at':NOW+9999999999,'access_token':'secret'})
         eve=EveConnection(self.store,vault=vault,transport=Mock());url=eve.start('session','http://127.0.0.1:8765/callback',character_id=11,feature='intel');scopes=urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)['scope'][0].split();self.assertTrue(set(SCOPES+MOON_SCOPES+INTEL_SCOPES).issubset(scopes))

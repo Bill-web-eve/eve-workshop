@@ -44,6 +44,13 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(self.request('/api/intel/claim',{})[1]['items'],[])
         self.assertEqual(self.request('/intel.js')[0],200)
 
+    def test_pilot_lookup_trigger_is_local_and_ship_images_use_only_the_ccp_cdn(self):
+        self.app.intel.request_characters=Mock()
+        self.assertEqual(self.request('/api/intel/characters',{},Origin='https://other.invalid')[0],403);self.app.intel.request_characters.assert_not_called()
+        self.assertEqual(self.request('/api/intel/characters',{})[0],200);self.app.intel.request_characters.assert_called_once()
+        _,_,headers=self.request('/');self.assertIn("img-src 'self' data: https://images.evetech.net",headers['Content-Security-Policy']);self.assertIn("script-src 'self'",headers['Content-Security-Policy'])
+        self.assertEqual(self.request('/api/intel?region=999')[0],400)
+
     def test_intel_location_refresh_is_a_separate_background_worker(self):
         self.app.intel.request_locations=Mock()
         status,data,_=self.request('/api/intel/locations',{});self.assertEqual(status,200);self.assertIn('intel',data);self.app.intel.request_locations.assert_called_once()

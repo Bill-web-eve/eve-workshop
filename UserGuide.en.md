@@ -457,7 +457,7 @@ Reliable ESI positioning requires both a fresh location and an online character.
 The parser recognizes full system names and unambiguous uppercase prefixes of at least three characters containing a digit or hyphen. An optional region narrows prefix matching. Reports mentioning several systems are marked ambiguous and do not trigger alerts. A clear arrow route uses its destination system.
 
 - `J5A-IX Pilot Name` reports a pilot in a system. The reporter stays in a separate column and is never automatically counted as the reported pilot.
-- A character showinfo link supplies a name and ID. Names inferred from plain text are marked accordingly. Typos, unusual ship abbreviations and conversation can produce incorrect guesses; the original message remains available. Text is not sent to a third-party service for verification.
+- A character showinfo link supplies a name and ID. Names inferred from plain text are marked accordingly. Typos, unusual ship abbreviations and conversation can produce incorrect guesses; the original message remains available. The inferred character names can be checked through public ESI name resolution; the full message text is not sent.
 - `J5A-IX clr` and `J5A-IX clear` both mark the system clear and remove proximity alerts from earlier reports there.
 - `J5A-IX clr?` and `clear?` are questions and do not clear previous intel. “Not clear” does not clear it either.
 - Expired reports do not trigger alerts. A newer unambiguous sighting of a pilot replaces their previous system report.
@@ -466,8 +466,26 @@ Identical channel messages appearing in multiple characters' logs are deduplicat
 
 ## Using the intel map
 
-Select an own **Character** to follow. **Map radius** controls the visible neighborhood independently of alert distance. **Region** shows a region; **Follow character** returns to the selected character's neighborhood. Drag to pan, use the wheel or +/− to zoom, and **Fit map** to restore the initial framing.
+Select an own **Character** to follow. The full region of the selected character is shown by default. **Region** selects another complete region; **Follow character** returns to your character's region. Blue halos and highlighted gates mark systems within five jumps, or the distance configured in Intel settings. This is stargate distance, not a geometric circle. System placement is a schematic region diagram adjusted for label readability; gate connections follow CCP data. Distances always use the selected own character as reference, even when another system is selected. Last known Local locations use dashed highlighting and a warning rather than claiming a current live position. Drag to pan, use the wheel or +/− to zoom, and **Fit map** to restore the initial framing.
 
 Red means an active report, green means clear, and gold marks expired intel when history is enabled. A blue ring marks a read or pinned own-character location; check its source. Labels beside systems show reported pilots. Click a system, or focus it and press Enter, to inspect original reports below. The **Intel messages** table displays up to 500 entries from the last 24 hours and supports the shared sorting and filters.
 
-Distance uses the shortest route across the full public CCP SDE stargate network, excluding Ansiblex, wormholes and cynos. The map draws at most 400 systems; alerts still use the complete network. Public system and gate data can update with the recipe database. Chat text and intel settings stay in your local profile and are excluded from distribution packages. Original logs are never modified. File rotation, new files, UTF-16 and incomplete lines are supported.
+Distance uses the shortest route across the full public CCP SDE stargate network, excluding Ansiblex, wormholes and cynos. Every system in the selected region is drawn; proximity calculations still use the entire network. Public system and gate data can update with the recipe database. Chat text and intel settings stay in your local profile and are excluded from distribution packages. Original logs are never modified. File rotation, new files, UTF-16 and incomplete lines are supported.
+
+## Activity cards, ship icons and zKillboard
+
+Small cards beside reported systems show pilots, ships and the report age. Larger cards scroll internally. Ship icons use the official CCP image service. A generic “shuttle” or unrecognized ship name does not receive a guessed type ID or a fabricated type icon.
+
+Identified pilot names open the default browser at `https://zkillboard.com/character/<ID>/`. The example for Steve Hluskan is `https://zkillboard.com/character/359618261/`. A name inferred from text remains an inference even when ESI confirms that a character of that name exists. Names without a resolved ID are marked **ID not yet identified**, with no fabricated link.
+
+Only inferred character names are sent to the public CCP ESI resolver, without authentication tokens; full messages are not sent. Positive name–ID matches are cached locally for 30 days and negative results for one hour. Network failures do not stop log monitoring. **Refresh pilot IDs** starts any necessary lookups while respecting the cache. zKillboard opens only on a click; killboard data is not fetched in the background.
+
+A report listing multiple pilots and ships is labelled **Multiple pilots · shared ship report**; the app does not invent a certain pilot-to-ship pairing. Ship recognition uses public EVE names and a small set of common abbreviations. Original messages remain available for verification.
+
+## Separate map and intel chat windows
+
+**Open map window** opens an independent, resizable Mac window with the full region, activity cards and range highlighting. **Open intel chat window** opens a game-like feed combining all selected intel channels. Each line shows its local time, channel, reporter and message. Identified pilot names link to zKillboard; selecting a system opens or focuses the map window there.
+
+The chat is **read-only** and never sends messages to EVE. Disable **Auto-scroll**, or scroll upwards, to retain your reading position. Returning to the bottom resumes following new messages. Messages are chronological, oldest first, with up to 500 entries from the last 24 hours. Unchanged rows are retained during background checks.
+
+One map and one chat window can be open. Opening one again focuses the existing window. Closing an auxiliary window keeps the main app and other window running. Closing the main window or quitting stops all windows and monitoring. Theme and language are shared. Only the main window delivers OS alerts, avoiding duplicate notifications from multiple windows.
