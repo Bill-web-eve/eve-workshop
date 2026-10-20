@@ -276,6 +276,44 @@ class ServerTests(unittest.TestCase):
         p=next(r for r in self.request('/api/plan?product_id=92822&quantity=4')[1]['rows'] if r['id']==92822)['parameters']
         self.assertEqual((p['bpc_count'],p['source']),(0,'manual'))
 
+    def test_desktop_auth_handoff_is_one_use_and_browser_callback_resumes_window(self):
+        from urllib.parse import urlsplit,parse_qs
+        self.request('/api/settings',{'client_id':'public-client'})
+        status,auth,_=self.request('/api/auth/start',{'desktop':True})
+        self.assertEqual(status,200);self.assertTrue(auth['url'].startswith(self.app.origin+'/desktop/auth/'))
+        path=urlsplit(auth['url']).path
+        # The external browser has no application's session cookie yet.
+        code,_,headers=self.request(path,Cookie='')
+        self.assertEqual(code,303);self.assertIn('eve_session=',headers['Set-Cookie'])
+        self.assertTrue(headers['Location'].startswith('https://login.eveonline.com/v2/oauth/authorize?'))
+        state=parse_qs(urlsplit(headers['Location']).query)['state'][0]
+        self.assertEqual(self.request(path,Cookie='')[0],404)
+        poll='/api/desktop/auth?ticket='+auth['ticket']
+        self.assertEqual(self.request(poll,Cookie='')[0],403)
+        self.assertEqual(self.request(poll)[1],{'status':'pending','error':None})
+        self.app.eve.finish=Mock();self.app.eve.authorized_feature=None
+        code,page,_=self.request('/callback?state='+state+'&code=fake')
+        self.assertEqual(code,200);self.assertIn(b'Return to the EVE Workshop application',page)
+        self.app.eve.finish.assert_called_once_with(state,'fake',self.app.cookie)
+        data=self.request(poll)[1];self.assertEqual(data,{'status':'complete','error':None})
+        self.assertNotIn('access_token',str(data));self.assertNotIn('code',str(data))
+
+    def test_desktop_auth_expiry_failures_and_untrusted_starts(self):
+        from urllib.parse import urlsplit,parse_qs
+        self.assertEqual(self.request('/api/auth/start',{'desktop':True},Origin='https://other.example')[0],403)
+        self.request('/api/settings',{'client_id':'public-client'})
+        auth=self.request('/api/auth/start',{'desktop':True})[1]
+        ticket=auth['ticket'];entry=self.app.desktop_auth[ticket]
+        state=entry['oauth_state']
+        code,_,_=self.request('/callback?state='+state+'&error=invalid_scope')
+        self.assertEqual(code,400)
+        result=self.request('/api/desktop/auth?ticket='+ticket)[1]
+        self.assertEqual(result['status'],'error');self.assertIn('scope',result['error'])
+        entry['expires']=time.time()-1
+        self.assertEqual(self.request(urlsplit(auth['url']).path,Cookie='')[0],404)
+        self.assertEqual(self.request('/api/desktop/auth?ticket='+ticket)[1]['status'],'error')
+        self.assertEqual(self.request('/desktop/auth/not-a-ticket',Cookie='')[0],404)
+
     def test_auth_configuration_is_actionable_and_tokens_never_reach_browser(self):
         status,result,_=self.request('/api/auth/start',{})
         self.assertEqual(status,400);self.assertIn('Client ID',result['error'])

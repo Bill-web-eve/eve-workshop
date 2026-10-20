@@ -110,7 +110,7 @@ const EveI18n=(()=>{
   }
   function init(){
     ready=true;controls();translate();
-    for(const button of document.querySelectorAll('[data-ui-language]'))button.addEventListener('click',()=>setLanguage(button.dataset.uiLanguage));
+    document.addEventListener('click',event=>{const button=event.target.closest('[data-ui-language]');if(button)setLanguage(button.dataset.uiLanguage);});
     observer=new MutationObserver(records=>{
       const roots=new Set();
       for(const record of records){

@@ -20,7 +20,7 @@ function moonAuthPanel(){
 }
 function bindMoonAuth(){
   $('#extraction-refresh').onclick=()=>startTask('/api/moons/extractions/sync');
-  $$('[data-moon-auth]').forEach(b=>b.onclick=async()=>{try{b.disabled=true;const data=await api('/api/auth/start',{feature:'moons',character_id:Number(b.dataset.moonAuth)});sessionStorage.setItem('eve-muhely-auth-return','settings:access');window.location.assign(data.url);}catch(e){b.disabled=false;error(e.message);}});
+  $$('[data-moon-auth]').forEach(b=>b.onclick=async()=>{try{b.disabled=true;const data=await api('/api/auth/start',{feature:'moons',character_id:Number(b.dataset.moonAuth)});sessionStorage.setItem('eve-muhely-auth-return','settings:access');await openEveAuthorization(data);}catch(e){b.disabled=false;error(e.message);}});
 }
 let moonCalendarFeed=null,moonCalendarFeedRequest=null;
 function calendarFeedURL(url){return url+'?lang='+EveI18n.language;}

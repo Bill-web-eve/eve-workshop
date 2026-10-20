@@ -8,7 +8,8 @@
   <script src="/i18n-en.js"></script>
   <script src="/i18n.js"></script>
   <script src="/theme.js"></script>
-  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <script src="/desktop.js" defer></script>
+  <link rel="icon" href="/app-window-icon.png" type="image/png">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/graph.css">
   <script src="/tables.js" defer></script>
@@ -32,7 +33,7 @@
 </head>
 <body>
   <aside class="sidebar">
-    <a class="brand" href="/" aria-label="EVE Műhely kezdőlap"><img src="/icon.svg" alt=""><span>EVE <strong>MŰHELY</strong><small>EVE gyártástervező</small></span></a>
+    <a class="brand" href="/" aria-label="EVE Műhely kezdőlap"><img src="/app-window-icon.png" alt=""><span>EVE <strong>MŰHELY</strong><small>EVE gyártástervező</small></span></a>
     <div class="nav-label">A TERVED</div>
     <nav aria-label="Főmenü">
       <button class="nav active" data-view="queue"><span class="nav-icon">▤</span>Gyártási terv <span id="queue-count" class="nav-count">–</span></button>
@@ -61,6 +62,7 @@
       <div class="nav-group">
         <button class="nav" data-view="settings" aria-expanded="false" aria-controls="settings-submenu"><span class="nav-icon">⚙</span><span>Beállítások</span><span class="nav-chevron" aria-hidden="true">▸</span></button>
         <div id="settings-submenu" class="nav-submenu" hidden>
+          <button data-settings-nav="appearance">Megjelenés és nyelv</button>
           <button data-settings-nav="structures">Struktúrák és bónuszok</button>
           <button data-settings-nav="connection">EVE-kapcsolat <span id="connection-dot" class="dot"></span></button>
           <button data-settings-nav="access">Adathozzáférések</button>
@@ -72,8 +74,6 @@
       <button class="nav" data-view="saved"><span class="nav-icon">▱</span>Mentett tervek</button>
     </nav>
     <nav class="documentation-nav" aria-label="Súgó"><button class="nav" data-view="documentation"><span class="nav-icon" aria-hidden="true">▣</span>Dokumentáció</button></nav>
-    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Sötét mód" aria-pressed="true"><span class="nav-icon" aria-hidden="true">☾</span><span>Sötét mód</span><span class="theme-switch" aria-hidden="true"></span></button>
-    <div class="language-control" role="group" aria-label="Nyelv / Language" data-i18n-skip><button type="button" data-ui-language="hu" lang="hu" aria-pressed="true">Magyar</button><button type="button" data-ui-language="en" lang="en" aria-pressed="false">English</button></div>
     <div class="sidebar-bottom"><div class="local-indicator"><span class="dot online"></span>Helyben fut a gépeden</div><small id="sde-side">Receptadatok betöltése…</small><button id="shutdown" class="text-button">Alkalmazás leállítása</button></div>
   </aside>
 

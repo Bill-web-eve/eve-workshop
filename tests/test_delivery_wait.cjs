@@ -102,3 +102,17 @@ test('cancelled dirty-plan switches leave the current view, target and unsaved i
  w.confirm=()=>{prompts++;return true;};await run('openSavedPlan("saved-salvation")');await tick();
  assert.equal(prompts,2);assert.equal(run('view'),'schedule');assert.equal(run('activePlanId'),'saved-salvation');assert.equal(run('Object.keys(dirty).length'),0);
 });
+
+test('appearance and language controls work in Settings across repeated renders and launches',async t=>{
+ const {w,d,run}=await setup(null);t.after(()=>w.close());
+ assert.equal(d.querySelector('.sidebar [data-ui-language]'),null);assert.equal(d.querySelector('.sidebar [data-theme-toggle]'),null);
+ run('openSettingsTab("appearance")');await tick();
+ assert(d.querySelector('#settings-content [data-theme-toggle]'));assert.equal(d.querySelector('.plan-selector').hidden,true);
+ const toggle=d.querySelector('[data-theme-toggle]');toggle.click();await tick();
+ assert.equal(d.documentElement.dataset.theme,'light');assert.equal(toggle.getAttribute('aria-pressed'),'false');assert.equal(w.localStorage.getItem('eve-muhely-theme'),'light');
+ d.querySelector('[data-ui-language=hu]').click();await tick();assert.equal(d.documentElement.lang,'hu');assert.equal(d.querySelector('#page-title').textContent,'Megjelenés és nyelv');
+ run('navigate("jobs");openSettingsTab("appearance")');await tick();
+ assert.equal(d.querySelector('[data-theme-toggle]').getAttribute('aria-pressed'),'false');assert.equal(d.querySelector('[data-ui-language=hu]').getAttribute('aria-pressed'),'true');
+ d.querySelector('[data-ui-language=en]').click();await tick();assert.equal(d.querySelector('#page-title').textContent,'Appearance and language');assert.equal(w.localStorage.getItem('eve-muhely-language'),'en');
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('#settings-content').textContent.replace('Magyar','')));
+});

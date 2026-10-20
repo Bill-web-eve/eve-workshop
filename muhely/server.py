@@ -50,9 +50,29 @@ class App:
         self.cookie = secrets.token_urlsafe(32)
         self.csrf = secrets.token_urlsafe(32)
         self.instance = secrets.token_urlsafe(24)
+        self.desktop_auth = {}
+        self.desktop_auth_lock = threading.RLock()
         self.task_lock = threading.RLock()
         self.planning_lock = threading.RLock()
         self.task = {'running': False, 'kind': None, 'message': '', 'finished': None, 'results': []}
+
+    def desktop_auth_start(self, url):
+        """One-use browser handoff; OAuth codes and tokens never enter the UI."""
+        ticket = secrets.token_urlsafe(32)
+        oauth_state = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)['state'][0]
+        with self.desktop_auth_lock:
+            self.desktop_auth = {k:v for k,v in self.desktop_auth.items() if v['expires'] > time.time()}
+            self.desktop_auth[ticket] = {'url':url,'oauth_state':oauth_state,'status':'pending',
+                                         'opened':False,'expires':time.time()+600}
+        return {'url':self.origin+'/desktop/auth/'+ticket,'ticket':ticket}
+
+    def desktop_auth_finish(self, oauth_state, error=None):
+        with self.desktop_auth_lock:
+            for item in self.desktop_auth.values():
+                if item['oauth_state'] == oauth_state and item['expires'] > time.time() and item['status'] == 'pending':
+                    item.update(status='error' if error else 'complete',error=error)
+                    return True
+        return False
 
     def start_task(self, kind):
         with self.task_lock:
@@ -540,9 +560,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/icon.svg']:
+            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
+            if path.startswith('/desktop/auth/'):
+                ticket = path.removeprefix('/desktop/auth/')
+                with self.app.desktop_auth_lock:
+                    handoff = self.app.desktop_auth.get(ticket)
+                    if not handoff or handoff['expires'] <= time.time() or handoff['opened']:
+                        return self.send(404, {'error':'Az EVE-belépés lejárt. Próbáld újra.'})
+                    handoff['opened'] = True
+                    return self.send(303,b'',cookie=True,headers={'Location':handoff['url']})
             if path.startswith('/calendar/moons/'):
                 token = moon_calendar.feed_token(self.app.store)
                 supplied = path.removeprefix('/calendar/moons/').removesuffix('.ics')
@@ -552,6 +580,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(200, moon_calendar.export(self.app.store, self.app.catalog, query.get('lang', ['en'])[0]), 'text/calendar; charset=utf-8')
             if not self.authorized():
                 return self.send(403, {'error': 'Nyisd meg az alkalmazás kezdőlapját.'})
+            if path == '/api/desktop/auth':
+                with self.app.desktop_auth_lock:
+                    item = self.app.desktop_auth.get(query.get('ticket',[''])[0])
+                    if not item or item['expires'] <= time.time():
+                        return self.send(200,{'status':'error','error':'Az EVE-belépés lejárt. Próbáld újra.'})
+                    return self.send(200,{'status':item['status'],'error':item.get('error')})
             if path == '/callback':
                 error = query.get('error')
                 if error==['invalid_scope']:
@@ -562,6 +596,8 @@ class Handler(BaseHTTPRequestHandler):
                 if self.app.eve.authorized_feature=='moons':
                     try:self.app.start_task('extractions')
                     except PlanningError:pass
+                if self.app.desktop_auth_finish(query.get('state',[''])[0]):
+                    return self.send(200,'<!doctype html><html><head><meta charset="utf-8"><title>EVE Workshop</title></head><body><h1>EVE authorization complete</h1><p>Return to the EVE Workshop application. You can close this browser tab.</p><p>A belépés sikerült. Térj vissza az EVE Műhely alkalmazásablakába. Ezt a böngészőlapot bezárhatod.</p></body></html>','text/html; charset=utf-8')
                 return self.send(303, b'', headers={'Location': '/?connected=1'})
             if path == '/api/documentation':
                 language = query.get('lang', ['hu'])[0]
@@ -609,6 +645,7 @@ class Handler(BaseHTTPRequestHandler):
         except (PlanningError, EsiError, ValueError) as error:
             message = str(error) if isinstance(error, (PlanningError, EsiError)) else 'Hibás kérés.'
             if urllib.parse.urlsplit(self.path).path == '/callback':
+                self.app.desktop_auth_finish(urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('state',[''])[0],message)
                 import html
                 return self.send(400, '<!doctype html><html lang="hu"><head><meta charset="utf-8"><title>EVE-belépés</title><script src="/i18n-en.js"></script><script src="/i18n.js"></script></head><body><h1>A belépés nem fejeződött be</h1><p>'+html.escape(message)+'</p><a href="/">Vissza az alkalmazáshoz</a></body></html>', 'text/html; charset=utf-8')
             return self.send(400, {'error': message,**({'delivery_wait':error.info} if isinstance(error,AssetSnapshotPending) else {})})
@@ -716,7 +753,8 @@ class Handler(BaseHTTPRequestHandler):
                         raise PlanningError('A karakter már nincs hozzáadva.')
                 feature=data.get('feature')
                 if feature not in [None,'skills','pi','corporations','moons']:raise PlanningError('Ismeretlen engedélyezési cél.')
-                return self.send(200, {'url': self.app.eve.start(self.app.cookie, self.app.origin+'/callback',char_id,feature)})
+                url = self.app.eve.start(self.app.cookie, self.app.origin+'/callback',char_id,feature)
+                return self.send(200,self.app.desktop_auth_start(url) if data.get('desktop') is True else {'url':url})
             elif path == '/api/characters/remove':
                 self.app.eve.forget(integer(data.get('id'), 'Karakter', 2**53-1, 1))
             elif path == '/api/sync':

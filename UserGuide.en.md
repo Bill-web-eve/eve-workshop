@@ -8,15 +8,25 @@ Use the **Table of contents** to jump to a chapter. **Search the user guide** se
 
 ## Interface language
 
-Use **Magyar / English** in the sidebar below the dark-mode switch. The change is immediate, and your browser remembers it. Your current inputs, filters and unapplied changes remain in place. Character, corporation, saved-plan and EVE item names are not translated.
+Use **Magyar / English** under **Settings → Appearance and language**. The change is immediate, and the application window remembers it. Your current inputs, filters and unapplied changes remain in place. Character, corporation, saved-plan and EVE item names are not translated.
 
 EVE Workshop runs locally on macOS or Windows 11 64-bit. Excel and an OpenAI API subscription are not required. The browser interface connects to the app running on your own computer.
+
+## Mac application window – test version
+
+The new local Mac test version runs in its own application window, without an address bar or browser tab. It uses the existing local profile for characters, saved plans, inventory and settings. There is no Windows windowed test package yet; previous Windows releases retain their browser interface.
+
+**Settings → Appearance and language** contains the dark-mode switch and Magyar / English buttons. **⌘,** opens this section; **⌘R** reloads the interface. Window preferences are stored separately from the previous browser, so select the theme and language once on first use. Window size and position are remembered.
+
+The red window-close button or **⌘Q** also shuts down the local Workshop service. Unapplied edits or a running EVE refresh prompt before quitting. Saved data is retained. CSV, ICS and guide exports use the Mac save dialog. Item names and Multibuy lists are copied as plain text.
+
+EVE authorization opens the official EVE sign-in page in your system browser. After successful authorization, Workshop receives the result and returns to the relevant settings section automatically. You can close the browser's sign-in tab afterwards. The Client ID and callback URL do not change.
 
 ## Starting and stopping the application
 
 On a Mac, open the **EVE Műhely** desktop shortcut or the installed **EVE Muhely.app**. The local installation uses **~/Applications/EVE Muhely.app**. Its program files are inside the application, so starting it does not depend on a cloud drive being available. A separately published source installation may also have **EVE Muhely.command** and an application copy beside its workdir folder.
 
-The browser opens **http://127.0.0.1:8765**. Starting the launcher again opens the existing instance. Closing the browser tab does not stop the app. Use **Stop application** at the bottom of the sidebar; saved data is retained. The next launch opens the app again.
+Previous browser releases open **http://127.0.0.1:8765**. Starting the launcher again opens the existing instance. Closing the browser tab does not stop the app. Use **Stop application** at the bottom of the sidebar; saved data is retained. The next launch opens the app again.
 
 The packaged Mac and Windows distributions include their runtime. A source installation needs Python and its cryptography dependency; its launcher can create its own environment and download dependencies on first use. No separate server, Docker, Node.js or database installation is needed for normal use.
 
@@ -57,7 +67,7 @@ Column filters are closed initially. Use **Open filters** and **Close filters** 
 
 ## Dark mode
 
-Use **Dark mode** in the sidebar to switch appearance. Dark mode is the default. Your browser remembers the selection across reloads and app restarts. The theme applies to forms, tables, graphs and documentation.
+Use **Dark mode** under **Settings → Appearance and language** to switch appearance. Dark mode is the default. The application window remembers the selection across reloads and app restarts. The theme applies to forms, tables, graphs and documentation.
 
 ## Copying an item name
 

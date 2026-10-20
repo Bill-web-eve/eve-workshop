@@ -8,16 +8,26 @@ A **Tartalomjegyzékben** kattints a kívánt fejezetre. A **Keresés a kézikö
 
 ## Felület nyelve / Interface language
 
-Az oldalsávban a sötét mód kapcsolója alatt válassz a **Magyar** és **English** gombokkal. A váltás azonnali, és a böngésző megjegyzi. A beírt mezők, szűrők és még nem mentett módosítások megmaradnak. A nevek és EVE-adatok változatlanok.
+A **Beállítások → Megjelenés és nyelv** oldalon válassz a **Magyar** és **English** gombokkal. A váltás azonnali, és az alkalmazásablak megjegyzi. A beírt mezők, szűrők és még nem mentett módosítások megmaradnak. A nevek és EVE-adatok változatlanok.
 
 
 Az EVE Műhely helyben futó, magyar és angol nyelvű gyártástervező macOS-re és Windows 11 64 bitre. Excel és OpenAI API-előfizetés nem szükséges hozzá. A böngészős felület a saját gépeden futó alkalmazáshoz kapcsolódik.
 
+## Saját Mac-ablak – tesztváltozat
+
+Az új helyi Mac-tesztváltozat a saját alkalmazásablakában nyílik meg, címsor és böngészőlap nélkül. A meglévő karakterek, mentett tervek, készlet és beállítások ugyanabból a helyi profilból töltődnek be. Windowsos ablakos tesztkiadás még nincs; a korábbi Windows-kiadások böngészőben működnek.
+
+A **Beállítások → Megjelenés és nyelv** tartalmazza a sötét módot és a Magyar / English választót. **⌘,** megnyitja ezt a részt, **⌘R** újratölti a felületet. A téma és a nyelv az appablakban külön tárolódik a korábbi böngészőtől, ezért első alkalommal válaszd ki őket. Az ablak helyzete és mérete megmarad.
+
+Az ablak piros bezárógombja vagy a **⌘Q** a helyi Műhely-szolgáltatást is leállítja. Nem alkalmazott módosítás vagy futó EVE-frissítés esetén megerősítést kér. A mentett adatok megmaradnak. CSV-, ICS- és kézikönyv-exportnál a Mac fájlmentési ablaka nyílik meg. Az itemnevek és Multibuy-listák egyszerű szövegként kerülnek a vágólapra.
+
+Az EVE-jóváhagyás a rendszer böngészőjében, a hivatalos EVE-oldalon történik. Sikeres belépés után a Műhely automatikusan átveszi az eredményt és visszatér a megfelelő beállításhoz. A böngésző belépési lapja ezután bezárható. A Client ID és a callback cím változatlan.
+
 ## Indítás
 
-Az Asztalon nyisd meg az **EVE Műhely** parancsikont. Ez a helyi **~/Applications/EVE Muhely.app** alkalmazást indítja. A futáshoz szükséges programfájlok az alkalmazáson belül vannak, ezért az indítás nem függ a ProtonDrive mappa hozzáférésétől vagy szinkronizálásától. Az EVE mappában külön alkalmazáspéldány és **EVE Muhely.command** indító is található. A megnyíló cím: http://127.0.0.1:8765.
+Az Asztalon nyisd meg az **EVE Műhely** parancsikont. Ez a helyi **~/Applications/EVE Muhely.app** alkalmazást indítja. A futáshoz szükséges programfájlok az alkalmazáson belül vannak, ezért az indítás nem függ a ProtonDrive mappa hozzáférésétől vagy szinkronizálásától. Az EVE mappában külön alkalmazáspéldány és **EVE Muhely.command** indító is található. A régebbi böngészős változat címe: http://127.0.0.1:8765.
 
-Az indító már futó példány esetén ugyanazt az alkalmazást nyitja meg. A böngészőlap bezárása nem állítja le a műhelyt; erre a bal alsó sarokban lévő **Alkalmazás leállítása** gomb szolgál. A mentett adatok megmaradnak.
+Az indító már futó példány esetén ugyanazt az alkalmazást nyitja meg. A régebbi böngészős változatban a böngészőlap bezárása nem állítja le a műhelyt; erre a bal alsó sarokban lévő **Alkalmazás leállítása** gomb szolgál. A mentett adatok megmaradnak.
 
 A csomagolt Mac- és Windows-kiadás tartalmazza a futtatókörnyezetet. Forrásból indításkor Python és a `cryptography` csomag szükséges; az indító ehhez saját környezetet hozhat létre, és első alkalommal interneten letöltheti a függőségeket. Külön szerver, Docker, Node.js vagy adatbázis-telepítés a normál használathoz nem kell.
 
@@ -58,7 +68,7 @@ Az oszlopbeállítások nézetenként megmaradnak adatfrissítés és menüvált
 
 ## Sötét mód
 
-A menüben a **Sötét mód** kapcsolóval válthatsz a világos és a sötét megjelenés között. Az alapbeállítás sötét. A választásodat a böngésző ezen a gépen megjegyzi, újratöltés és az alkalmazás újraindítása után is. A téma minden nézetre, a gyártási gráfra és a beviteli mezőkre is érvényes.
+A **Beállítások → Megjelenés és nyelv** oldalon a **Sötét mód** kapcsolóval válthatsz a világos és a sötét megjelenés között. Az alapbeállítás sötét. A választásodat az alkalmazásablak ezen a gépen megjegyzi, újratöltés és az alkalmazás újraindítása után is. A téma minden nézetre, a gyártási gráfra és a beviteli mezőkre is érvényes.
 
 ## Itemnév másolása
 

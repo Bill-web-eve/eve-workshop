@@ -103,8 +103,10 @@ if(typeof document!=='undefined'){
       $('#manual-search').oninput=event=>{manualQuery=event.target.value;filter();};
       $('#manual-clear').onclick=()=>{manualQuery='';$('#manual-search').value='';filter();$('#manual-search').focus();};
       content.querySelectorAll('[data-manual-link]').forEach(link=>link.onclick=event=>{event.preventDefault();const section=$('#'+link.dataset.manualLink);section.scrollIntoView({block:'start'});section.focus({preventScroll:true});});
-      $('#manual-download').disabled=false;$('#manual-download').onclick=()=>{
-        const url=URL.createObjectURL(new Blob([data.markdown],{type:'text/markdown;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='EVE-Workshop-User-Guide-'+language+'.md';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      $('#manual-download').disabled=false;$('#manual-download').onclick=async()=>{
+        const blob=new Blob([data.markdown],{type:'text/markdown;charset=utf-8'});
+        if(EveDesktop.active){try{await EveDesktop.saveBlob(blob,'EVE-Workshop-User-Guide-'+language+'.md');}catch(e){error(e.message);}return;}
+        const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='EVE-Workshop-User-Guide-'+language+'.md';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
       };
       $('#manual-print').disabled=false;$('#manual-print').onclick=()=>window.print();
       document.body.classList.add('manual-view');filter();

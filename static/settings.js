@@ -1,6 +1,6 @@
 'use strict';
-let settingsTab='structures',settingsAccessData=null,settingsAccessRequest=null;
-const settingsSections={structures:'Struktúrák és bónuszok',connection:'EVE-kapcsolat',access:'Adathozzáférések',moons:'Holdak számítási beállításai',calendar:'Naptárszinkron',accounts:'Accountok és tanulás'};
+let settingsTab='appearance',settingsAccessData=null,settingsAccessRequest=null;
+const settingsSections={appearance:'Megjelenés és nyelv',structures:'Struktúrák és bónuszok',connection:'EVE-kapcsolat',access:'Adathozzáférések',moons:'Holdak számítási beállításai',calendar:'Naptárszinkron',accounts:'Accountok és tanulás'};
 function settingsShortcut(message,tab='access'){
   return `<div class="banner"><span>${esc(message)}</span> <button class="text-button" data-open-settings="${tab}">Beállítások megnyitása</button></div>`;
 }
@@ -32,7 +32,8 @@ function renderSettings(content){
   $$('[data-settings-tab]').forEach(button=>button.onclick=()=>openSettingsTab(button.dataset.settingsTab));
   const target=$('#settings-content');
   $('#plan-status').hidden=true;
-  if(settingsTab==='structures')renderStructureSettings(target);
+  if(settingsTab==='appearance')renderAppearanceSettings(target);
+  else if(settingsTab==='structures')renderStructureSettings(target);
   else if(settingsTab==='connection')renderConnection(target);
   else if(settingsTab==='accounts')renderAccounts(target);
   else if(!moonData){target.innerHTML=empty('Holdadatok betöltése');void refreshMoons();}
@@ -73,7 +74,12 @@ function bindGeneralAccess(){
   $('#access-status-refresh').onclick=()=>void loadSettingsAccess();
   $$('[data-access-sync]').forEach(button=>button.onclick=async()=>{await startTask('/api/'+button.dataset.accessSync+'/sync');await loadSettingsAccess();});
   $$('[data-access-feature]').forEach(button=>button.onclick=async()=>{
-    try{button.disabled=true;error('');const auth=await api('/api/auth/start',{character_id:Number(button.dataset.accessCharacter),feature:button.dataset.accessFeature});sessionStorage.setItem('eve-muhely-auth-return','settings:access');window.location.assign(auth.url);}
+    try{button.disabled=true;error('');const auth=await api('/api/auth/start',{character_id:Number(button.dataset.accessCharacter),feature:button.dataset.accessFeature});sessionStorage.setItem('eve-muhely-auth-return','settings:access');await openEveAuthorization(auth);}
     catch(e){error(e.message);button.disabled=false;}
   });
+}
+
+function renderAppearanceSettings(target){
+  const dark=EveTheme.theme==='dark';
+  target.innerHTML=panel('Megjelenés és nyelv','',`<div class="panel-body appearance-settings"><section><h3>Téma</h3><p>A sötét és világos mód a teljes felületre érvényes.</p><button type="button" class="theme-toggle" data-theme-toggle aria-label="Sötét mód" aria-pressed="${dark}"><span class="nav-icon" aria-hidden="true">☾</span><span>Sötét mód</span><span class="theme-switch" aria-hidden="true"></span></button></section><section><h3>A felület nyelve</h3><p>A választás azonnal érvényesül, a beírt adatok megmaradnak.</p><div class="language-control" role="group" aria-label="Nyelv / Language" data-i18n-skip><button type="button" data-ui-language="hu" lang="hu" aria-pressed="${EveI18n.language==='hu'}">Magyar</button><button type="button" data-ui-language="en" lang="en" aria-pressed="${EveI18n.language==='en'}">English</button></div></section><p class="footnote">A beállításokat ez az alkalmazásablak megjegyzi a következő indításhoz.</p></div>`);
 }

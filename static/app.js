@@ -42,6 +42,7 @@ async function setProductionScope(id){
 }
 
 async function api(path, body) {
+  if(path==='/api/auth/start'&&globalThis.EveDesktop?.active)body={...body,desktop:true};
   const options = body === undefined ? {} : {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':state?.csrf || ''}, body:JSON.stringify(body)};
   const response = await fetch(path, options);
   const result = await response.json();
@@ -608,7 +609,7 @@ function renderConnection(content) {
   $('#client-id').oninput=()=>dirty.client_id=true;
   $$('[data-char]').forEach(input=>input.onchange=()=>dirty.character_selection=true);
   $('#save-client').onclick=async()=>{try{await api('/api/settings',{client_id:$('#client-id').value.trim()});delete dirty.client_id;await reloadState();toast('Client ID mentve.');render();}catch(e){error(e.message);}};
-  $('#add-character').onclick=async()=>{try{error('');const result=await api('/api/auth/start',{});sessionStorage.setItem('eve-muhely-auth-return','settings:connection');window.location.assign(result.url);}catch(e){error(e.message);}};
+  $('#add-character').onclick=async()=>{try{error('');const result=await api('/api/auth/start',{});sessionStorage.setItem('eve-muhely-auth-return','settings:connection');await openEveAuthorization(result);}catch(e){error(e.message);}};
   $$('[data-remove-character]').forEach(el=>el.onclick=async()=>{if(!confirmUI('Eltávolítod ezt a karaktert és a helyben mentett adatait?'))return;try{await api('/api/characters/remove',{id:Number(el.dataset.removeCharacter)});await reloadState();render();}catch(e){error(e.message);}});
   if($('#save-characters')) $('#save-characters').onclick=async()=>{try{const checked=$$('[data-char]:checked').map(el=>Number(el.dataset.char));if(!checked.length)throw new Error('Válassz legalább egy karaktert.');await api('/api/settings',{character_ids:checked.length===state.characters.length?[]:checked});delete dirty.character_selection;await reloadState();if(productId&&!Object.keys(dirty).length)await calculate(false);else render();toast('Karakterválasztás mentve.');}catch(e){error(e.message);}};
 }
@@ -674,6 +675,7 @@ function csv(rows, headers, name) {
   const quote=value=>{let s=String(value??'');if(/^[=+@-]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';};
   headers=headers.map(EveI18n.t);
   const blob=new Blob(['\ufeff'+[headers,...rows].map(row=>row.map(quote).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'});
+  if(EveDesktop.active){void EveDesktop.saveBlob(blob,'eve-'+name+'.csv').catch(e=>error(e.message));return;}
   const url=URL.createObjectURL(blob), a=document.createElement('a');a.href=url;a.download='eve-'+name+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
@@ -706,7 +708,7 @@ $('#new-plan').onclick=async()=>{
   if(Object.keys(dirty).length)return error('Az új terv előtt alkalmazd a beírt módosításokat.');
   activePlanId=null;updatePlanControls();await calculate();
 };
-$('#shutdown').onclick=async()=>{if(!confirmUI('Leállítod a helyi alkalmazást? A mentett adatok megmaradnak.'))return;try{await api('/api/shutdown',{});document.body.innerHTML='<main><section class="content"><h1>A műhely leállt.</h1><p>Az indítóikonnal újra megnyithatod. Ezt a böngészőlapot bezárhatod.</p></section></main>';}catch(e){error(e.message);}};
+$('#shutdown').onclick=async()=>{if(!confirmUI('Leállítod a helyi alkalmazást? A mentett adatok megmaradnak.'))return;try{await api('/api/shutdown',{});if(EveDesktop.active){await EveDesktop.quit();return;}document.body.innerHTML='<main><section class="content"><h1>A műhely leállt.</h1><p>Az indítóikonnal újra megnyithatod. Ezt a böngészőlapot bezárhatod.</p></section></main>';}catch(e){error(e.message);}};
 $('#product-search').oninput=()=>{
   productId=null;activePlanId=null;updatePlanControls();clearTimeout(searchTimer);
   const q=$('#product-search').value;

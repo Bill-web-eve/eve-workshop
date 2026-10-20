@@ -1,6 +1,17 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Megjelenés és nyelv": "Appearance and language",
+  "Téma": "Theme",
+  "A felület nyelve": "Interface language",
+  "A sötét és világos mód a teljes felületre érvényes.": "Dark and light mode apply to the entire interface.",
+  "A választás azonnal érvényesül, a beírt adatok megmaradnak.": "Changes apply immediately and preserve entered values.",
+  "A beállításokat ez az alkalmazásablak megjegyzi a következő indításhoz.": "This application window remembers your preferences for the next launch.",
+  "Az EVE-belépés a böngésződben nyílt meg. Jóváhagyás után térj vissza ide.": "EVE sign-in opened in your browser. Return here after authorization.",
+  "Az EVE-belépés lejárt. Próbáld újra.": "EVE sign-in expired. Please try again.",
+  "A fájl túl nagy a mentéshez.": "The file is too large to save.",
+  "A fájl mentése nem sikerült.": "The file could not be saved.",
+
   "Ütemezési tudnivalók": "Scheduling notes",
   "Folyamatban az EVE-ben": "Running in EVE",
   "Várhatóan elkészült": "Expected complete",
