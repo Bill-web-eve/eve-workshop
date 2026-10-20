@@ -158,3 +158,5 @@ html[data-intel-window=map] .page-heading{display:none}html[data-intel-window=ma
 @media(max-width:760px){.plan-selector>.scope-selector{margin:10px 0;padding:8px 10px}.plan-selector>#calculation-feedback{margin-top:8px}.cost-summary>.panel-body{padding:12px}.cost-summary .cost-grand{font-size:22px}}
 
 @media(min-width:761px){.content .metric strong.schedule-date{font-size:18px}}
+
+@media(min-width:761px){.schedule-setup .plan-selector>.scope-selector{align-items:stretch;text-align:left}}
