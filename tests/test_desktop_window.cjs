@@ -45,3 +45,13 @@ test('desktop windows are limited to map/chat and include only public view optio
  const {w,messages}=fixture();t.after(()=>w.close());await w.EveDesktop.openIntelWindow('map',{character_id:123,region:10000001});const call=messages.find(m=>m.action==='openIntelWindow');assert(call);assert.equal(call.kind,'map');
  await assert.rejects(w.EveDesktop.openIntelWindow('settings'));
 });
+
+test('test notification requests the default OS notification sound',async t=>{
+ const {w,messages,run}=fixture();t.after(()=>w.close());
+ run(`globalThis.$=s=>document.querySelector(s);globalThis.$$=s=>[...document.querySelectorAll(s)];globalThis.EveI18n={t:s=>s};globalThis.esc=s=>String(s);globalThis.panel=(title,subtitle,html)=>html;globalThis.error=message=>{throw Error(message)};let dirty={};`);
+ run(fs.readFileSync(path.join(__dirname,'../static/notifications.js'),'utf8'));
+ w.EveDesktop.notificationStatus=async()=>({status:'authorized'});
+ run(`notificationData={preferences:{os_enabled:true,auto_refresh:true,personal:true,corporations:true,categories:{jobs:true},moon_days:3,moon_owners:{}},moons:[]};notificationPermission='authorized';renderNotificationSettings(document.body);`);
+ await w.document.querySelector('#notification-test').onclick();
+ const notification=messages.find(m=>m.action==='notify');assert(notification);assert.equal(notification.sound,true);assert.equal(notification.category,'all');
+});
