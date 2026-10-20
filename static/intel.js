@@ -4,11 +4,11 @@ const intelDate=at=>at?date(at):'–';
 const intelLabels={contact:'Bejelentett aktivitás',clear:'Clear · tiszta',query:'Kérdés',unparsed:'Nem értelmezett',old:'Lejárt intel',quiet:'Nincs friss bejelentés'};
 const intelAge=at=>at==null?'–':EveI18n.t('{0} perce').replace('{0}',fmt(Math.max(0,Math.floor((Date.now()/1000-at)/60))));
 const intelSource=p=>p.source==='manual'?'Kézi referencia':p.source==='esi'?p.online===false?'ESI · offline':p.alertable?'ESI · élő helyzet':'ESI · korábbi adat':p.source==='local'?'Local napló · utolsó ismert hely':'Nincs helyzetadat';
-async function refreshIntel(){
+async function refreshIntel(background=false){
   if(intelRequest)return intelRequest;
   intelRequest=(async()=>{try{
     const pos=intelData?.characters.find(c=>c.id===intelCharacter);const center=intelCenter||pos?.system_id;
-    intelData=await api('/api/intel?radius='+intelRadius+(center?'&center='+center:'')+(intelRegion?'&region='+intelRegion:'')+(intelHistory?'&history=1':''));intelEnabled=intelData.preferences.enabled;
+    intelData=await api('/api/intel?radius='+intelRadius+(center?'&center='+center:'')+(intelRegion?'&region='+intelRegion:'')+(intelHistory?'&history=1':'')+(background?'&background=1':''));intelEnabled=intelData.preferences.enabled;
     if(intelCharacter===null&&intelData.characters.length)intelCharacter=intelData.characters[0].id;
     if((view==='intel'&&!intelMapDragging)||(view==='settings'&&settingsTab==='intel'))render();
   }catch(e){if(view==='intel'||view==='settings'&&settingsTab==='intel')error(e.message);}finally{intelRequest=null;}})();return intelRequest;
@@ -21,7 +21,7 @@ async function pollIntelAlerts(){
     if(data.enabled&&EveDesktop.active&&notificationData?.preferences.os_enabled&&notificationData.preferences.categories.intel!==false){
       const status=await EveDesktop.notificationStatus();if(status.status==='authorized')await deliverNotifications('/api/intel/claim');
     }
-    if(view==='intel'&&!intelMapDragging&&!Object.keys(dirty).length)await refreshIntel();
+    if(view==='intel'&&!intelMapDragging&&!Object.keys(dirty).length)await refreshIntel(true);
   }catch(e){if(view==='intel')error(e.message);}finally{intelAlertBusy=false;}
 }
 function startIntelMonitor(){clearInterval(intelTick);intelTick=setInterval(()=>{if(!document.hidden)void pollIntelAlerts();},2000);void pollIntelAlerts();}

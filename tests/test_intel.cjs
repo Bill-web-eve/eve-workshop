@@ -12,14 +12,14 @@ async function fixture(){
  w.localStorage.setItem('eve-muhely-language','en');w.confirm=()=>true;
  w.fetch=async (url,opts)=>{calls.push(url);const value=url==='/api/state'?state:url==='/api/notifications'?notifications:url==='/api/intel/alerts'?{enabled:true,items:intel.alerts}:url==='/api/intel/preferences'?Object.assign(prefs,JSON.parse(opts.body)):url.startsWith('/api/intel?')?intel:url.startsWith('/api/intel/channels?')?{channels:['Test Intel','Other Intel']}:url.startsWith('/api/intel/systems?')?[{id:300002,name:'L-A5XP',region:'Test Region'}]:url==='/api/intel/claim'?{items:intel.alerts}:null;if(value===null)throw Error('Unexpected '+url);return {ok:true,json:async()=>value};};
  for(const tag of d.querySelectorAll('script[src]'))run(fs.readFileSync(path.join(root,tag.getAttribute('src')),'utf8'));
- await tick();await tick();run('navigate("intel")');await tick();await tick();return {w,d,run,calls,intel,notifications};
+ await tick();await tick();run('error("Old production error");navigate("intel")');await tick();await tick();return {w,d,run,calls,intel,notifications};
 }
 test('map layout is deterministic, finite, bounded and retains input data',()=>{
  const nodes=Array.from({length:150},(_,id)=>({id,x:id%15,y:Math.floor(id/15),name:'System '+id})),original=JSON.stringify(nodes),rows=layout(nodes);
  assert.deepEqual(layout(nodes),rows);assert.equal(JSON.stringify(nodes),original);assert.equal(new Set(rows.map(n=>n.id)).size,150);assert(rows.every(n=>Number.isFinite(n.lx)&&n.lx>=0&&n.lx<=1200&&n.ly>=0&&n.ly<=720));
 });
 test('intel has a separate view, map, original source and safe English labels',async t=>{
- const {w,d,run}=await fixture();t.after(()=>w.close());assert.equal(d.querySelector('.plan-selector').hidden,true);assert.equal(d.querySelector('#page-title').textContent,'Intel map');assert.equal(d.querySelectorAll('.intel-node').length,1);assert.equal(d.querySelector('#view-content script'),null);
+ const {w,d,run}=await fixture();t.after(()=>w.close());assert.equal(d.querySelector('#global-error').hidden,true);assert.equal(d.querySelector('.plan-selector').hidden,true);assert.equal(d.querySelector('#page-title').textContent,'Intel map');assert.equal(d.querySelectorAll('.intel-node').length,1);assert.equal(d.querySelector('#view-content script'),null);
  assert(d.querySelector('#view-content').textContent.includes('Reported Pilot'));assert(d.querySelector('#view-content').textContent.includes('Reporter'));assert(d.querySelector('#view-content').textContent.includes('Inferred from text'));
  assert(!/[áéíóöőúüű]/i.test(d.querySelector('#view-content').textContent),d.querySelector('#view-content').textContent);
  d.querySelector('[data-intel-system]').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));assert.equal(run('intelSelected'),300001);
