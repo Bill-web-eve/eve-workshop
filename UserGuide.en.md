@@ -51,7 +51,7 @@ For first use, open **Settings → Data access** and choose **Authorize mining l
 
 - Choose 7, 30 or 90 days, all local history, or a custom period. Both boundary dates are included; ledger dates use UTC.
 - Filter by character and ore. **By character** and **By ore** show units, m³, raw value, refined value and totals.
-- **Daily totals** and **Ledger entries** show the dates and systems. Tables support sorting and collapsible column filters; character columns use a dropdown. Detailed entries can be exported to CSV.
+- **Daily totals** shows separate raw and refined value columns and a period footer using the same Jita pricing as the headline total. Refining leftovers carry forward to the next day within the selected period, separately for each character and ore type. Daily material outputs sum to the period output; rounding individual ISK rows may differ by a few cents. **Ledger entries** shows the dates and systems. Tables support sorting and collapsible column filters; character columns use a dropdown. Detailed entries can be exported to CSV.
 - **Valuation** switches the main total between raw ore and refined outputs. Jita buy, sell and split are supported; the summary tables show both valuations. These are estimates at current prices, not historical sales proceeds.
 - Refining uses the moon settings: nullsec Tatara, T2 rig, maximum skills and the configured implant. Ore is pooled by character and type within the selected period. Only complete portions are refined and material outputs are rounded down. Leftover ore and gas are not counted as refined products. Refining and market fees are excluded.
 

@@ -51,6 +51,23 @@ class MiningTests(unittest.TestCase):
         combined=self.view(character_id=1);ore=self.catalog.mining_types[1230]
         expected=int(mining.Decimal(ore['materials'][0]['quantity'])*mining.reprocessing_yield(self.catalog.moon_rules,mining.preferences(self.store)))
         self.assertEqual(combined['summary']['materials'][0]['quantity'],expected)
+    def test_daily_refining_carries_remainders_and_matches_period_without_pooling_characters(self):
+        for cid,quantities in [(1,[50,70]),(2,[50,50])]:
+            self.store.save_mining(cid,snap([entry(quantities[0],'2026-10-19'),entry(quantities[1],'2026-10-20')]))
+        d=self.view();days={b['date']:b for b in d['by_day']}
+        self.assertEqual(sum(b['quantity'] for b in days.values()),d['summary']['quantity'])
+        self.assertTrue(all(m['quantity']==0 for m in days['2026-10-19']['materials']))
+        totals={}
+        for b in days.values():
+            for m in b['materials']:totals[m['id']]=totals.get(m['id'],0)+m['quantity']
+        self.assertEqual(totals,{m['id']:m['quantity'] for m in d['summary']['materials']})
+        before=self.view(end='2026-10-19')
+        self.assertTrue(all(m['quantity']==0 for m in before['summary']['materials']))
+        self.assertEqual(before['summary']['quantity'],100)
+        # Selecting a single day resets that period's carry; no hidden earlier ore.
+        only=self.view(start='2026-10-20')
+        self.assertTrue(all(m['quantity']==0 for m in only['summary']['materials']))
+
     def test_unknown_volumes_and_nonrefinable_gas_are_not_invented(self):
         gas=next(t for t,r in self.catalog.mining_types.items() if not r['materials'])
         self.store.save_mining(1,snap([entry(tid=gas),entry(tid=999999999)]))

@@ -59,3 +59,20 @@ test('missing access and missing prices are marked incomplete rather than presen
  assert(d.querySelector('[data-cost-warning]').textContent.includes('subtotal'));
  assert(d.querySelector('[data-mining-value=summary][data-mining-basis=raw]').textContent.startsWith('≥ '));
 });
+
+
+test('daily totals show comparable raw and refined values and a period footer in every pricing mode',async t=>{
+ const {w,d}=await setup();t.after(()=>w.close());
+ const form=d.querySelector('#mining-filters');form.elements.basis.value='refined';
+ form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
+ d.querySelector('[data-mining-tab=days]').click();await tick();
+ const table=d.querySelector('.mining-days');assert(table);assert(table.tHead.textContent.includes('Raw ore value'));assert(table.tHead.textContent.includes('Refined value'));
+ for(const [mode,raw,refined] of [['sell','4 200,00 ISK','108,00 ISK'],['buy','3 000,00 ISK','54,00 ISK'],['split','3 600,00 ISK','81,00 ISK']]){
+  const control=d.querySelector('[data-jita-mode]');control.value=mode;control.dispatchEvent(new w.Event('change'));await tick();
+  assert.equal(table.querySelector('tbody [data-mining-basis=raw]').textContent,raw);
+  assert.equal(table.querySelector('tbody [data-mining-basis=refined]').textContent,refined);
+  assert.equal(table.querySelector('tfoot [data-mining-basis=refined]').textContent,refined);
+  assert.equal(d.querySelector('[data-cost-grand]').textContent,refined);
+ }
+ assert(d.querySelector('#view-content').textContent.includes('using the same Jita pricing as the period total above.'));
+});

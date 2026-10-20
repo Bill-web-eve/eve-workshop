@@ -67,7 +67,11 @@ function renderMining(content){
     const markup=table([chars?'Karakter':'Érc',...heads],rows,'mining-'+miningTab).replace('</tbody></table>','</tbody>'+total+'</table>');
     content.innerHTML+=panel(miningTabs[miningTab],'',markup);
   }else if(miningTab==='days'){
-    content.innerHTML+=panel('Napi bontás','UTC',table(['Dátum','Mennyiség (db)','Térfogat (m³)','Nyers érc értéke'],d.by_day.map(b=>`<tr><td>${esc(b.date)}</td><td class="num">${fmt(b.quantity)}</td><td class="num">${miningVolume(b)}</td><td class="num" data-mining-value="d${b.date}" data-mining-basis="raw">–</td></tr>`),'mining-days'));
+    const rows=d.by_day.map(b=>`<tr><td>${esc(b.date)}</td>${stats(b,'d'+b.date)}</tr>`);
+    const total=`<tfoot><tr class="total-row"><td>Összesen</td>${stats(d.summary,'summary')}</tr></tfoot>`;
+    const markup=table(['Dátum',...heads],rows,'mining-days').replace('</tbody></table>','</tbody>'+total+'</table>');
+    content.innerHTML+=panel('Napi bontás','UTC',markup);
+    content.innerHTML+='<p class="footnote">A napi táblázat külön mutatja a nyers és a finomított értéket, ugyanazzal a Jita-árazással, mint a felső összesítés. A finomítási adagok maradékát a következő napra visszük tovább a kiválasztott időszakon belül, karakterenként és érctípusonként. Az ISK-sorok kerekítése néhány fillér eltérést okozhat.</p>';
   }else{
     const rows=d.records.map(r=>`<tr><td>${esc(r.date)}</td><td>${verbatim(r.character_name)}</td><td data-i18n-skip>${esc(r.system_name)}</td><td>${itemName(r.name)}</td><td class="num">${fmt(r.quantity)}</td><td class="num">${r.volume===null?'–':miningNumber(r.volume)}</td>${costCell(r.type_id,r.quantity)}</tr>`);
     content.innerHTML+=panel(miningTabs[miningTab],'',rows.length?table(['Dátum','Karakter','Rendszer','Érc','Mennyiség (db)','Térfogat (m³)','Egységár','Nyers érc értéke'],rows,'mining-records'):empty('Nincs bányászati naplósor a kiválasztott időszakban'));

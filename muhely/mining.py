@@ -99,7 +99,7 @@ def dashboard(store,catalog,start=None,end=None,character_id=None,ore_id=None,ac
         earliest=db.execute('SELECT MIN(date) FROM mining_ledger l JOIN characters c ON c.id=l.character_id').fetchone()[0]
     prefs=preferences(store);yield_=reprocessing_yield(catalog.moon_rules,prefs) if catalog.moon_rules else None
     def bucket():return {'quantity':0,'volume':0.,'unknown_volume':0,'records':0,'raw':defaultdict(int),'materials':defaultdict(int),'unrefinable':0}
-    all_=bucket();by_char=defaultdict(bucket);by_ore=defaultdict(bucket);by_day=defaultdict(bucket);batches=defaultdict(int)
+    all_=bucket();by_char=defaultdict(bucket);by_ore=defaultdict(bucket);by_day=defaultdict(bucket);batches=defaultdict(lambda:defaultdict(int))
     def add(b,r):
         b['quantity']+=r['quantity'];b['records']+=1;b['raw'][r['type_id']]+=r['quantity']
         if r['volume'] is None:b['unknown_volume']+=1
@@ -109,16 +109,23 @@ def dashboard(store,catalog,start=None,end=None,character_id=None,ore_id=None,ac
         r.update(name=catalog.name(r['type_id']),character_name=names[r['character_id']],system_name=catalog.moon_systems.get(r['solar_system_id'],{}).get('name',str(r['solar_system_id'])),
                  volume=float(Decimal(str(info['volume']))*r['quantity']) if info else None)
         for b in [all_,by_char[r['character_id']],by_ore[r['type_id']],by_day[r['date']]]:add(b,r)
-        batches[r['character_id'],r['type_id']]+=r['quantity']
-    for (c,t),quantity in batches.items():
+        batches[r['character_id'],r['type_id']][r['date']]+=r['quantity']
+    for (c,t),days in batches.items():
         info=catalog.mining_types.get(t,{})
         if not info.get('materials') or yield_ is None:
-            for b in [all_,by_char[c],by_ore[t]]:b['unrefinable']+=1
+            for b in [all_,by_char[c],by_ore[t],*(by_day[d] for d in days)]:b['unrefinable']+=1
             continue
-        portions=quantity//info['portion']
+        # Attribute pooled refining output to the day its cumulative complete
+        # portions become available. Carry ore remainders forward, never between
+        # characters or types, so daily material quantities sum to the period.
         for m in info['materials']:
-            output=int((Decimal(portions)*m['quantity']*yield_).to_integral_value(rounding=ROUND_FLOOR))
-            for b in [all_,by_char[c],by_ore[t]]:b['materials'][m['id']]+=output
+            cumulative=0;previous=0
+            for d,quantity in sorted(days.items()):
+                cumulative+=quantity
+                output=int((Decimal(cumulative//info['portion'])*m['quantity']*yield_).to_integral_value(rounding=ROUND_FLOOR))
+                by_day[d]['materials'][m['id']]+=output-previous
+                previous=output
+            for b in [all_,by_char[c],by_ore[t]]:b['materials'][m['id']]+=previous
     def finish(b):
         return {**b,'raw':[{'id':i,'name':catalog.name(i),'quantity':n} for i,n in sorted(b['raw'].items())],
                 'materials':[{'id':i,'name':catalog.name(i),'quantity':n} for i,n in sorted(b['materials'].items())]}

@@ -52,7 +52,7 @@ Első használatkor a **Beállítások → Adathozzáférések** oldalon karakte
 
 - Válassz 7, 30, 90 napos, teljes helyi vagy egyéni időszakot. A kezdő és záró nap is beleszámít; a napló dátumai UTC szerint értendők.
 - Szűrhetsz karakterre és ércre. A karakterenkénti és ércenkénti táblák mind a darabszámot, mind az m³-t mutatják, összesítő sorral.
-- A **Napi bontás** és **Naplósorok** az időbeli és rendszer szerinti részleteket mutatja. A táblák rendezhetők, szűrősoruk alapból zárt. A részletes napló CSV-be menthető.
+- A **Napi bontás** külön oszlopban mutatja a nyers és a finomított értéket, a felső összesítésével azonos Jita-árazással, összesítő sorral. A finomítási adagok maradékát karakterenként és érctípusonként továbbvisszük az időszak következő napjára; a napi anyagkihozatalok összege megegyezik az időszaki kihozatallal. Az ISK-sorok külön kerekítése néhány fillér eltérést okozhat. A **Naplósorok** az időbeli és rendszer szerinti részleteket mutatja. A táblák rendezhetők, szűrősoruk alapból zárt. A részletes napló CSV-be menthető.
 - Az **Értékelés** választóval a nyers érc vagy a finomított anyagok összértéke kerül felülre. Jita buy, sell és split használható; a soronkénti táblák mindkét értéket mutatják. Az érték a jelenlegi árakon számolt becslés, nem a bányászat napjának eladási bevétele.
 - A finomítás a holdaknál beállított nullsec Tatara, T2 rig, maximális skillek és implant kihozatalával számol. Az adott időszak érceit karakterenként és típusonként összevonja, csak egész finomítási adagokat dolgoz fel, a kimenetet lefelé kerekíti. A maradék ércet és a gázokat nem számolja finomított terméknek. Finomítási és piaci díjakat nem von le.
 

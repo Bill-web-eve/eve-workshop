@@ -1,6 +1,7 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "A napi táblázat külön mutatja a nyers és a finomított értéket, ugyanazzal a Jita-árazással, mint a felső összesítés. A finomítási adagok maradékát a következő napra visszük tovább a kiválasztott időszakon belül, karakterenként és érctípusonként. Az ISK-sorok kerekítése néhány fillér eltérést okozhat.": "Daily totals show raw and refined values separately, using the same Jita pricing as the period total above. Refining leftovers carry forward to the next day within the selected period, separately for each character and ore type. Rounding individual ISK rows may cause a difference of a few cents.",
   "Árazási tudnivalók": "Pricing details",
   "Skillek, PI, corporation és mining ledger olvasási engedélyek": "Read permissions for skills, PI, corporations and mining ledgers",
   "Dátum": "Date",
