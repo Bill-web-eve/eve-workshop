@@ -37,6 +37,7 @@ function applyJita(){
   $$('[data-jita-status]').forEach(el=>el.textContent=!jitaWanted.length?'Nincs lekérendő piaci ár.':jitaData.fetch_error?'A Jita-árak most nem érhetők el.':jitaData.running?`Jita-árak betöltése: ${jitaData.done||0}/${jitaData.total||0}`:Object.keys(jitaData.errors||{}).some(id=>jitaWanted.includes(Number(id)))?'Néhány Jita-ár nem frissült; a korábbi adatok megmaradtak.':oldest?'Árak ellenőrizve: '+date(oldest):'A Jita-árak még nem érkeztek meg.');
   $$('[data-jita-refresh]').forEach(el=>el.disabled=!jitaWanted.length||jitaData.running||!!jitaRequest);
   if(typeof applyEconomics==='function')applyEconomics();
+  if(typeof applyMiningValues==='function')applyMiningValues();
   globalThis.EveTables?.refreshAll();
 }
 function bindJita(ids){

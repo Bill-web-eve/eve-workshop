@@ -51,6 +51,9 @@ class Store:
         self.path = self.folder / 'muhely.sqlite3'
         with self.db() as db:
             db.executescript('''
+                CREATE TABLE IF NOT EXISTS mining_ledger(character_id INTEGER NOT NULL,date TEXT NOT NULL,
+                    solar_system_id INTEGER NOT NULL,type_id INTEGER NOT NULL,quantity INTEGER NOT NULL,
+                    fetched REAL NOT NULL,PRIMARY KEY(character_id,date,solar_system_id,type_id));
                 CREATE TABLE IF NOT EXISTS market_quotes(type_id INTEGER PRIMARY KEY,data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS moons(id TEXT PRIMARY KEY,moon_id INTEGER UNIQUE NOT NULL,data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS moon_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
@@ -181,6 +184,7 @@ class Store:
         with self.db() as db:
             db.execute('DELETE FROM snapshots WHERE character_id=?', (char_id,))
             db.execute('DELETE FROM resource_status WHERE character_id=?', (char_id,))
+            db.execute('DELETE FROM mining_ledger WHERE character_id=?', (char_id,))
             db.execute('DELETE FROM characters WHERE id=?', (char_id,))
 
     def snapshot(self, char_id, kind):
@@ -199,6 +203,14 @@ class Store:
             else:
                 db.execute('INSERT OR REPLACE INTO resource_status VALUES (?,?,?,?,?)',
                            (char_id, domain, time.time(), None, 0))
+
+    def save_mining(self, char_id, snapshot):
+        with self.db() as db:
+            db.executemany('INSERT INTO mining_ledger VALUES (?,?,?,?,?,?) ON CONFLICT(character_id,date,solar_system_id,type_id) DO UPDATE SET quantity=excluded.quantity,fetched=excluded.fetched',
+                ((char_id,r['date'],r['solar_system_id'],r['type_id'],r['quantity'],snapshot['fetched']) for r in snapshot['data']))
+            db.execute('INSERT OR REPLACE INTO snapshots VALUES (?,?,?,?,?,?)',
+                (char_id,'mining',json.dumps(snapshot['data']),snapshot['fetched'],snapshot['expires'],None))
+            db.execute('INSERT OR REPLACE INTO resource_status VALUES (?,?,?,?,?)',(char_id,'mining',time.time(),None,0))
 
     def resource_status(self, char_id, kind):
         with self.db() as db:

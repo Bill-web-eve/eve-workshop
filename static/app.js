@@ -205,10 +205,11 @@ function scheduleTaskPoll() {
       if(!state.task.running && state.task.finished!==lastTaskFinished) {
         lastTaskFinished=state.task.finished;if(state.task.kind!=='notifications')toast(state.task.message);
         if(view==='settings'&&settingsTab==='access')void loadSettingsAccess();
-        if(!['skills','pi','notifications'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
-        if(state.task.kind==='notifications'){skillData=null;piData=null;moonData=null;settingsAccessData=null;void refreshNotifications();if(view==='skills')await refreshSkills();else if(view==='pi')await refreshPI();else if(view==='moons')await refreshMoons();}
+        if(!['skills','pi','notifications','mining'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
+        if(state.task.kind==='notifications'){skillData=null;piData=null;moonData=null;settingsAccessData=null;void refreshNotifications();if(view==='mining')await refreshMining();else if(view==='skills')await refreshSkills();else if(view==='pi')await refreshPI();else if(view==='moons')await refreshMoons();}
         else if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else if(view==='settings')render();else await calculate(false);}
         else if(state.task.kind==='skills') await refreshSkills();
+        else if(state.task.kind==='mining')await refreshMining();
         else if(state.task.kind==='pi')await refreshPI();
       else if(['moons','extractions'].includes(state.task.kind))await refreshMoons();
         else {skillData=null;piData=null;moonData=null;if(view==='settings')render();else await calculate(false);}
@@ -275,9 +276,9 @@ function navigate(next) {
   syncMoonNavigation();
   clearTimeout(skillTimer);
   clearTimeout(piTimer);
-  if(['intel','skills','pi','notifications'].includes(next))error('');
+  if(['mining','intel','skills','pi','notifications'].includes(next))error('');
   $$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
-  const names={intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
+  const names={mining:'Mining ledger',intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
   $('#breadcrumb').textContent='Műhely / '+names[view]; render();return true;
 }
 function render() {
@@ -291,8 +292,9 @@ function render() {
   restorePlanSelector();
   const content=$('#view-content'); actions();
   document.body.classList.toggle('manual-view',view==='documentation');
-  $('.plan-selector').hidden=['intel','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures');
+  $('.plan-selector').hidden=['mining','intel','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures');
   $('#plan-status').hidden=!plan?.stale_characters.length;
+  if(view==='mining'){ $('#plan-status').hidden=true;return renderMining(content); }
   if(view==='intel')return renderIntel(content);
   if(view==='notifications')return renderNotifications(content);
   if(view==='documentation')return void renderDocumentation(content);
@@ -674,14 +676,15 @@ async function startTask(path) {
     error('');
     if(Object.keys(dirty).length) throw new Error('A frissítés előtt alkalmazd a megadott módosításokat.');
     await api(path,{}); await reloadState();
-    if(['skills','pi','corporations','moons','settings'].includes(view))render();
+    if(['mining','skills','pi','corporations','moons','settings'].includes(view))render();
     if(!state.task.running) {
       toast(state.task.message);
       if(view==='settings'&&settingsTab==='access')void loadSettingsAccess();
-      if(!['skills','pi','notifications'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
+      if(!['skills','pi','notifications','mining'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
       if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else if(view==='settings')render();else await calculate(false);}
       else if(state.task.kind==='skills')await refreshSkills();
-      else if(state.task.kind==='pi')await refreshPI();
+      else if(state.task.kind==='mining')await refreshMining();
+        else if(state.task.kind==='pi')await refreshPI();
       else if(['moons','extractions'].includes(state.task.kind))await refreshMoons();
       else if(state.task.kind!=='skills'){skillData=null;piData=null;if(view==='settings')render();else await calculate(false);}
     }
@@ -747,6 +750,6 @@ document.addEventListener('click',event=>{if(!event.target.closest('.search-wrap
     if(saved?.id && saved?.quantity){productId=saved.id;productName=saved.name;activePlanId=saved.saved_plan_id||null;EveNumbers.set($('#target-quantity'),saved.quantity);}
   }catch{}
   $('#product-search').value=productName;
-  try {if(intelWindowMode){await reloadState();view='intel';render();startIntelMonitor();return;}await reloadState();scheduleNotificationMonitor();startIntelMonitor();void refreshNotifications();if(productId)await calculate(false);else render();if(new URLSearchParams(location.search).has('connected')){history.replaceState(null,'','/');const back=sessionStorage.getItem('eve-muhely-auth-return');sessionStorage.removeItem('eve-muhely-auth-return');if(back?.startsWith('settings:'))openSettingsTab(back.split(':')[1]);else navigate(['skills','pi','corporations','moons'].includes(back)?back:'connection');if(back==='corporations')void startTask('/api/corporations/sync');toast(back==='moons'?'Holdadatok engedélyezve. A betöltés automatikusan elindult.':'Karakter engedélyezve. Frissítsd az EVE-adatokat.');}}
+  try {if(intelWindowMode){await reloadState();view='intel';render();startIntelMonitor();return;}await reloadState();scheduleNotificationMonitor();startIntelMonitor();void refreshNotifications();if(productId)await calculate(false);else render();if(new URLSearchParams(location.search).has('connected')){history.replaceState(null,'','/');const back=sessionStorage.getItem('eve-muhely-auth-return');sessionStorage.removeItem('eve-muhely-auth-return');if(back?.startsWith('settings:'))openSettingsTab(back.split(':')[1]);else navigate(['mining','skills','pi','corporations','moons'].includes(back)?back:'connection');if(back==='corporations')void startTask('/api/corporations/sync');toast(back==='moons'?'Holdadatok engedélyezve. A betöltés automatikusan elindult.':'Karakter engedélyezve. Frissítsd az EVE-adatokat.');}}
   catch(e){error(e.message);}
 })();

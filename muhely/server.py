@@ -21,7 +21,7 @@ import uuid
 import webbrowser
 
 from . import __version__
-from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe
+from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe, mining
 from .market import Market,validate_ids as market_ids
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
@@ -95,7 +95,8 @@ class App:
             try:
                 include_corps=any(c['synced_at'] for c in self.store.corporations())
                 include_moons=any(self.store.snapshot(c['id'],k) for c in self.store.characters() for k in ['moon_calendar','moon_timers','moon_notifications'])
-                phases=3+int(include_corps)+int(include_moons) if kind in ['sync','notifications'] else 1
+                include_mining=any('esi-industry.read_character_mining.v1' in scopes for scopes in self.eve.granted_scopes().values())
+                phases=3+int(include_corps)+int(include_moons)+int(include_mining) if kind in ['sync','notifications'] else 1
                 if kind in ['sync','notifications']:
                     if not self.store.characters():
                         raise PlanningError('Előbb adj hozzá egy karaktert az EVE-kapcsolat oldalon.')
@@ -117,6 +118,12 @@ class App:
                     if include_moons:
                         moon_results=phase('Holdak és naptár',lambda:extractions.sync(self.eve))
                         if any(not r['ok'] for r in moon_results):message+=' Néhány holdadat nem frissült; ellenőrizd a Kitermelési naptár hozzáféréseit. Ez a holdadat-figyelmeztetés önmagában nem akadályozza a gyártási terv számítását.'
+                    if include_mining:
+                        mining_results=phase('Bányászati naplók',lambda:mining.sync(self.eve))
+                        message+=f" Bányászati naplók frissítve: {sum(r['ok'] for r in mining_results)}/{len(mining_results)} karakter."
+                elif kind == 'mining':
+                    result=phase('Bányászati naplók',lambda:mining.sync(self.eve))
+                    message=f"Bányászati naplók frissítve: {sum(r['ok'] for r in result)}/{len(result)} karakter."
                 elif kind == 'skills':
                     if not self.store.characters():
                         raise PlanningError('Előbb adj hozzá karaktert az EVE-kapcsolat oldalon.')
@@ -178,7 +185,7 @@ class App:
             with urllib.request.urlopen(req, timeout=30) as response:
                 records = [json.loads(line) for line in response if line.strip()]
             latest = next(r for r in records if r['_key'] == 'sde')
-            if str(latest['buildNumber']) == self.catalog.meta.get('buildNumber'):
+            if str(latest['buildNumber']) == self.catalog.meta.get('buildNumber') and self.catalog.mining_types:
                 return
             build = integer(latest['buildNumber'], 'SDE build', 10**12, 1)
             archive = self.store.folder/'sde.download'
@@ -506,7 +513,7 @@ class App:
                 'locations': locations, 'jobs': [j for j in jobs if j.get('status') in ['active', 'paused', 'ready']],
                 'blueprint_count': len(bps), 'stale_characters': stale, 'sde': self.catalog.meta,
                 'recipe_count': sum(self.catalog.types.get(i, {}).get('published', 0) for i in self.catalog.recipes),
-                'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,
+                'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,'mining_scopes':mining.MINING_SCOPES,
                 'crypto_available': crypto_available()}
 
 
@@ -604,7 +611,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -651,6 +658,9 @@ class Handler(BaseHTTPRequestHandler):
                     raise PlanningError('Az EVE-belépés megszakadt. Az EVE-kapcsolat oldalon újraindítható.')
                 self.app.eve.finish(query.get('state', [''])[0], query.get('code', [''])[0], self.app.cookie)
                 if self.app.eve.authorized_feature=='intel':self.app.intel.request_locations()
+                if self.app.eve.authorized_feature=='mining':
+                    try:self.app.start_task('mining')
+                    except PlanningError:pass
                 if self.app.eve.authorized_feature=='moons':
                     try:self.app.start_task('extractions')
                     except PlanningError:pass
@@ -668,6 +678,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/corporations':
                 return self.send(200,corporation_dashboard(self.app.store))
             if path == '/api/accounts':return self.send(200,accounts.dashboard(self.app.store))
+            if path == '/api/mining':
+                with self.app.catalog.lock:
+                    return self.send(200,mining.dashboard(self.app.store,self.app.catalog,query.get('start',[None])[0],query.get('end',[None])[0],int(query.get('character_id',['0'])[0]),int(query.get('ore_id',['0'])[0]),self.app.eve.granted_scopes()))
             if path == '/api/skills':
                 with self.app.catalog.lock:
                     return self.send(200, skill_dashboard(self.app.store,self.app.catalog))
@@ -816,7 +829,7 @@ class Handler(BaseHTTPRequestHandler):
                     if char_id not in {c['id'] for c in self.app.store.characters()}:
                         raise PlanningError('A karakter már nincs hozzáadva.')
                 feature=data.get('feature')
-                if feature not in [None,'skills','pi','corporations','moons','intel']:raise PlanningError('Ismeretlen engedélyezési cél.')
+                if feature not in [None,'skills','pi','corporations','moons','intel','mining']:raise PlanningError('Ismeretlen engedélyezési cél.')
                 url = self.app.eve.start(self.app.cookie, self.app.origin+'/callback',char_id,feature)
                 return self.send(200,self.app.desktop_auth_start(url) if data.get('desktop') is True else {'url':url})
             elif path == '/api/characters/remove':
@@ -842,6 +855,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.app.start_task('sync')
             elif path == '/api/skills/sync':
                 self.app.start_task('skills')
+            elif path == '/api/mining/sync':
+                self.app.start_task('mining')
             elif path == '/api/pi/sync':
                 self.app.start_task('pi')
             elif path == '/api/corporations/sync':

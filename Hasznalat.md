@@ -44,6 +44,22 @@ A kézi módosítások az **alkalmazás** gomb megnyomásakor mentődnek. A kéz
 
 Az automatikus EVE-készletből csak a **becsomagolt** példányok használhatók fel, személyes és corporation-gyártásnál is. A kibontott hajók és modulok használatban lévőnek számítanak: nem fedezik a célt és nem szolgálnak gyártási bemenetként. A bennük vagy konténerekben lévő becsomagolt anyagok továbbra is számítanak. A BPO/BPC-tulajdont külön kezeljük. A kézi készletfelülírás szándékos kivétel. A **Terv kiszámítása** után a célmező alatt megjelenik a számítás eredménye; üres gyártási lista esetén jelzi, ha becsomagolt késztermék vagy folyamatban lévő job fedezi a célt.
 
+## Mining ledger – bányászati statisztikák
+
+A bal oldali **Mining ledger** menüpont a hozzáadott karakterek személyes bányászati naplóját összesíti. Ez a gyártási kör választásától független; ugyanazt a bányászatot nem számoljuk hozzá még egyszer corporation-megfigyelőkből.
+
+Első használatkor a **Beállítások → Adathozzáférések** oldalon karakterenként kattints a **Mining ledger engedélyezése** gombra. Az EVE Developer alkalmazásnak engedélyeznie kell az **esi-industry.read_character_mining.v1** scope-ot. A már hozzáadott karakterrel hagyd jóvá az engedélyt; a korábbi hozzáférések megmaradnak. Ezután a **Bányászati naplók frissítése** lekéri az összes karakter adatait. A közös EVE-adatellenőrzés is frissíti őket, ha legalább egy karakter hozzáférését már megadtad. A folyamatjelző a karaktert és az adatoldalt is mutatja.
+
+- Válassz 7, 30, 90 napos, teljes helyi vagy egyéni időszakot. A kezdő és záró nap is beleszámít; a napló dátumai UTC szerint értendők.
+- Szűrhetsz karakterre és ércre. A karakterenkénti és ércenkénti táblák mind a darabszámot, mind az m³-t mutatják, összesítő sorral.
+- A **Napi bontás** és **Naplósorok** az időbeli és rendszer szerinti részleteket mutatja. A táblák rendezhetők, szűrősoruk alapból zárt. A részletes napló CSV-be menthető.
+- Az **Értékelés** választóval a nyers érc vagy a finomított anyagok összértéke kerül felülre. Jita buy, sell és split használható; a soronkénti táblák mindkét értéket mutatják. Az érték a jelenlegi árakon számolt becslés, nem a bányászat napjának eladási bevétele.
+- A finomítás a holdaknál beállított nullsec Tatara, T2 rig, maximális skillek és implant kihozatalával számol. Az adott időszak érceit karakterenként és típusonként összevonja, csak egész finomítási adagokat dolgoz fel, a kimenetet lefelé kerekíti. A maradék ércet és a gázokat nem számolja finomított terméknek. Finomítási és piaci díjakat nem von le.
+
+Az ESI jelenleg 30 nap bányászati adatát biztosítja, legfeljebb 10 perces gyorsítótárral. A már letöltött előzmény helyben megmarad. Az újabb érték ugyanannak a karakter–nap–rendszer–érc sornak a korábbi mennyiségét felülírja; nem adódik hozzá újra. A letöltés előtti, ESI-ben már nem látható múlt nem állítható vissza. A karakter törlése a saját helyi bányászati előzményeit is törli.
+
+Hiányzó engedély, sikertelen frissítés, ismeretlen térfogat vagy hiányzó ár esetén a felület jelzi a hiányt; egy részösszeg nem jelenti az összes karakter teljes termelését. Az **Adatforrás és lefedettség** mutatja az utolsó sikeres lekérést és a gyorsítótár lejáratát. A bányászati napló nem készlet: a kibányászott ércet azóta eladhattad vagy felhasználhattad.
+
 ## Corporation készletek és corp gyártás
 
 A **Corporationok** menüpontban kérheted le a hozzáadott karakterek corporationjeit. A **Corp-adatok felderítése és frissítése** gomb felderíti a tagságukat, majd corporationönként egyszer tölti le a teljes készletet, blueprintlistát és ipari joblistát. Több hozzáadott tag nem többszörözi meg ugyanazt a corp készletet. A személyes karakter-/helyszűrő nem korlátozza ezt a lekérést.

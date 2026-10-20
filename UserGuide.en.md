@@ -43,6 +43,22 @@ Manual changes are saved when you use the corresponding **Apply** button. A blan
 
 Automatic EVE inventory uses only **packaged** items for both personal and corporation production. Assembled ships and modules are considered in use: they neither cover the target nor supply production inputs. Packaged materials inside ships or containers still count. BPO/BPC ownership is handled separately. Manual stock overrides remain an explicit exception. After **Calculate plan**, a status below the target fields confirms the result; when no production remains, it explains how packaged finished products or active jobs cover the target.
 
+## Mining ledger
+
+**Mining ledger** in the sidebar combines the personal mining history of all connected characters, independently of the production inventory owner. Corporation observer data is not added again to the same personal totals.
+
+For first use, open **Settings → Data access** and choose **Authorize mining ledger** for each character. Enable **esi-industry.read_character_mining.v1** in the EVE Developer application, then authorize the character already connected to the app. Existing scopes are preserved. **Refresh mining ledgers** fetches all characters. The shared EVE data check also refreshes the ledgers once at least one character has authorized access. The operation indicator shows the current character and page.
+
+- Choose 7, 30 or 90 days, all local history, or a custom period. Both boundary dates are included; ledger dates use UTC.
+- Filter by character and ore. **By character** and **By ore** show units, m³, raw value, refined value and totals.
+- **Daily totals** and **Ledger entries** show the dates and systems. Tables support sorting and collapsible column filters; character columns use a dropdown. Detailed entries can be exported to CSV.
+- **Valuation** switches the main total between raw ore and refined outputs. Jita buy, sell and split are supported; the summary tables show both valuations. These are estimates at current prices, not historical sales proceeds.
+- Refining uses the moon settings: nullsec Tatara, T2 rig, maximum skills and the configured implant. Ore is pooled by character and type within the selected period. Only complete portions are refined and material outputs are rounded down. Leftover ore and gas are not counted as refined products. Refining and market fees are excluded.
+
+ESI currently provides 30 days of mining history, cached for up to 10 minutes. Downloaded history is kept locally. Refreshes replace each character/date/system/ore quantity rather than adding it again. History that expired from ESI before it was downloaded cannot be recovered. Removing a character also removes its local mining history.
+
+Missing permissions, failed refreshes, unknown volumes and missing prices are shown explicitly; partial totals do not represent every character's complete mining activity. **Source and coverage** shows the last successful fetch and cache expiry. Mining history is not inventory: the ore may already have been sold or consumed.
+
 ## Corporation inventory and production
 
 Open **Corporations** and use **Discover and refresh corporation data** to identify the corporations of your added characters. Inventory, blueprints and industry jobs are downloaded once per corporation. Adding several members does not multiply corporation stock. Personal character and location filters do not restrict discovery.

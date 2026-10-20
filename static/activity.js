@@ -7,6 +7,7 @@ globalThis.EveActivity=(()=>{
   const detailText=value=>Array.isArray(value)?value.map(p=>p.raw?p.text:t(p.text,...(p.args||[]))).join(' · '):t(value);
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const labels={
+    '/api/mining':'Bányászati naplók összesítése','/api/mining/sync':'Bányászati naplók frissítése',
     '/api/intel/characters':'Pilótaazonosítók ellenőrzése…','/api/intel':'Inteladatok betöltése','/api/intel/channels':'Intelcsatornák keresése','/api/intel/locations':'ESI-helyzetek frissítése',
     '/api/state':'Műhelyadatok betöltése','/api/plan':'Gyártási terv számítása','/api/schedule':'Gyártás ütemezése','/api/search':'Termékkeresés',
     '/api/skills':'Skilladatok összesítése','/api/pi':'PI-adatok összesítése','/api/moons':'Holdadatok összesítése','/api/moons/systems':'Rendszerkeresés',
@@ -15,8 +16,8 @@ globalThis.EveActivity=(()=>{
     '/api/corporations':'Corp-adatok összesítése','/api/accounts':'Accountadatok kezelése','/api/plans/shopping':'Összes terv anyaghiányának számítása','/api/documentation':'Kézikönyv betöltése','/api/export':'Fájl előkészítése',
     '/api/auth/start':'EVE-belépés előkészítése','/api/desktop/auth':'EVE-belépés ellenőrzése','/api/shutdown':'Alkalmazás leállítása'
   };
-  const taskLabels={sync:'EVE-adatok frissítése',notifications:'EVE-adatok ellenőrzése',skills:'Skilladatok frissítése',pi:'PI-adatok frissítése',corporations:'Corp-adatok frissítése',moons:'Holdrendszerek ellenőrzése',extractions:'Holdadatok frissítése',sde:'Receptadatbázis frissítése'};
-  const starts=new Set(['/api/sync','/api/notifications/sync','/api/skills/sync','/api/pi/sync','/api/corporations/sync','/api/moons/sync','/api/moons/extractions/sync','/api/sde/update','/api/prices/refresh','/api/industry/refresh']);
+  const taskLabels={mining:'Bányászati naplók frissítése',sync:'EVE-adatok frissítése',notifications:'EVE-adatok ellenőrzése',skills:'Skilladatok frissítése',pi:'PI-adatok frissítése',corporations:'Corp-adatok frissítése',moons:'Holdrendszerek ellenőrzése',extractions:'Holdadatok frissítése',sde:'Receptadatbázis frissítése'};
+  const starts=new Set(['/api/mining/sync','/api/sync','/api/notifications/sync','/api/skills/sync','/api/pi/sync','/api/corporations/sync','/api/moons/sync','/api/moons/extractions/sync','/api/sde/update','/api/prices/refresh','/api/industry/refresh']);
   const base=path=>String(path).split('?')[0];
   function label(path){const key=base(path);if(labels[key])return labels[key];if(starts.has(key))return 'Adatfrissítés indítása';if(/\/(save|settings|preferences|parameters|inventory|reservation|remove)$/.test(key))return 'Módosítások mentése';return 'Adatok lekérése';}
   function elements(){

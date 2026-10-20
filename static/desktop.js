@@ -26,6 +26,7 @@ globalThis.EveDesktop=(()=>{
       const back=sessionStorage.getItem('eve-muhely-auth-return');sessionStorage.removeItem('eve-muhely-auth-return');
       if(typeof settingsAccessData!=='undefined')settingsAccessData=null;
       if(back?.startsWith('settings:'))openSettingsTab(back.split(':')[1]);
+      if(back==='mining'){navigate('mining');void refreshMining();}
       render();
       preferences();await send('activate');toast('Karakter engedélyezve. Frissítsd az EVE-adatokat.');return;
     }

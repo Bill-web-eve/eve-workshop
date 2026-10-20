@@ -79,6 +79,8 @@ def import_sde(archive_path, target):
                     ((r['_key'],planet_name(r),r['solarSystemID'],r['typeID']) for r in rows('mapPlanets.jsonl')))
             from .moon_catalog import import_moons
             import_moons(db, archive)
+            from .mining_catalog import import_mining
+            import_mining(db, archive)
             duplicate_count = 0
             for r in rows('blueprints.jsonl'):
                 blueprint = db.execute('SELECT published FROM types WHERE id=?', (r['blueprintTypeID'],)).fetchone()
@@ -182,6 +184,15 @@ class Catalog:
                     meta=dict(fallback.execute('SELECT key,value FROM meta'))
                     if meta.get('buildNumber')==self.meta.get('buildNumber'):
                         self.moon_variants={int(k):v for k,v in json.loads(meta.get('moonOreVariants','{}')).items()}
+
+            self.mining_types={}
+            for source in dict.fromkeys(p for p in [self.path,self.pi_fallback] if p):
+                with closing(sqlite3.connect(source)) as mining_db:
+                    if not mining_db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mining_types'").fetchone():continue
+                    meta=dict(mining_db.execute('SELECT key,value FROM meta'))
+                    if meta.get('buildNumber')!=self.meta.get('buildNumber'):continue
+                    self.mining_types={r[0]:json.loads(r[1]) for r in mining_db.execute('SELECT id,data FROM mining_types')}
+                    break
 
     def moon_locations(self, system_id):
         if not self.moon_source:return []
