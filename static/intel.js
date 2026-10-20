@@ -1,5 +1,5 @@
 'use strict';
-let intelData=null,intelRequest=null,intelEnabled=null,intelAlertBusy=false,intelTick=null,intelCharacter=null,intelCenter=null,intelRegion=null,intelRadius=5,intelHistory=false,intelSelected=null,intelZoom=1,intelPan={x:0,y:0},intelMapDragging=false,intelDiscovered=[],intelSettingsDraft=null;
+let intelFingerprint=null,intelData=null,intelRequest=null,intelEnabled=null,intelAlertBusy=false,intelTick=null,intelCharacter=null,intelCenter=null,intelRegion=null,intelRadius=5,intelHistory=false,intelSelected=null,intelZoom=1,intelPan={x:0,y:0},intelMapDragging=false,intelDiscovered=[],intelSettingsDraft=null;
 const intelDate=at=>at?date(at):'–';
 const intelLabels={contact:'Bejelentett aktivitás',clear:'Clear · tiszta',query:'Kérdés',unparsed:'Nem értelmezett',old:'Lejárt intel',quiet:'Nincs friss bejelentés'};
 const intelAge=at=>at==null?'–':EveI18n.t('{0} perce').replace('{0}',fmt(Math.max(0,Math.floor((Date.now()/1000-at)/60))));
@@ -10,7 +10,11 @@ async function refreshIntel(background=false){
     const pos=intelData?.characters.find(c=>c.id===intelCharacter);const center=intelCenter||pos?.system_id;
     intelData=await api('/api/intel?radius='+intelRadius+(center?'&center='+center:'')+(intelRegion?'&region='+intelRegion:'')+(intelHistory?'&history=1':'')+(background?'&background=1':''));intelEnabled=intelData.preferences.enabled;
     if(intelCharacter===null&&intelData.characters.length)intelCharacter=intelData.characters[0].id;
-    if((view==='intel'&&!intelMapDragging)||(view==='settings'&&settingsTab==='intel'))render();
+    const fingerprint=JSON.stringify([intelData.preferences,intelData.characters,intelData.nodes,intelData.reports,intelData.edges,intelData.status.error,intelData.status.file_errors,intelData.status.files,Math.floor(Date.now()/60000)]);
+    if((view==='intel'&&!intelMapDragging)||(view==='settings'&&settingsTab==='intel')){
+      if(!background||fingerprint!==intelFingerprint){render();intelFingerprint=fingerprint;}
+      else if($('#intel-watcher-time'))$('#intel-watcher-time').textContent=intelDate(intelData.status.checked);
+    }
   }catch(e){if(view==='intel'||view==='settings'&&settingsTab==='intel')error(e.message);}finally{intelRequest=null;}})();return intelRequest;
 }
 async function pollIntelAlerts(){
@@ -32,7 +36,7 @@ function renderIntel(content){
   actions('<button class="button compact" id="intel-refresh">Állapot frissítése</button><button class="button compact" data-open-settings="intel">Intelbeállítások</button>');$('#intel-refresh').onclick=()=>void refreshIntel();
   if(!intelData){content.innerHTML=empty('Inteladatok betöltése');void refreshIntel();return;}
   const d=intelData,p=d.preferences,current=d.characters.find(c=>c.id===intelCharacter),status=d.status;
-  content.innerHTML=`<div class="banner ${status.error?'error':''}"><strong>${p.enabled?'Chatlogfigyelés bekapcsolva':'Chatlogfigyelés kikapcsolva'}</strong><span> · ${fmt(status.done||0)} / ${fmt(status.files||0)} <span>napló</span> · <span>Utolsó ellenőrzés:</span> ${intelDate(status.checked)}</span>${status.error?'<div>'+esc(status.error)+'</div>':''}${status.file_errors?'<p>Legalább egy naplófájl nem olvasható; ellenőrizd a mappa és a fájlok hozzáférését.</p>':''}<div data-i18n-skip>${esc(p.channels.join(' · '))}</div></div>`;
+  content.innerHTML=`<div class="banner ${status.error?'error':''}"><strong>${p.enabled?'Chatlogfigyelés bekapcsolva':'Chatlogfigyelés kikapcsolva'}</strong><span> · ${fmt(status.done||0)} / ${fmt(status.files||0)} <span>napló</span> · <span>Utolsó ellenőrzés:</span> <span id="intel-watcher-time">${intelDate(status.checked)}</span></span>${status.error?'<div>'+esc(status.error)+'</div>':''}${status.file_errors?'<p>Legalább egy naplófájl nem olvasható; ellenőrizd a mappa és a fájlok hozzáférését.</p>':''}<div data-i18n-skip>${esc(p.channels.join(' · '))}</div></div>`;
   if(!p.enabled)content.innerHTML+=settingsShortcut('Az intel használatához válassz mappát és csatornákat, majd kapcsold be a figyelést.','intel');
   if(current&&!current.alertable)content.innerHTML+=settingsShortcut('A kiválasztott karakterhez nincs megbízható helyzet. Engedélyezd az ESI-helyzetet vagy válassz kézi referenciarendszert. A régi helyzet nem igazolja a jelenlegi közelséget.','intel');
   if(d.alerts.length)content.innerHTML+=`<div class="banner intel-danger" role="alert"><strong>Közeli intel</strong>${d.alerts.map(a=>`<div>${verbatim(a.character_name)} · ${esc(fmt(a.jumps))} jump · <button class="text-button" data-intel-locate="${a.system_id}">${verbatim(a.subject)}</button></div>`).join('')}</div>`;

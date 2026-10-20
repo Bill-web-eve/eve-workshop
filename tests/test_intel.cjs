@@ -41,3 +41,9 @@ test('nearby intel delivery uses durable claim, character and distance; notifica
  await run('pollIntelAlerts()');assert.equal(sent.length,1);assert(sent[0].body.includes('Own Pilot · 2 jump'));assert(sent[0].sound);assert(calls.includes('/api/intel/claim'));assert.equal(d.querySelector('#intel-count').textContent,'1');
  run('navigate("jobs");openNotificationCenter("personal","intel")');await tick();assert.equal(run('view'),'intel');
 });
+
+test('background status checks keep the map DOM stable when no intel changed',async t=>{
+ const {w,d,run,intel}=await fixture();t.after(()=>w.close());const svg=d.querySelector('#intel-map svg'),table=d.querySelector('.intel-feed');
+ intel.status.checked+=1;await run('refreshIntel(true)');await tick();assert.equal(d.querySelector('#intel-map svg'),svg);assert.equal(d.querySelector('.intel-feed'),table);
+ intel.reports[0].state='clear';await run('refreshIntel(true)');await tick();assert.notEqual(d.querySelector('#intel-map svg'),svg);
+});
