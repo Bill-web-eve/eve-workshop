@@ -62,6 +62,16 @@ class IntelStoreTests(unittest.TestCase):
             if not p.is_symlink():os.utime(p,(NOW,NOW))
         self.monitor.scan(self.p,NOW)
     def alerts(self):return i.collect_alerts(self.store,self.u,NOW)
+    def test_overlay_preferences_validate_exact_seconds_and_alert_payload_keeps_report_detail(self):
+        self.enable(overlay_enabled=True,overlay_seconds=75,jumps=1)
+        self.write_log(line('L-A5XP Pilot One Buzzard')+'\n'+line('Jita Far Pilot')+'\n');self.scan()
+        alerts=self.alerts();self.assertEqual(alerts['overlay'],{'enabled':True,'seconds':75});self.assertEqual(len(alerts['items']),1)
+        report=alerts['items'][0]['overlay_reports'][0];self.assertEqual(report['pilots'],['Pilot One']);self.assertEqual(report['ships'],['Buzzard']);self.assertEqual(report['when'],NOW);self.assertEqual(alerts['items'][0]['system_name'],'L-A5XP')
+        for value in [0,3601,1.5,True]:
+            with self.assertRaises(PlanningError):i.save_preferences(self.store,{'overlay_seconds':value},self.u)
+        with self.assertRaises(PlanningError):i.save_preferences(self.store,{'overlay_enabled':1},self.u)
+        self.enable(overlay_enabled=False);self.assertFalse(self.alerts()['overlay']['enabled'])
+
     def test_utf16_partial_lines_duplicate_listeners_and_incremental_reads(self):
         path=self.write_log(line('L-A5XP Pilot One')+'\n'+line('Jita Pilot Two')[:-3]);self.scan();self.assertEqual(len(i.read_reports(self.store,self.p,NOW)),1)
         with path.open('ab') as f:f.write((line('Jita Pilot Two')[-3:]+'\n').encode('utf-16-le'))

@@ -21,7 +21,7 @@ def build_app(application):
             'CFBundleIdentifier': 'hu.eve.muhely.local', 'CFBundleExecutable': 'EVE Muhely',
             'CFBundlePackageType': 'APPL',
             'CFBundleShortVersionString': runpy.run_path(str(SOURCE/'muhely/__init__.py'))['__version__'],
-            'CFBundleVersion': '25', 'LSMinimumSystemVersion': '11.0', 'LSUIElement': False,
+            'CFBundleVersion': '26', 'LSMinimumSystemVersion': '11.0', 'LSUIElement': False,
             'CFBundleIconFile': 'app-window.icns',
             'NSAppTransportSecurity': {'NSAllowsLocalNetworking': True},
             'NSHighResolutionCapable': True}

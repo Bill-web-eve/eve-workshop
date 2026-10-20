@@ -493,3 +493,13 @@ On Mac, the Window menu and the app icon’s Dock context menu list the individu
 The chat is **read-only** and never sends messages to EVE. Disable **Auto-scroll**, or scroll upwards, to retain your reading position. Returning to the bottom resumes following new messages. Messages are chronological, oldest first, with up to 500 entries from the last 24 hours. Unchanged rows are retained during background checks.
 
 One map and one chat window can be open. Opening one again focuses the existing window. Closing an auxiliary window keeps the main app and other window running. Closing the main window or quitting stops all windows and monitoring. Theme and language are shared. Only the main window delivers OS alerts, avoiding duplicate notifications from multiple windows.
+
+## Intel overlay
+
+Settings → Intel settings → **Intel overlay** enables a separate borderless Mac panel. It uses the configured alert jump distance and only reliable positions and unambiguous fresh reports. It does not require OS notification permission and does not send extra notification sounds. A clear report or a pilot moving elsewhere removes the corresponding active report.
+
+The default display duration is **60 seconds**, editable as whole seconds from 1 to 3600. Age is measured from the message timestamp, so polling or reopening the app does not restart the countdown. Older reports remain in chat. Up to five recent reports are visible at once, with system, jump distance, reported pilots, known ships and your reference character.
+
+When empty the panel is hidden completely. In normal use it has no title bar, does not take keyboard focus and allows mouse clicks through to the underlying app. It floats above ordinary and full-screen applications; macOS system/security interfaces can take precedence.
+
+Select a **Monitor**, **X**, **Y** and **Width**, then **Save overlay**. Coordinates are measured from that monitor’s top-left corner in screen points. Each monitor remembers its own placement. **Move overlay** displays a draggable placeholder, even without reports. Drag it onto the desired monitor and click its **Done** button. **Finish positioning · reload position** locks the panel and reads its current position back into Settings. When a saved monitor is unavailable, the panel uses an available monitor and stays within its bounds. Placement is saved locally on that Mac. Closing the app stops the overlay.

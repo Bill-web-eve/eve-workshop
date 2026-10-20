@@ -65,6 +65,6 @@ globalThis.EveDesktop=(()=>{
     const query=new URLSearchParams({intel_window:kind});for(const key of ['character_id','region','center'])if(Number.isSafeInteger(options[key])&&options[key]>0)query.set(key,options[key]);if(options.history)query.set('history','1');
     const child=window.open('/?'+query,'eve-intel-'+kind,'popup,width='+(kind==='map'?1200:700)+',height=800');return child?Promise.resolve({opened:true}):Promise.reject(Error('A külön ablakot a böngésző letiltotta. Engedélyezd a felugró ablakokat.'));
   }
-  return {active,saveBlob,openIntelWindow,openExternal:url=>send('external',{url}),chooseIntelFolder:()=>send('chooseIntelFolder'),authorize,prepareQuit,shutdown,notificationStatus:()=>send('notificationStatus'),requestNotifications:()=>send('requestNotifications'),notify:content=>send('notify',content),quit:()=>send('stopped')};
+  return {active,saveBlob,openIntelWindow,intelOverlayStatus:()=>send('intelOverlayStatus'),configureIntelOverlay:options=>send('configureIntelOverlay',{options}),syncIntelOverlay:data=>send('syncIntelOverlay',{data}),openExternal:url=>send('external',{url}),chooseIntelFolder:()=>send('chooseIntelFolder'),authorize,prepareQuit,shutdown,notificationStatus:()=>send('notificationStatus'),requestNotifications:()=>send('requestNotifications'),notify:content=>send('notify',content),quit:()=>send('stopped')};
 })();
 async function openEveAuthorization(auth){return EveDesktop.authorize(auth);}

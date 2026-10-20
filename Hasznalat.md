@@ -501,3 +501,13 @@ A Mac az önálló ablakokat az Ablak menüben és a Dock appikonjára jobb katt
 A chat **csak olvasható**: nem küld üzenetet a játékba. Az **Automatikus görgetés** kapcsolóval a legújabb sor követése leállítható. Felfelé görgetve az app megőrzi az olvasási helyet; az alsó szélre visszatérve a követés folytatódik. A bejegyzéseket időrendben, legrégebbitől a legújabbig mutatja, legfeljebb az utolsó 24 óra 500 sorával. A változatlan sorok nem épülnek újra minden ellenőrzésnél.
 
 Egy térkép- és egy chatablak lehet nyitva; az ismételt megnyitás a meglévőt hozza elő. A mellékablak bezárása nem állítja le az appot és a másik ablakot. A főablak bezárása vagy az alkalmazás kiléptetése minden ablakot és a helyi figyelést leállítja. A nyelv és a sötét/világos téma közös az ablakokban. Az OS-értesítéseket továbbra is a főablak kezeli, így a több ablak nem küld ismételt értesítést.
+
+## Átlátszó inteljelző
+
+Beállítások → Intelbeállítások → **Átlátszó inteljelző**: külön, keret nélküli Mac-ablak. A beállított riasztási jumptávolságon belüli, friss és egyértelmű jelentéseket mutatja, megbízható karakterhelyzet alapján. Nem igényel macOS-értesítési engedélyt, és nem ad külön értesítési hangot. Clear vagy a pilóta új helyszíne megszünteti a korábbi aktív jelentést.
+
+Alapértelmezett megjelenítés: **60 másodperc**, 1–3600 között egész másodpercre állítható. Az üzenet időpontjától számolunk: a frissítés vagy újranyitás nem indítja újra a visszaszámlálást. Az előzmények a chatben megmaradnak. Egyszerre legfeljebb öt friss jelentés látszik: rendszer, jump, jelentett pilóták, ismert hajók és a saját referenciakarakter.
+
+Üresen teljesen eltűnik. Normál módban nincs címsora, nem veszi el a billentyűzet fókuszát, és a kattintásokat átengedi az alatta lévő alkalmazásnak. A normál és teljes képernyős alkalmazások fölött lebeg; a macOS rendszer- és biztonsági felületei elsőbbséget élvezhetnek.
+
+Válaszd ki a monitort, az X/Y pozíciót és a szélességet, majd mentsd. Az X/Y az adott monitor bal felső sarkától mért képernyőpont. Monitoronként megmarad a hely. Az **Inteljelző mozgatása** gomb egy húzható mintát mutat akkor is, ha nincs jelentés. Húzd a kívánt monitorra, majd kattints a mintán a **Kész** gombra. Az **Elhelyezés kész · pozíció beolvasása** lezárja a mozgatást és visszaolvassa a beállítási mezőkbe a helyet. Ha a mentett monitor nincs csatlakoztatva, elérhető monitorra helyezi az ablakot, annak határain belül. A pozíció ezen a Macen tárolódik. Az app bezárásával az inteljelző is leáll.

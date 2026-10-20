@@ -8,7 +8,7 @@ from .planner import PlanningError
 from .esi import ESI,EsiError,AuthenticationError,INTEL_SCOPES
 from . import intel_universe
 
-DEFAULTS={'enabled':False,'folder':'','channels':[],'character_ids':None,'manual_locations':{},'jumps':5,'ttl_minutes':20,'cooldown_seconds':20,'region_ids':[],'allow_local_alerts':False,'sound':False}
+DEFAULTS={'enabled':False,'folder':'','channels':[],'character_ids':None,'manual_locations':{},'jumps':5,'ttl_minutes':20,'cooldown_seconds':20,'region_ids':[],'allow_local_alerts':False,'sound':False,'overlay_enabled':True,'overlay_seconds':60}
 FILE=re.compile(r'^(?P<channel>.+)_(?P<date>\d{8})_(?P<time>\d{6})_(?P<character>\d+)\.txt$',re.I)
 LINE=re.compile(r'^\ufeff*\[\s*(\d{4}\.\d\d\.\d\d \d\d:\d\d:\d\d)\s*\]\s*([^>]{1,100})>\s*(.*)$')
 LINK=re.compile(r'<url=["\']?showinfo:(137[3-9]|138[0-6])//(\d+)["\']?>(.*?)</url>',re.I)
@@ -37,7 +37,7 @@ def save_preferences(store,data,universe):
     if not isinstance(data,dict) or set(data)-set(DEFAULTS):raise PlanningError('Hibás intelbeállítás.')
     p=preferences(store);known={c['id'] for c in store.characters()}
     for key,value in data.items():
-        if key in ['enabled','allow_local_alerts','sound']:
+        if key in ['enabled','allow_local_alerts','sound','overlay_enabled']:
             if type(value) is not bool:raise PlanningError('Hibás intelkapcsoló.')
         elif key=='folder':
             if not isinstance(value,str) or len(value)>2000:raise PlanningError('Hibás chatlogmappa.')
@@ -55,7 +55,7 @@ def save_preferences(store,data,universe):
             valid={r['region_id'] for r in universe.systems.values()}
             if not isinstance(value,list) or any(type(v) is not int or v not in valid for v in value):raise PlanningError('Ismeretlen intelrégió.')
         else:
-            low,high={'jumps':(0,30),'ttl_minutes':(1,120),'cooldown_seconds':(0,600)}[key]
+            low,high={'jumps':(0,30),'ttl_minutes':(1,120),'cooldown_seconds':(0,600),'overlay_seconds':(1,3600)}[key]
             if type(value) is not int or not low<=value<=high:raise PlanningError('Az intelérték kívül esik a megengedett tartományon.')
         p[key]=value
     if p['enabled'] and (not p['folder'] or not p['channels']):raise PlanningError('A figyeléshez válassz chatlogmappát és legalább egy csatornát.')
@@ -169,7 +169,7 @@ def collect_alerts(store,universe=None,now=None):
     now=time.time() if now is None else now;p=preferences(store);universe=universe or intel_universe.load(store)
     with store.db() as db:row=db.execute('SELECT data FROM intel_status WHERE id=1').fetchone()
     status=json.loads(row['data']) if row else {}
-    if not p['enabled'] or status.get('error') or now-(status.get('checked') or 0)>10:return {'items':[],'observed_domains':[],'enabled':p['enabled']}
+    if not p['enabled'] or status.get('error') or now-(status.get('checked') or 0)>10:return {'items':[],'observed_domains':[],'enabled':p['enabled'],'overlay':{'enabled':p['overlay_enabled'],'seconds':p['overlay_seconds']}}
     pos=positions(store,universe,p,now);reports=read_reports(store,p,now);owned={c['name'].casefold() for c in store.characters()}
     active,cleared=active_state(reports,now,p['ttl_minutes']*60,owned);items=[];domains=[]
     by_system=defaultdict(list)
@@ -185,7 +185,9 @@ def collect_alerts(store,universe=None,now=None):
             key=f"intel:{char['id']}:{sid}:{identity}";newest=max(rows,key=lambda r:r['timestamp']);name=universe.systems[sid]['name']
             items.append({'id':key,'domain':domain,'category':'intel','kind':'intel_near','subject':name+(' · '+', '.join(pilots[:6]) if pilots else ''),'corporation_id':None,'scope_name':'Személyes','when':newest['timestamp'],'checked_at':status['checked'],'reliable':True,'character_id':char['id'],'character_name':char['name'],'system_id':sid,'jumps':distance,'pilots':pilots,'report_id':newest['id'],'sound':p['sound'],'cooldown':p['cooldown_seconds']})
             items[-1]['episode_key']=str(int(cleared.get(sid,0)))
-    return {'items':items,'observed_domains':domains,'enabled':p['enabled']}
+            items[-1]['system_name']=name
+            items[-1]['overlay_reports']=[{'id':r['id'],'when':r['timestamp'],'pilots':[pilot['name'] for pilot in r['pilots']],'ships':[ship['name'] for ship in r.get('ships',[])]} for r in rows]
+    return {'items':items,'observed_domains':domains,'enabled':p['enabled'],'overlay':{'enabled':p['overlay_enabled'],'seconds':p['overlay_seconds']}}
 
 
 class IntelMonitor:

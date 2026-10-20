@@ -36,7 +36,7 @@ test('intel settings preserve dirty inputs and support selectable systems and ch
 test('nearby intel delivery uses durable claim, character and distance; notification opens intel',async t=>{
  const {w,d,run,intel,notifications:n,calls}=await fixture();t.after(()=>w.close());
  intel.alerts=[{id:'intel:1:300001:x',category:'intel',kind:'intel_near',subject:'J5A-IX · Reported Pilot',character_name:'Own Pilot',jumps:2,corporation_id:null,when:1800000000,receipt:'receipt',notification_id:'id',sound:true}];n.preferences.os_enabled=true;
- const sent=[];w.EveDesktop.active=true;w.EveDesktop.notificationStatus=async()=>({status:'authorized'});w.EveDesktop.notify=async body=>sent.push(body);
+ const sent=[];w.EveDesktop.active=true;w.EveDesktop.syncIntelOverlay=async()=>({});w.EveDesktop.notificationStatus=async()=>({status:'authorized'});w.EveDesktop.notify=async body=>sent.push(body);
  const old=w.fetch;w.fetch=async(url,opts)=>url==='/api/notifications/sent'?{ok:true,json:async()=>({ok:true})}:old(url,opts);
  await run('pollIntelAlerts()');assert.equal(sent.length,1);assert(sent[0].body.includes('Own Pilot · 2 jump'));assert(sent[0].sound);assert(calls.includes('/api/intel/claim'));assert.equal(d.querySelector('#intel-count').textContent,'1');
  run('navigate("jobs");openNotificationCenter("personal","intel")');await tick();assert.equal(run('view'),'intel');
@@ -97,4 +97,17 @@ test('report cards expire at three minutes without a refresh, preserve reports a
  now=origin+180000;timers.at(-1).fn();assert(d.querySelector('.intel-activity-card'));assert(!d.querySelector('.intel-card-body').textContent.includes('Reported Pilot'));assert(d.querySelector('.intel-card-body').textContent.includes('Next report'));assert.equal(timers.at(-1).delay,10000);
  now=origin+190000;timers.at(-1).fn();assert.equal(d.querySelector('.intel-activity-card'),null);assert.equal(intel.reports.length,1);assert(d.querySelector('.intel-node.contact'));
  intel.nodes[0].contacts.push({...intel.nodes[0].contacts[0],timestamp:now/1000});run('drawIntelMap()');assert(d.querySelector('.intel-activity-card'));
+});
+
+test('intel overlay receives fresh report details independently of OS notification permission',async t=>{
+ const {w,run,intel,notifications,calls}=await fixture();t.after(()=>w.close());const sent=[];
+ w.EveDesktop.active=true;w.EveDesktop.syncIntelOverlay=async data=>sent.push(data);notifications.preferences.os_enabled=false;
+ intel.alerts=[{system_id:300001,system_name:'J5A-IX',character_name:'Own Pilot',jumps:2,overlay_reports:[{id:'new-report',when:1800000000,pilots:['Reported Pilot'],ships:['Buzzard']}]}];
+ const original=w.fetch;w.fetch=async(url,options)=>url==='/api/intel/alerts'?{ok:true,json:async()=>({enabled:true,overlay:{enabled:true,seconds:75},items:intel.alerts})}:original(url,options);
+ await run('pollIntelAlerts()');assert.equal(sent.length,1);assert.equal(sent[0].seconds,75);assert.equal(sent[0].items[0].system,'J5A-IX');assert.equal(sent[0].items[0].pilots,'Reported Pilot');assert.equal(sent[0].items[0].ships,'Buzzard');assert(!calls.includes('/api/intel/claim'));
+});
+test('overlay settings expose monitor selection, exact seconds and explicit move/lock controls',async t=>{
+ const {w,d,run}=await fixture();t.after(()=>w.close());w.EveDesktop.active=true;
+ w.EveDesktop.intelOverlayStatus=async()=>({screens:[{id:'1',name:'Test monitor',width:1920,height:1080,placement:{x:20,y:40,width:330}}],screen_id:'1',placement:{x:20,y:40,width:330},editing:false});
+ run('openSettingsTab("intel")');await tick();await tick();const form=d.querySelector('#intel-overlay-form');assert(form);assert.equal(form.elements.overlay_seconds.value,'60');assert.equal(form.elements.screen_id.value,'1');assert(d.querySelector('#intel-overlay-move'));assert(d.querySelector('#intel-overlay-lock'));assert(!/[áéíóöőúüű]/i.test(d.querySelector('#intel-overlay-settings').textContent));
 });

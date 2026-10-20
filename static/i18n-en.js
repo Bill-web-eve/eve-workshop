@@ -1937,6 +1937,22 @@ globalThis.EveEnglish={
   "Hibás holdkitermelési értesítés.": "Invalid moon extraction notification.",
   "Hiányzik a karakterértesítések olvasási engedélye. Engedélyezd a holdadatok új értesítési hozzáférését.": "Character notification read permission is missing. Authorize the new moon notification access.",
   "Engedélyezett olvasók": "Authorized readers",
-  "Karakterek hozzáférése és engedélyezése": "Character access and authorization"
+  "Karakterek hozzáférése és engedélyezése": "Character access and authorization",
+  "Átlátszó inteljelző": "Intel overlay",
+  "Átlátszó inteljelző bekapcsolva": "Enable intel overlay",
+  "Az átlátszó inteljelző a Mac-alkalmazásban érhető el.": "The intel overlay is available in the Mac app.",
+  "Megjelenítési idő (másodperc)": "Display duration (seconds)",
+  "Monitor": "Monitor",
+  "Szélesség": "Width",
+  "X · a bal széltől": "X · from the left edge",
+  "Y · a felső széltől": "Y · from the top edge",
+  "Inteljelző mentése": "Save overlay",
+  "Inteljelző mozgatása": "Move overlay",
+  "Elhelyezés kész · pozíció beolvasása": "Finish positioning · reload position",
+  "Üresen nem látható, normál módban átengedi az egérkattintásokat. Csak friss, a riasztási jumptávolságon belüli jelentéseket mutat, legfeljebb ötöt egyszerre. A jelentés az üzenet időpontjától számított megjelenítési idő után eltűnik.": "Hidden when empty; mouse clicks pass through in normal use. Shows only fresh reports within the alert jump range, up to five at once. Each report disappears after the display duration measured from its message timestamp.",
+  "A normál és teljes képernyős alkalmazások felett jelenik meg. A macOS rendszer- és biztonsági felületei elsőbbséget élvezhetnek. A monitor és a pozíció ezen a Macen mentődik.": "Appears above normal and full-screen apps. macOS system and security interfaces may take priority. The monitor and position are saved on this Mac.",
+  "Inteljelző mentve.": "Overlay saved.",
+  "Húzd az inteljelzőt a helyére, majd válaszd a Kész gombot.": "Drag the overlay into place, then choose Done.",
+  "Az ablak pozíciója elmentve.": "Window position saved."
 };
 if(typeof module!=='undefined'&&module.exports)module.exports=globalThis.EveEnglish;

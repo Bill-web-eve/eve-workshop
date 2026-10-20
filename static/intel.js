@@ -28,13 +28,19 @@ async function refreshIntel(background=false){
 function updateIntelStatus(){if($('#intel-watcher-time'))$('#intel-watcher-time').textContent=intelDate(intelData.status.checked);}
 async function pollIntelAlerts(){
   if(intelWindowMode){if(state&&!intelMapDragging)await refreshIntel(true);return;}
-  if(!state||intelEnabled===false||intelAlertBusy)return;intelAlertBusy=true;
+  if(!state||intelAlertBusy)return;intelAlertBusy=true;
   try{
     const data=await api('/api/intel/alerts');intelEnabled=data.enabled;
+    if(EveDesktop.active)await syncIntelOverlay(data);
     const badge=$('#intel-count');if(badge){badge.textContent=fmt(data.items.length);badge.hidden=!data.items.length;}
     if(data.enabled&&EveDesktop.active&&notificationData?.preferences.os_enabled&&notificationData.preferences.categories.intel!==false){const status=await EveDesktop.notificationStatus();if(status.status==='authorized')await deliverNotifications('/api/intel/claim');}
     if(view==='intel'&&!intelMapDragging&&!Object.keys(dirty).length)await refreshIntel(true);
   }catch(e){if(view==='intel')error(e.message);}finally{intelAlertBusy=false;}
+}
+async function syncIntelOverlay(data){
+  const prefs=data.overlay||{},items=[];
+  if(data.enabled&&prefs.enabled)for(const alert of data.items||[])for(const report of alert.overlay_reports||[]){items.push({key:alert.system_id+':'+report.id,system:alert.system_name,pilots:((report.pilots||[]).join(', ')||EveI18n.t('Nem megnevezett pilóta')).slice(0,1900),ships:(report.ships||[]).join(', ').slice(0,1900),character:alert.character_name,jumps:alert.jumps,when:report.when});}
+  await EveDesktop.syncIntelOverlay({enabled:!!(data.enabled&&prefs.enabled),seconds:prefs.seconds||60,items:items.slice(0,3000)});
 }
 function startIntelMonitor(){clearInterval(intelTick);intelTick=setInterval(()=>{if(!document.hidden)void pollIntelAlerts();},2000);void pollIntelAlerts();}
 function resetIntelMap(){intelZoom=1;intelPan={x:0,y:0};}
@@ -92,7 +98,7 @@ function intelReportTable(rows,key){
 }
 function applyIntelTransform(){const group=$('#intel-map-transform');if(group)group.setAttribute('transform',`translate(${intelPan.x} ${intelPan.y}) scale(${intelZoom})`);}
 function intelCard(node){
-  const contacts=node.contacts||[],rows=contacts.map(r=>`<div class="intel-card-report"><div>${r.pilots.length?r.pilots.map(intelPilotName).join('<br>'):'<span>Nem megnevezett pilóta</span>'}</div><div class="intel-card-ships">${intelShips(r.ships)}</div>${r.pilots.length>1&&(r.ships||[]).length?'<small>Több pilóta · közös hajójelentés</small>':''}<small>${intelAge(r.timestamp)}${r.ambiguous?' · <span>Bizonytalan helyszín</span>':''}</small></div>`).join('');
+  const contacts=node.contacts||[],rows=contacts.map(r=>`<div class="intel-card-report"><div>${r.pilots.length?r.pilots.map(intelPilotName).join('<br>'):'<span>Nem megnevezett pilóta</span>'}</div>${r.ships?.length?`<div class="intel-card-ships">${intelShips(r.ships)}</div>`:''}${r.pilots.length>1&&(r.ships||[]).length?'<small>Több pilóta · közös hajójelentés</small>':''}<small>${intelAge(r.timestamp)}${r.ambiguous?' · <span>Bizonytalan helyszín</span>':''}</small></div>`).join('');
   return `<div xmlns="http://www.w3.org/1999/xhtml" class="intel-activity-card ${node.state==='old'?'old':''}"><div class="intel-card-header">${verbatim(node.name)}<span>${node.distance==null?'–':node.distance+'j'}</span></div><div class="intel-card-body">${rows}</div></div>`;
 }
 function drawIntelMap(){
@@ -151,6 +157,7 @@ function renderIntelSettings(target){
   if(!intelData){target.innerHTML=empty('Inteladatok betöltése');void refreshIntel();return;}
   const d=intelData,p=d.preferences;
   target.innerHTML=panel('Chatlog és riasztás','',`<form id="intel-settings" class="panel-body"><div class="intel-preferences"><label class="field-full">Chatlogmappa<div class="intel-folder-row"><input name="folder" type="text" value="${esc(p.folder)}" placeholder="Documents/EVE/logs/Chatlogs"><button type="button" class="button compact" id="intel-folder-pick" ${EveDesktop.active?'':'disabled'}>Mappa kiválasztása</button><button type="button" class="button compact" id="intel-discover">Csatornák keresése</button></div></label><label class="field-full">Figyelt csatornák · soronként egy<textarea name="channels" rows="3" data-i18n-skip>${esc(p.channels.join('\n'))}</textarea></label><div id="intel-channel-options" class="field-full"></div><label><input name="enabled" type="checkbox" ${p.enabled?'checked':''}> Chatlogfigyelés bekapcsolva</label><label>Riasztási távolság (jump)<input name="jumps" type="number" min="0" max="30" value="${p.jumps}" required></label><label>Intel érvényessége (perc)<input name="ttl_minutes" type="number" min="1" max="120" value="${p.ttl_minutes}" required></label><label>Riasztási szünet azonos rendszerhez (mp)<input name="cooldown_seconds" type="number" min="0" max="600" value="${p.cooldown_seconds}" required></label><label><input name="allow_local_alerts" type="checkbox" ${p.allow_local_alerts?'checked':''}> Friss Local-napló helyzetével is riasszon</label><label><input name="sound" type="checkbox" ${p.sound?'checked':''}> Hang az intel rendszerértesítésében</label><label>Rövidített rendszernevek régiója<select name="region"><option value="">Összes régió · csak egyértelmű rövidítés</option>${d.regions.map(([id,name])=>`<option data-i18n-skip value="${id}">${esc(name)}</option>`).join('')}</select></label></div><p class="footnote">Csak a kiválasztott csatornákat olvassuk, és saját karakterek Local-rendszerváltásait használjuk. A chatlog nem kerül külső szolgáltatáshoz. A Local-napló nem igazolja az online állapotot; riasztáshoz legfeljebb 5 perces Local-adat használható. A kézi referencia nem követi a mozgást.</p>${table(['Figyelt karakter','Helyzet forrása','Utolsó helyzet','Kézi referenciarendszer','EVE-hozzáférés'],state.characters.map(c=>{const pos=d.characters.find(x=>x.id===c.id),manual=p.manual_locations[c.id];return `<tr><td><label><input type="checkbox" data-intel-character="${c.id}" ${p.character_ids===null||p.character_ids.includes(c.id)?'checked':''}> ${verbatim(c.name)}</label></td><td>${esc(pos?intelSource(pos):'Nincs helyzetadat')}</td><td>${verbatim(pos?.system_name||'–')}<div>${intelDate(pos?.as_of)}</div></td><td class="intel-system-cell"><input type="search" data-intel-manual="${c.id}" data-system-id="${manual||''}" value="${esc(manual?d.manual_system_names[c.id]||'':'')}" placeholder="Üres: automatikus helyzet" autocomplete="off"></td><td><div>${esc(pos?.error||(pos?.needs_auth?'Engedélyezés szükséges':''))}</div><button class="text-button" type="button" data-intel-authorize="${c.id}">Intelhelyzet engedélyezése</button></td></tr>`;}),'intel-characters')}<div class="actions"><button class="button primary" type="submit">Intelbeállítások mentése</button><button class="button" type="button" id="intel-location-refresh">ESI-helyzetek frissítése</button><button class="text-button" type="button" data-open-settings="notifications">Rendszerértesítések beállítása</button></div></form><div class="panel-body"><details><summary>Szükséges ESI-jogosultságok</summary><code>esi-location.read_location.v1 · esi-location.read_online.v1</code><p>A Client ID EVE Developer alkalmazásában is engedélyezni kell a két scope-ot, majd a karaktert egyszer újra kell engedélyezni. A korábbi jogosultságok megmaradnak.</p></details><p>Az intel csak futó alkalmazás és íródó EVE-chatlog mellett frissül. A rendszerértesítésekhez a macOS külön engedélye is szükséges.</p></div>`);
+  target.innerHTML+=panel('Átlátszó inteljelző','',`<div class="panel-body" id="intel-overlay-settings"></div>`);renderIntelOverlaySettings($('#intel-overlay-settings'));if(intelOverlayNative)void loadIntelOverlaySettings();
   const form=$('#intel-settings');form.elements.region.value=p.region_ids[0]||'';form.oninput=()=>dirty.intel=true;form.onchange=()=>dirty.intel=true;
   $$('[data-intel-manual]').forEach(bindIntelSystemInput);
   form.onsubmit=async e=>{e.preventDefault();try{
@@ -163,4 +170,28 @@ function renderIntelSettings(target){
   $('#intel-discover').onclick=async()=>{try{const result=await api('/api/intel/channels?folder='+encodeURIComponent(form.elements.folder.value));intelDiscovered=result.channels;$('#intel-channel-options').innerHTML=intelDiscovered.map(name=>`<button type="button" class="button compact" data-intel-add="${esc(name)}">${verbatim(name)}</button>`).join('');$$('[data-intel-add]').forEach(b=>b.onclick=()=>{const names=new Set(form.elements.channels.value.split('\n').filter(Boolean));names.add(b.dataset.intelAdd);form.elements.channels.value=[...names].join('\n');dirty.intel=true;});}catch(e){error(e.message);}};
   $('#intel-location-refresh').onclick=async()=>{try{await api('/api/intel/locations',{});await refreshIntel();}catch(e){error(e.message);}};
   $$('[data-intel-authorize]').forEach(b=>b.onclick=async()=>{try{const auth=await api('/api/auth/start',{character_id:Number(b.dataset.intelAuthorize),feature:'intel'});sessionStorage.setItem('eve-muhely-auth-return','settings:intel');await openEveAuthorization(auth);await refreshIntel();}catch(e){error(e.message);}});
+}
+
+let intelOverlayNative=null;
+async function loadIntelOverlaySettings(){
+  const target=$('#intel-overlay-settings');if(!target||!EveDesktop.active)return;
+  try{const info=await EveDesktop.intelOverlayStatus();if(!target.isConnected||dirty.intel_overlay)return;intelOverlayNative=info;renderIntelOverlaySettings(target);}catch(e){target.textContent=EveI18n.t(e.message);}
+}
+function renderIntelOverlaySettings(target){
+  if(!EveDesktop.active){target.innerHTML='<p>Az átlátszó inteljelző a Mac-alkalmazásban érhető el.</p>';return;}
+  const info=intelOverlayNative,p=intelData.preferences;if(!info){target.innerHTML='<p>Betöltés…</p>';void loadIntelOverlaySettings();return;}
+  const pos=info.placement;
+  target.innerHTML=`<form id="intel-overlay-form"><div class="intel-preferences"><label><input name="overlay_enabled" type="checkbox" ${p.overlay_enabled!==false?'checked':''}> Átlátszó inteljelző bekapcsolva</label><label>Megjelenítési idő (másodperc)<input name="overlay_seconds" type="number" min="1" max="3600" step="1" required value="${p.overlay_seconds||60}"></label><label>Monitor<select name="screen_id">${info.screens.map(s=>`<option value="${esc(s.id)}" data-i18n-skip>${esc(s.name)} · ${fmt(s.width)} × ${fmt(s.height)}</option>`).join('')}</select></label><label>Szélesség<input name="width" type="number" min="260" max="600" required value="${pos.width}"></label><label>X · a bal széltől<input name="x" type="number" min="0" max="20000" required value="${Math.round(pos.x)}"></label><label>Y · a felső széltől<input name="y" type="number" min="0" max="20000" required value="${Math.round(pos.y)}"></label></div><div class="actions"><button type="submit" class="button primary">Inteljelző mentése</button><button type="button" class="button" id="intel-overlay-move">Inteljelző mozgatása</button><button type="button" class="button" id="intel-overlay-lock">Elhelyezés kész · pozíció beolvasása</button></div></form><p class="footnote">Üresen nem látható, normál módban átengedi az egérkattintásokat. Csak friss, a riasztási jumptávolságon belüli jelentéseket mutat, legfeljebb ötöt egyszerre. A jelentés az üzenet időpontjától számított megjelenítési idő után eltűnik.</p><p class="footnote">A normál és teljes képernyős alkalmazások felett jelenik meg. A macOS rendszer- és biztonsági felületei elsőbbséget élvezhetnek. A monitor és a pozíció ezen a Macen mentődik.</p>`;
+  const form=$('#intel-overlay-form');form.elements.screen_id.value=info.screen_id;
+  const placement=()=>({screen_id:form.elements.screen_id.value,x:Number(form.elements.x.value),y:Number(form.elements.y.value),width:Number(form.elements.width.value)});
+  form.oninput=()=>dirty.intel_overlay=true;
+  form.elements.screen_id.onchange=()=>{const saved=info.screens.find(s=>s.id===form.elements.screen_id.value)?.placement;if(saved)for(const k of ['x','y','width'])form.elements[k].value=Math.round(saved[k]);dirty.intel_overlay=true;};
+  form.onsubmit=async e=>{e.preventDefault();if(!form.reportValidity())return;try{
+    await EveDesktop.configureIntelOverlay({...placement(),editing:false});
+    const body={overlay_enabled:form.elements.overlay_enabled.checked,overlay_seconds:Number(form.elements.overlay_seconds.value)};
+    await api('/api/intel/preferences',body);Object.assign(intelData.preferences,body);delete dirty.intel_overlay;
+    await syncIntelOverlay(await api('/api/intel/alerts'));await loadIntelOverlaySettings();toast('Inteljelző mentve.');
+  }catch(e){error(e.message);}};
+  $('#intel-overlay-move').onclick=async()=>{try{if(!form.reportValidity())return;await EveDesktop.configureIntelOverlay({...placement(),editing:true});toast('Húzd az inteljelzőt a helyére, majd válaszd a Kész gombot.');}catch(e){error(e.message);}};
+  $('#intel-overlay-lock').onclick=async()=>{try{const latest=await EveDesktop.configureIntelOverlay({editing:false});intelOverlayNative=latest;for(const key of ['x','y','width'])form.elements[key].value=Math.round(latest.placement[key]);form.elements.screen_id.value=latest.screen_id;toast('Az ablak pozíciója elmentve.');}catch(e){error(e.message);}};
 }

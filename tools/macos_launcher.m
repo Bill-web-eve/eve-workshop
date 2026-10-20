@@ -2,6 +2,7 @@
 #import <WebKit/WebKit.h>
 #import <UserNotifications/UserNotifications.h>
 #include <sys/stat.h>
+#import "macos_intel_overlay.m"
 
 // macOS-only window shell. The Python service and shared UI remain portable.
 @interface EveWindow : NSObject <NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandlerWithReply, UNUserNotificationCenterDelegate>
@@ -16,6 +17,7 @@
 @property NSTimer *notificationMonitor;
 @property NSTimer *intelMonitor;
 @property NSDictionary *pendingNotification;
+@property EveIntelOverlay *intelOverlay;
 @property NSMutableDictionary<NSString *,NSWindow *> *intelWindows;
 @property NSMutableDictionary<NSString *,WKWebView *> *intelViews;
 - (BOOL)localURL:(NSURL *)url;
@@ -236,6 +238,12 @@ static BOOL StartService(NSString **logPath) {
     if (!message.frameInfo.mainFrame || ![self localURL:message.frameInfo.request.URL] || ![self managedWeb:message.webView] || ![message.body isKindOfClass:NSDictionary.class]) {reply(nil,@"Untrusted origin");return;}
     NSDictionary *body=message.body;NSString *action=body[@"action"];
     if(message.webView!=self.web && ![@[@"clipboard",@"preferences",@"external",@"activate",@"openIntelWindow"] containsObject:action]){reply(nil,@"Main window action required");return;}
+    if([@[@"intelOverlayStatus",@"configureIntelOverlay",@"syncIntelOverlay"] containsObject:action]){
+        if(!self.intelOverlay)self.intelOverlay=[[EveIntelOverlay alloc] initWithDefaults:NSUserDefaults.standardUserDefaults];
+        self.intelOverlay.english=[self english];self.intelOverlay.light=[self.window.appearance.name isEqual:NSAppearanceNameAqua];
+        BOOL ok=YES;if([action isEqual:@"configureIntelOverlay"])ok=[self.intelOverlay configure:body[@"options"]];else if([action isEqual:@"syncIntelOverlay"])ok=[self.intelOverlay sync:body[@"data"]];
+        reply(ok?[self.intelOverlay settings]:nil,ok?nil:@"Invalid intel overlay settings");return;
+    }
     if([action isEqual:@"openIntelWindow"]){BOOL opened=[self openIntelWindow:body[@"kind"] options:[body[@"options"] isKindOfClass:NSDictionary.class]?body[@"options"]:@{}];reply(opened?@{ @"opened":@YES }:nil,opened?nil:@"Hibás intelablak.");return;}
     if([@[@"notificationStatus",@"requestNotifications",@"notify"] containsObject:action]){[self notificationAction:body reply:reply];return;}
     if ([action isEqual:@"clipboard"] && [body[@"text"] isKindOfClass:NSString.class] && [body[@"text"] length]<8*1024*1024) {
@@ -251,6 +259,7 @@ static BOOL StartService(NSString **logPath) {
         for(NSString *key in self.intelWindows){NSWindow *window=self.intelWindows[key];window.appearance=self.window.appearance;BOOL map=[key isEqual:@"map"];window.title=[self english]?(map?@"EVE Workshop · System map":@"EVE Workshop · Intel chat"):(map?@"EVE Műhely · Rendszertérkép":@"EVE Műhely · Intelchat");[NSApp changeWindowsItem:window title:window.title filename:NO];}
         self.windowRoot.title=[self english]?@"Window":@"Ablak";NSApp.windowsMenu.title=self.windowRoot.title;
         self.minimizeItem.title=[self english]?@"Minimize":@"Kis méret";self.zoomItem.title=[self english]?@"Zoom":@"Nagyítás";self.frontItem.title=[self english]?@"Bring All to Front":@"Összes ablak előre";
+        self.intelOverlay.english=[self english];self.intelOverlay.light=[self.window.appearance.name isEqual:NSAppearanceNameAqua];[self.intelOverlay refresh];
         self.editRoot.title=[self english]?@"Edit":@"Szerkesztés";self.viewRoot.title=[self english]?@"View":@"Nézet";
         NSArray *labels=[self english]?@[@"Undo",@"Cut",@"Copy",@"Paste",@"Select All"]:@[@"Visszavonás",@"Kivágás",@"Másolás",@"Beillesztés",@"Összes kijelölése"];
         for(NSUInteger i=0;i<labels.count;i++)[self.editMenu itemAtIndex:i].title=labels[i];
