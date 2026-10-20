@@ -6,6 +6,7 @@ static NSString *TestOrigin, *TestOutput;
 @property NSMutableArray *savedFiles;
 @property NSString *copied;
 @property BOOL passed;
+@property BOOL progressCaptured;
 @property NSMutableArray *testNotifications;
 @end
 @implementation WindowSmoke
@@ -18,6 +19,13 @@ static NSString *TestOrigin, *TestOutput;
     if ([body[@"action"] isEqual:@"notificationStatus"]) {reply(@{ @"status":@"authorized" },nil);return;}
     if ([body[@"action"] isEqual:@"notify"]) {[self.testNotifications addObject:body];reply(@{ @"queued":@YES },nil);return;}
     if ([body[@"action"] isEqual:@"requestNotifications"]) {[self fail:@"Unexpected OS permission request"];return;}
+    if ([body[@"action"] isEqual:@"activitySnapshot"]) {
+        [self.web takeSnapshotWithConfiguration:nil completionHandler:^(NSImage *img,NSError *error){
+            if(error){[self fail:error.description];return;}
+            NSBitmapImageRep *bitmap=[[NSBitmapImageRep alloc] initWithData:img.TIFFRepresentation];
+            self.progressCaptured=[[bitmap representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:[TestOutput stringByAppendingString:@".progress.png"] atomically:YES];reply(@YES,nil);
+        }];return;
+    }
     if ([body[@"action"] isEqual:@"clipboard"]) {self.copied=body[@"text"];reply(@YES,nil);return;}
     if ([body[@"action"] isEqual:@"save"]) {[self.savedFiles addObject:body];reply(@{ @"saved":@YES },nil);return;}
     if ([body[@"action"] isEqual:@"external"]) {
@@ -53,7 +61,11 @@ static NSString *TestOrigin, *TestOutput;
     "openNotificationCenter('99','jobs');await wait(50);if(!$('.notification-table')||!$('#view-content').textContent.includes('Inquisitor'))throw Error('Corp notifications');if($('#view-content').textContent.includes('Megnyitás'))throw Error('Untranslated notification action');"
     "await api('/api/notifications/preferences',{os_enabled:true,auto_refresh:false});await refreshNotifications();await refreshNotifications();"
     "openSettingsTab('notifications');await wait(50);if(!$('#notification-test')||document.querySelector('#view-content').textContent.includes('Értesítések'))throw Error('Notification settings/language');"
-    "$('#notification-test').click();await wait(100);return {native:EveDesktop.active,language:EveI18n.language,theme:EveTheme.theme,characters:state.characters.length};";
+    "$('#notification-test').click();await wait(100);await api('/api/notifications/sync',{manual:true});await wait(900);"
+    "if($('#activity-panel').hidden||$('#activity-panel').getAttribute('aria-busy')!=='true'||!$('#activity-panel').textContent.includes('Test Pilot'))throw Error('Missing live activity progress');"
+    "await window.webkit.messageHandlers.eveDesktop.postMessage({action:'activitySnapshot'});"
+    "for(let i=0;i<100;i++){const a=await api('/api/activity');if(!a.task.running){EveActivity.task(a.task);break;}await wait(100);}"
+    "if(!$('#activity-panel').textContent.includes('Warning'))throw Error('Missing partial outcome');return {native:EveDesktop.active,language:EveI18n.language,theme:EveTheme.theme,characters:state.characters.length};";
     [web callAsyncJavaScript:script arguments:@{} inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:^(id result,NSError *error){
         if(error){[self fail:error.description];return;}
         if(![self.copied isEqual:@"Ferrofluid"] || self.savedFiles.count!=2){[self fail:@"Copy/export bridge"];return;}
@@ -74,7 +86,7 @@ static NSString *TestOrigin, *TestOutput;
     }];
 }
 - (void)applicationWillTerminate:(NSNotification *)notification {
-    NSDictionary *report=@{ @"native_webkit":@(self.passed),@"notification_bridge_submissions":@(self.testNotifications.count),@"notification_deep_links":@(self.passed),@"settings_language_and_theme":@(self.passed),@"copy":@(self.copied!=nil),@"exports":@(self.savedFiles.count),@"oauth_return":@(self.passed),@"quit_service":@YES };
+    NSDictionary *report=@{ @"native_webkit":@(self.passed),@"live_activity_progress":@(self.progressCaptured),@"notification_bridge_submissions":@(self.testNotifications.count),@"notification_deep_links":@(self.passed),@"settings_language_and_theme":@(self.passed),@"copy":@(self.copied!=nil),@"exports":@(self.savedFiles.count),@"oauth_return":@(self.passed),@"quit_service":@YES };
     [[NSJSONSerialization dataWithJSONObject:report options:NSJSONWritingPrettyPrinted error:NULL] writeToFile:TestOutput atomically:YES];
 }
 @end

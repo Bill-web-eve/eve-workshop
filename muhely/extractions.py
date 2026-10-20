@@ -9,6 +9,7 @@ import time
 
 from .esi import ESI, EsiError, AuthenticationError
 from . import moon_notifications as notices
+from . import progress
 
 CALENDAR_SCOPE='esi-calendar.read_calendar_events.v1'
 MINING_SCOPE='esi-industry.read_corporation_mining.v1'
@@ -40,6 +41,8 @@ def validate_timers(data):
 
 def cached(eve,char_id,kind,url,token,validator):
     old=eve.store.snapshot(char_id,kind);now=time.time()
+    label='Holdértesítések' if kind=='moon_notification_response' else 'Naptáresemény részletei' if kind.startswith('moon_event:') else 'Naptár'
+    progress.resource(label,bool(old and old['expires']>now))
     if old and old['expires']>now:return old
     data,h=eve.http.request(url,token=token,headers={'If-None-Match':old['etag']} if old and old.get('etag') else {})
     if data is None:
@@ -80,7 +83,7 @@ def sync(eve):
     if not eve.sync_lock.acquire(blocking=False):raise EsiError('Az EVE-frissítés már folyamatban van.')
     results=[];done={}
     try:
-        for char in eve.store.characters():
+        for char in progress.items(eve.store.characters()):
             cid=char['id']
             try:
                 token=eve.token(cid,required_scopes=[notices.SCOPE])
@@ -119,6 +122,7 @@ def sync(eve):
             except EsiError as error:
                 eve.store.resource_error(cid,'moon_calendar',str(error),isinstance(error,AuthenticationError));results.append({'id':cid,'kind':'calendar','ok':False,'error':str(error)})
             try:
+                progress.resource('Corporation holdidőzítői')
                 token=eve.token(cid,required_scopes=[MINING_SCOPE])
                 profile,_=eve.http.request(f'{ESI}/characters/{cid}')
                 corp=profile.get('corporation_id') if isinstance(profile,dict) else None
@@ -131,6 +135,7 @@ def sync(eve):
                         key=f'moon_timer_page:{corp}:{page}'
                         # X-Pages is not present on a cached body; keep it in its payload.
                         old=eve.store.snapshot(cid,key);now=time.time()
+                        progress.resource('Corporation holdidőzítői',bool(old and old['expires']>now),page,pages if page>1 else None)
                         if old and old['expires']>now:
                             chunk=old['data']['rows'];pages=old['data']['pages'];part=old
                         else:
@@ -142,6 +147,7 @@ def sync(eve):
                             low={k.lower():v for k,v in h.items()};pages=int(low.get('x-pages',(old or {}).get('data',{}).get('pages',1)))
                             if not 1<=pages<=1000:raise EsiError('Túl sok ESI kitermelési oldal.')
                             part={'data':{'rows':chunk,'pages':pages,'modified':low.get('last-modified') or (old or {}).get('data',{}).get('modified')},'fetched':now,'expires':cache_expiry(h,now),'etag':low.get('etag') or (old or {}).get('etag')}
+                        progress.report(page=page,pages=pages)
                         parts[key]=part;rows.extend(chunk);modified.append(part['data'].get('modified'))
                         if page>=pages:break
                     validate_timers(rows)

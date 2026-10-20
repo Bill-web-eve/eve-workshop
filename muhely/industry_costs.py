@@ -67,12 +67,13 @@ def cache_expiry(headers,now):
 class IndustryCosts:
     def __init__(self,store,http=None,clock=None):
         self.store=store;self.http=http or Transport();self.clock=clock or time.time
-        self.lock=threading.RLock();self.running=False;self.errors={};self.retry_after=0
+        self.lock=threading.RLock();self.running=False;self.errors={};self.retry_after=0;self.current=None;self.done=0
 
     def cached(self,kind):return self.store.universe_cached('industry-'+kind,0)
 
     def refresh(self):
-        for kind,path in PATHS.items():
+        for index,(kind,path) in enumerate(PATHS.items()):
+            with self.lock:self.current=kind;self.done=index
             old=self.cached(kind);now=self.clock()
             if old and old['data'].get('next_check',old['data']['expires'])>now:continue
             try:
@@ -98,7 +99,7 @@ class IndustryCosts:
         def work():
             try:self.refresh()
             finally:
-                with self.lock:self.running=False
+                with self.lock:self.running=False;self.current=None;self.done=2
         threading.Thread(target=work,daemon=True).start()
 
     def status(self):
@@ -106,7 +107,7 @@ class IndustryCosts:
         for kind in PATHS:
             r=self.cached(kind)
             resources[kind]={'checked':r['fetched'] if r else None,'expires':r['data']['expires'] if r else None,'stale':not r or r['data']['expires']<=self.clock()}
-        with self.lock:return {'resources':resources,'running':self.running,'errors':dict(self.errors),'retry_after':self.retry_after}
+        with self.lock:return {'resources':resources,'running':self.running,'errors':dict(self.errors),'retry_after':self.retry_after,'current':self.current,'done':self.done}
 
     def system(self,sid,catalog):
         sid=integer(sid,'Rendszer',2**31-1,1)

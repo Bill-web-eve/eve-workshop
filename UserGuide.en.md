@@ -374,6 +374,16 @@ Expand **Settings** in the sidebar for:
 
 Operational views link to the appropriate settings instead of repeating configuration panels. After authorization, the relevant Settings tab is reopened. Unapplied edits prompt before leaving their view.
 
+## Request and operation progress
+
+During a request or calculation, the top bar shows the number of active operations and a detailed status panel appears at the bottom right. It remains visible across navigation and scrolling. **Minimize** collapses it; the top-bar status button opens it again.
+
+EVE checks show the current stage, character or corporation, checked count, resource type and page progress. Valid EVE cache use and waiting for an EVE response are labelled separately. Jita prices and industry cost data have independent progress rows. Plan calculations, searches, saves and other data requests are also tracked.
+
+A progress bar follows a known item count; an indeterminate indicator is used when the full amount is unknown. **Elapsed time** is not an estimated completion time. Parallel operations are listed separately. A successful start response does not mean the background refresh has finished.
+
+Completion is marked **Complete**, **Warning** or **Failed**. Failures affecting individual characters or resources produce a partial result. If status polling itself fails, the panel explains that it is retrying and does not claim completion. Labels follow the selected Hungarian or English language.
+
 ## Notifications and macOS alerts
 
 The sidebar **Notifications** menu collects idle characters, queues ending within five days, completed jobs, stopped PI production and moon extractions due within the next **3 days**. Open an alert to visit its related view. The sidebar badge counts reliable current alerts; a question mark means data needs review.

@@ -55,13 +55,14 @@ class Market:
     def __init__(self,store,http=None,clock=None):
         self.store=store;self.http=http or Transport();self.clock=clock or time.time
         self.lock=threading.RLock();self.pending=set();self.running=False
-        self.total=0;self.done=0;self.errors={};self.retry_after={}
+        self.total=0;self.done=0;self.errors={};self.retry_after={};self.current=None;self.page=None;self.pages=None
 
     def quote(self,tid):
         old=self.store.market_quote(tid);now=self.clock()
         if old and old.get('next_check',old['expires'])>now:return old
         pages=[];count=1;page=1
         while page<=count:
+            with self.lock:self.page=page;self.pages=count if page>1 else None
             prior=(old or {}).get('pages',[])
             prior=prior[page-1] if len(prior)>=page else None
             headers={'If-None-Match':prior['etag']} if prior and prior.get('etag') else {}
@@ -69,6 +70,7 @@ class Market:
             h={k.lower():v for k,v in h.items()}
             try:count=int(h.get('x-pages',prior.get('count',1) if prior else 1))
             except (TypeError,ValueError):raise EsiError('Hibás Jita-piaci oldalszám.') from None
+            with self.lock:self.pages=count
             if not 1<=count<=100:raise EsiError('Túl sok Jita-piaci oldal érkezett.')
             if orders is None:
                 if not prior:raise EsiError('Üres Jita-válasz korábbi ár nélkül.')
@@ -114,8 +116,8 @@ class Market:
     def _work(self):
         while True:
             with self.lock:
-                if not self.pending:self.running=False;return
-                tid=min(self.pending)
+                if not self.pending:self.running=False;self.current=None;self.page=None;self.pages=None;return
+                tid=min(self.pending);self.current=tid;self.page=None;self.pages=None
             try:
                 self.quote(tid)
                 with self.lock:self.errors.pop(tid,None);self.retry_after.pop(tid,None)

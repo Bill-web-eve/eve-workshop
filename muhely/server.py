@@ -21,7 +21,7 @@ import uuid
 import webbrowser
 
 from . import __version__
-from . import moons, extractions, moon_calendar, accounts, scheduler, notifications
+from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress
 from .market import Market,validate_ids as market_ids
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
@@ -79,68 +79,97 @@ class App:
         with self.task_lock:
             if self.task['running']:
                 raise PlanningError('Egy frissítés már folyamatban van.')
-            self.task = {'running': True, 'kind': kind, 'message': 'Frissítés folyamatban…', 'results': [], 'finished': None}
+            self.task = {'id':uuid.uuid4().hex,'running':True,'kind':kind,'message':'Frissítés folyamatban…','results':[],'finished':None,'started':time.time(),'updated':time.time(),'outcome':'running','progress':{}}
         def work():
+            outcomes=[]
+            phases=1
+            phase_index=0
+            def phase(label,operation):
+                nonlocal phase_index
+                self.task_progress({'stage':label,'stage_index':phase_index,'stages':phases,'subject':'','completed':0,'total':None,'resource':'Előkészítés','mode':'checking','page':None,'pages':None})
+                with progress.listen(self.task_progress):value=operation()
+                if isinstance(value,list):outcomes.extend(value)
+                phase_index+=1
+                return value
             try:
+                include_corps=any(c['synced_at'] for c in self.store.corporations())
+                include_moons=any(self.store.snapshot(c['id'],k) for c in self.store.characters() for k in ['moon_calendar','moon_timers','moon_notifications'])
+                phases=3+int(include_corps)+int(include_moons) if kind in ['sync','notifications'] else 1
                 if kind in ['sync','notifications']:
                     if not self.store.characters():
                         raise PlanningError('Előbb adj hozzá egy karaktert az EVE-kapcsolat oldalon.')
-                    result = self.eve.sync()
+                    result = phase('Személyes ipari adatok',self.eve.sync)
                     ok = all(r['ok'] for r in result)
                     message = 'Az EVE-adatok frissítve.' if ok else 'Néhány karakter frissítése sikertelen. A részletek az EVE-kapcsolat oldalon láthatók.'
                     if kind=='sync' and ok and result and self.store.enable_eve_after_sync():
                         message += ' A terv most a személyes EVE-készlettel és jobkimenetekkel számol.'
-                    skill_results=self.eve.sync_skills()
+                    skill_results=phase('Skillek és tanulási sorok',self.eve.sync_skills)
                     missing=sum(not r['ok'] for r in skill_results)
                     if missing:
                         message+=f' {missing} karakter skilladata engedélyezést vagy frissítést igényel; részletek a Skillek és tanulás menüben.'
-                    pi_results=self.eve.sync_pi()
+                    pi_results=phase('Bolygók és PI',self.eve.sync_pi)
                     pi_missing=sum(not r['ok'] for r in pi_results)
                     if pi_missing:message+=f' {pi_missing} karakter PI-adata engedélyezést vagy frissítést igényel; részletek a Bolygók és PI menüben.'
-                    if any(c['synced_at'] for c in self.store.corporations()):
-                        corp_results=self.eve.sync_corporations()
+                    if include_corps:
+                        corp_results=phase('Corporationok',self.eve.sync_corporations)
                         message+=f" Corp-adatok: {sum(r['ok'] for r in corp_results)} sikeres lekérés; részletek a Corporationok oldalon."
-                    if any(self.store.snapshot(c['id'],'moon_calendar') or self.store.snapshot(c['id'],'moon_timers') or self.store.snapshot(c['id'],'moon_notifications') for c in self.store.characters()):
-                        moon_results=extractions.sync(self.eve)
+                    if include_moons:
+                        moon_results=phase('Holdak és naptár',lambda:extractions.sync(self.eve))
                         if any(not r['ok'] for r in moon_results):message+=' Néhány holdadat nem frissült; ellenőrizd a Kitermelési naptár hozzáféréseit.'
                 elif kind == 'skills':
                     if not self.store.characters():
                         raise PlanningError('Előbb adj hozzá karaktert az EVE-kapcsolat oldalon.')
-                    result=self.eve.sync_skills()
+                    result=phase('Skillek és tanulási sorok',self.eve.sync_skills)
                     ok_count=sum(r['ok'] for r in result)
                     message=f'Skilladatok ellenőrizve: {ok_count}/{len(result)} karakter. A részleteket a Skillek és tanulás oldalon találod.'
                 elif kind == 'pi':
                     if not self.store.characters():raise PlanningError('Előbb adj hozzá karaktert az EVE-kapcsolat oldalon.')
-                    result=self.eve.sync_pi();ok_count=sum(r['ok'] for r in result)
+                    result=phase('Bolygók és PI',self.eve.sync_pi);ok_count=sum(r['ok'] for r in result)
                     message=f'PI-adatok ellenőrizve: {ok_count}/{len(result)} karakter. Részletek a Bolygók és PI menüben.'
                 elif kind == 'moons':
-                    result=moons.refresh_universe(self.store,self.catalog,self.eve.http)
+                    result=phase('Holdak rendszeradatai',lambda:moons.refresh_universe(self.store,self.catalog,self.eve.http))
                     message='A holdak rendszeradatai frissítve.' if all(r['ok'] for r in result) else 'Néhány rendszer ESI-adata nem frissült. A korábbi adatok megmaradtak.'
                 elif kind == 'extractions':
-                    result=extractions.sync(self.eve)
+                    result=phase('Holdak és naptár',lambda:extractions.sync(self.eve))
                     message='A holdnaptár és a kitermelési időzítők ellenőrizve.'
                 elif kind == 'corporations':
                     if not self.store.characters():raise PlanningError('Előbb adj hozzá egy corp-hozzáférésre jogosult karaktert.')
-                    result=self.eve.sync_corporations();ok_count=sum(r['ok'] for r in result)
+                    result=phase('Corporationok',self.eve.sync_corporations);ok_count=sum(r['ok'] for r in result)
                     message=f'Corp-adatok ellenőrizve: {ok_count} sikeres lekérés. A részleteket a Corporationok oldalon találod.'
                 else:
-                    self.update_catalog()
+                    phase('Receptadatbázis',self.update_catalog)
                     result, message = [], 'Az EVE-receptadatbázis naprakész.'
                 with self.task_lock:
-                    self.task.update(running=False, message=message, results=result, finished=time.time())
+                    self.task.update(running=False,message=message,results=result,finished=time.time(),updated=time.time(),outcome='warning' if any(not row.get('ok',True) for row in outcomes) else 'success')
             except Exception as error:
                 message = str(error) if isinstance(error, (PlanningError, EsiError)) else 'A frissítés nem sikerült. Az előző adatok megmaradtak.'
                 with self.task_lock:
-                    self.task.update(running=False, message=message, finished=time.time(), results=[{'ok': False, 'error': message}])
+                    self.task.update(running=False,message=message,finished=time.time(),updated=time.time(),outcome='error',results=[{'ok':False,'error':message}])
         threading.Thread(target=work, daemon=True).start()
+
+    def task_progress(self,values):
+        allowed={'stage','stage_index','stages','subject','completed','total','resource','mode','page','pages','bytes_done','bytes_total'}
+        with self.task_lock:
+            self.task['progress'].update({key:value for key,value in values.items() if key in allowed})
+            self.task['updated']=time.time()
+
+    def task_snapshot(self):
+        with self.task_lock:return copy.deepcopy(self.task)
+
+    def activity(self):
+        task=self.task_snapshot()
+        with self.market.lock:
+            market={'running':self.market.running,'done':self.market.done,'total':self.market.total,'errors':len(self.market.errors),'current':getattr(self.market,'current',None),'current_name':self.catalog.name(self.market.current) if getattr(self.market,'current',None) else None,'page':getattr(self.market,'page',None),'pages':getattr(self.market,'pages',None)}
+        return {'task':task,'market':market,'industry':self.industry.status()}
 
     def notification_data(self):
         with self.catalog.lock:
             data=notifications.collect(self.store,self.catalog)
-        data.update(task=copy.deepcopy(self.task),next_sync_at=self.notification_sync_at+240)
+        data.update(task=self.task_snapshot(),next_sync_at=self.notification_sync_at+240)
         return data
 
     def update_catalog(self):
+        progress.resource('Adatbázis-verzió ellenőrzése')
         url = 'https://developers.eveonline.com/static-data/tranquility/latest.jsonl'
         req = urllib.request.Request(url, headers={'User-Agent': 'EveMuhely/'+__version__})
         try:
@@ -155,12 +184,17 @@ class App:
                                          headers={'User-Agent': 'EveMuhely/'+__version__})
             with urllib.request.urlopen(req, timeout=60) as response, archive.open('wb') as output:
                 total = 0
+                size=response.headers.get('Content-Length','')
+                size=int(size) if size.isdigit() else None
+                progress.report(resource='Receptadatbázis letöltése',mode='request',bytes_done=0,bytes_total=size)
                 while block := response.read(1024*1024):
                     total += len(block)
                     if total > 400*1024*1024:
                         raise PlanningError('A letöltött adatcsomag váratlanul nagy.')
                     output.write(block)
+                    progress.report(bytes_done=total)
             target = self.store.folder/'catalog.sqlite3'
+            progress.report(resource='Receptadatbázis feldolgozása',mode='checking',bytes_done=None,bytes_total=None)
             import_sde(archive, target)
             with self.catalog.lock:
                 self.catalog.path = target
@@ -469,7 +503,7 @@ class App:
                 'locations': locations, 'jobs': [j for j in jobs if j.get('status') in ['active', 'paused', 'ready']],
                 'blueprint_count': len(bps), 'stale_characters': stale, 'sde': self.catalog.meta,
                 'recipe_count': sum(self.catalog.types.get(i, {}).get('published', 0) for i in self.catalog.recipes),
-                'task': copy.deepcopy(self.task), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES,
+                'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES,
                 'crypto_available': crypto_available()}
 
 
@@ -567,7 +601,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -587,6 +621,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(200, moon_calendar.export(self.app.store, self.app.catalog, query.get('lang', ['en'])[0]), 'text/calendar; charset=utf-8')
             if not self.authorized():
                 return self.send(403, {'error': 'Nyisd meg az alkalmazás kezdőlapját.'})
+            if path == '/api/activity':return self.send(200,self.app.activity())
             if path == '/api/notifications':
                 return self.send(200,self.app.notification_data())
             if path == '/api/desktop/auth':
@@ -769,8 +804,9 @@ class Handler(BaseHTTPRequestHandler):
             elif path == '/api/notifications/preferences':
                 return self.send(200,notifications.save_preferences(self.app.store,data))
             elif path == '/api/notifications/claim':
+                snapshot=self.app.notification_data()
                 with self.app.task_lock:
-                    items=[] if self.app.task['running'] else notifications.claim(self.app.store,self.app.notification_data())
+                    items=[] if self.app.task['running'] else notifications.claim(self.app.store,snapshot)
                 return self.send(200,{'items':items})
             elif path == '/api/notifications/sent':
                 notifications.acknowledge(self.app.store,data.get('receipts'))

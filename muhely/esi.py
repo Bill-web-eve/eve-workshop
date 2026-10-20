@@ -18,6 +18,8 @@ import urllib.parse
 import urllib.request
 
 
+from . import progress
+
 ESI = 'https://esi.evetech.net'
 SSO = 'https://login.eveonline.com'
 INDUSTRY_SCOPES = ['esi-assets.read_assets.v1', 'esi-characters.read_blueprints.v1',
@@ -92,9 +94,11 @@ class Transport:
             body = urllib.parse.urlencode(form).encode()
             h['Content-Type'] = 'application/x-www-form-urlencoded'
         req = urllib.request.Request(url, data=body, headers=h)
+        progress.report(mode='request')
         try:
             with self.opener.open(req, timeout=30) as response:
                 payload = response.read(40*1024*1024)
+                progress.report(mode='received')
                 return json.loads(payload), dict(response.headers)
         except urllib.error.HTTPError as exc:
             if exc.code == 304:
@@ -348,6 +352,7 @@ class EveConnection:
         if kind not in ['skills','skillqueue']:
             raise EsiError('Ismeretlen skilladat.')
         old=self.store.snapshot(char_id,kind);now=time.time()
+        progress.resource({'skills':'Skillek','skillqueue':'Tanulási sor'}.get(kind,kind),bool(old and old['expires']>now))
         if old and old['expires']>now:
             return old
         headers={'If-None-Match':old['etag']} if old and old.get('etag') else {}
@@ -371,7 +376,7 @@ class EveConnection:
             result=[]
             # Skill monitoring always includes every connected character,
             # independent of production/location filters.
-            for char in self.store.characters():
+            for char in progress.items(self.store.characters()):
                 try:
                     token=self.token(char['id'],required_scopes=SKILL_SCOPES)
                     parts={kind:self.skill_resource(char['id'],kind,token) for kind in ['skills','skillqueue']}
@@ -387,6 +392,7 @@ class EveConnection:
     def pi_resource(self,char_id,kind,url,token):
         from .pi import validate_planets,validate_layout
         old=self.store.snapshot(char_id,kind);now=time.time()
+        progress.resource('PI-bolygók listája' if kind=='pi_planets' else 'PI-kolónia: '+kind.split(':')[-1],bool(old and old['expires']>now))
         if old and old['expires']>now:return old
         headers={'If-None-Match':old['etag']} if old and old.get('etag') else {}
         body,h=self.http.request(url,token=token,headers=headers)
@@ -407,7 +413,7 @@ class EveConnection:
         if not self.sync_lock.acquire(blocking=False):raise EsiError('Az EVE-frissítés már folyamatban van.')
         try:
             results=[]
-            for char in self.store.characters():
+            for char in progress.items(self.store.characters()):
                 try:
                     token=self.token(char['id'],required_scopes=PI_SCOPES)
                     base=f"{ESI}/characters/{char['id']}/planets"
@@ -439,12 +445,14 @@ class EveConnection:
     def resource(self, char_id, kind, token):
         old = self.store.snapshot(char_id, kind)
         now = time.time()
+        progress.resource({'assets':'Készlet','blueprints':'Blueprintok','jobs':'Ipari jobok'}[kind],bool(old and old['expires']>now))
         if old and old['expires'] > now:
             return old
         suffix = {'assets': 'assets/', 'blueprints': 'blueprints/', 'jobs': 'industry/jobs/?include_completed=true'}[kind]
         url = f'{ESI}/characters/{char_id}/{suffix}'
         result, dates, pages, expires = [], [], 1, []
         for page in range(1, 1001):
+            progress.report(page=page,pages=pages if page>1 else None)
             page_url = url+('&' if '?' in url else '?')+'page='+str(page)
             # Validate every page's snapshot date. Never bypass ESI's cache.
             body, h = self.http.request(page_url, token=token)
@@ -454,6 +462,7 @@ class EveConnection:
             dates.append(h.get('Last-Modified'))
             expires.append(self.expiry(h))
             pages = int(h.get('X-Pages', '1'))
+            progress.report(page=page,pages=pages)
             if pages > 1000:
                 raise EsiError('Az EVE több mint 1000 adatoldalt jelzett.')
             if page >= pages:
@@ -471,7 +480,7 @@ class EveConnection:
             raise EsiError('Az EVE-frissítés már folyamatban van.')
         try:
             result = []
-            for char in self.store.characters():
+            for char in progress.items(self.store.characters()):
                 try:
                     token = self.token(char['id'])
                     parts = {}
@@ -492,11 +501,13 @@ class EveConnection:
     def corporation_resource(self, corporation_id, kind, token):
         from .corporations import validate_resource
         old=self.store.corporation_snapshot(corporation_id,kind);now=time.time()
+        progress.resource({'assets':'Corp-készlet','blueprints':'Corp-blueprintek','jobs':'Corp-jobok'}[kind],bool(old and old['expires']>now))
         if old and old['expires']>now:return old
         suffix={'assets':'assets','blueprints':'blueprints','jobs':'industry/jobs?include_completed=true'}[kind]
         url=f'{ESI}/corporations/{corporation_id}/{suffix}'
         result=[];dates=[];expiry=[]
         for page in range(1,1001):
+            progress.report(page=page,pages=pages if page>1 else None)
             body,headers=self.http.request(url+('&' if '?' in url else '?')+'page='+str(page),token=token)
             h={k.lower():v for k,v in headers.items()}
             validate_resource(kind,body);result.extend(body);dates.append(h.get('last-modified'))
@@ -511,6 +522,7 @@ class EveConnection:
             try:pages=int(h.get('x-pages','1'))
             except (TypeError,ValueError):raise EsiError('Hibás corp adatlapozás.') from None
             if not 1<=pages<=1000:raise EsiError('Túl sok corp adatoldal.')
+            progress.report(page=page,pages=pages)
             if page>=pages:break
         if len(set(dates))>1:raise EsiError('A corporation adatai lapozás közben megváltoztak. Frissíts később.')
         try:as_of=parsedate_to_datetime(dates[0]).timestamp() if dates[0] else now
@@ -523,7 +535,7 @@ class EveConnection:
         if not self.sync_lock.acquire(blocking=False):raise EsiError('Az EVE-frissítés már folyamatban van.')
         try:
             groups={};names={};results=[]
-            for char in self.store.characters():
+            for char in progress.items(self.store.characters()):
                 try:
                     profile,_=self.http.request(f"{ESI}/characters/{char['id']}")
                     cid=positive_id(profile.get('corporation_id')) if isinstance(profile,dict) else None
@@ -539,10 +551,11 @@ class EveConnection:
                     self.store.resource_error(char['id'],'corporations',str(error),False)
                     if char.get('corporation_id'):self.store.corporation_error(char['corporation_id'],str(error))
                     results.append({'id':char['id'],'ok':False,'error':str(error)})
-            for cid,chars in groups.items():
+            for cid,chars in progress.items(groups.items(),name=lambda row:names[row[0]]):
                 success=False;failures=[]
                 for char in chars:
                     try:
+                        progress.report(subject=names[cid]+' · '+char['name'],resource='Hozzáférés ellenőrzése',mode='checking',page=None,pages=None)
                         token=self.token(char['id'],required_scopes=CORPORATION_SCOPES)
                         # Recheck membership before using a cached snapshot.
                         roles,_=self.http.request(f"{ESI}/characters/{char['id']}")

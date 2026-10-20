@@ -52,7 +52,8 @@ globalThis.EveDesktop=(()=>{
       const link=event.target.closest('a[download]');if(!link)return;
       const url=new URL(link.href,location.href);if(url.origin!==location.origin)return;
       event.preventDefault();event.stopImmediatePropagation();
-      void fetch(url).then(response=>{if(!response.ok)throw Error('A fájl mentése nem sikerült.');return response.blob();}).then(blob=>saveBlob(blob,link.download)).catch(e=>error(e.message));
+      const download=()=>fetch(url).then(response=>{if(!response.ok)throw Error('A fájl mentése nem sikerült.');return response.blob();});
+      void (globalThis.EveActivity?EveActivity.run('/api/export',download):download()).then(blob=>saveBlob(blob,link.download)).catch(e=>error(e.message));
     },true);
     window.print=()=>void send('print');
     window.addEventListener('eve-theme-change',preferences);window.addEventListener('eve-language-change',preferences);

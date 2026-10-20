@@ -42,13 +42,16 @@ async function setProductionScope(id){
 }
 
 async function api(path, body) {
+  return EveActivity.run(path,async()=>{
   if(path==='/api/auth/start'&&globalThis.EveDesktop?.active)body={...body,desktop:true};
   const options = body === undefined ? {} : {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':state?.csrf || ''}, body:JSON.stringify(body)};
   const response = await fetch(path, options);
   const result = await response.json();
   if (!response.ok){const failure=new Error(result.delivery_wait?deliveryWaitMessage(result.delivery_wait):result.error || 'A kérés nem sikerült.');failure.delivery_wait=result.delivery_wait;throw failure;}
   return result;
+  });
 }
+
 function error(message) { const el=$('#global-error'); el.textContent=message; el.hidden=!message; }
 function toast(message) { const el=$('#toast'); el.textContent=message; el.hidden=false; setTimeout(()=>el.hidden=true,3500); }
 function empty(title, description='') { return `<div class="empty"><div class="empty-icon">◈</div><h2>${esc(title)}</h2><p>${esc(description)}</p></div>`; }
@@ -118,7 +121,7 @@ async function reloadState() {
   $('#source-pill').textContent=corporationId?'Corp: '+state.scope_label:eve?'Személyes EVE-készlet':'Kézi készlet'; $('#source-pill').classList.toggle('eve',eve);
   $('#connection-dot').classList.toggle('online',state.characters.length>0);
   $('#sync').disabled=state.task.running;
-  const task=$('#task-banner'); task.hidden=!state.task.running;
+  const task=$('#task-banner'); task.hidden=true;
   if(state.task.running) { task.textContent=state.task.message; scheduleTaskPoll(); }
   return state;
 }

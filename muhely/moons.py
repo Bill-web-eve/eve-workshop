@@ -134,8 +134,9 @@ def system_info(store,catalog,http,sid,force=False):
 
 
 def refresh_universe(store,catalog,http):
+    from . import progress
     results=[]
-    for sid in sorted({r['system_id'] for r in store.moon_records()}):
+    for sid in progress.items(sorted({r['system_id'] for r in store.moon_records()}),name=lambda sid:catalog.moon_systems.get(sid,{}).get('name',str(sid))):
         data=system_info(store,catalog,http,sid,True)
         results.append({'ok':not data['error'],'id':sid,'error':data['error']})
     return results

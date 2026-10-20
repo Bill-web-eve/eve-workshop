@@ -423,5 +423,41 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(self.app.eve.pending[query['state'][0]]['character_id'],123)
         self.assertEqual(self.request('/api/auth/start',{'character_id':456})[0],400)
 
+    def test_activity_is_authenticated_and_reports_real_background_phases(self):
+        from muhely import progress
+        entered=threading.Event();release=threading.Event()
+        self.app.store.add_character(1,'Progress Pilot')
+        self.assertEqual(self.request('/api/activity',Cookie='')[0],403)
+        def industry():
+            progress.report(subject='Progress Pilot',completed=2,total=10,resource='Készlet',mode='cache',page=2,pages=5,access_token='must not appear')
+            entered.set();release.wait(5)
+            return [{'id':1,'ok':True}]
+        self.app.eve.sync=industry
+        self.app.eve.sync_skills=Mock(return_value=[{'id':1,'ok':False,'error':'Missing skills grant'}])
+        self.app.eve.sync_pi=Mock(return_value=[])
+        self.app.start_task('notifications')
+        try:
+            self.assertTrue(entered.wait(2));status,data,_=self.request('/api/activity')
+            self.assertEqual(status,200);task=data['task'];p=task['progress']
+            self.assertTrue(task['running']);self.assertEqual(p['stage'],'Személyes ipari adatok')
+            self.assertEqual((p['completed'],p['total'],p['page'],p['pages'],p['mode']),(2,10,2,5,'cache'))
+            self.assertEqual(p['stages'],3);self.assertNotIn('must not appear',json.dumps(data));self.assertNotIn('access_token',json.dumps(data))
+        finally:release.set()
+        for _ in range(200):
+            if not self.app.task['running']:break
+            time.sleep(.01)
+        done=self.request('/api/activity')[1]['task']
+        self.assertFalse(done['running']);self.assertEqual(done['id'],task['id']);self.assertEqual(done['outcome'],'warning')
+        self.assertEqual(self.app.store.settings()['source'],'manual')
+        self.assertEqual(self.request('/activity.js')[0],200)
+
+    def test_activity_marks_failed_tasks_without_false_completion(self):
+        self.app.start_task('skills')
+        for _ in range(200):
+            if not self.app.task['running']:break
+            time.sleep(.01)
+        task=self.request('/api/activity')[1]['task']
+        self.assertFalse(task['running']);self.assertEqual(task['outcome'],'error');self.assertFalse(task['results'][0]['ok'])
+
 
 if __name__=='__main__':unittest.main()

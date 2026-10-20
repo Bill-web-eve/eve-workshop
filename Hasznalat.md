@@ -329,6 +329,16 @@ A feliratkozás csak ezen a gépen működik, futó app mellett. Felhős naptár
 
 Az **ICS letöltése** egy egyszer importálható fájlt ad. Ez nem frissül automatikusan; ismételt importáláskor a naptárkliens duplikálhat eseményeket. A feliratkozás ajánlott a folyamatos frissítéshez.
 
+## Lekérések és folyamatjelző
+
+Lekérés vagy számítás közben a felső sávban megjelenik az aktív műveletek száma, a jobb alsó sarokban pedig a részletes állapotpanel. Nézetváltás és görgetés közben is látható. A **Kis méret** gomb összecsukja; a felső állapotgombbal újra kinyitható.
+
+Az EVE-adatellenőrzés az aktuális szakaszt, karaktert vagy corporationt, az ellenőrzött tételek számát, az adatfajtát és a lapozás állását mutatja. Külön jelzi az érvényes EVE-gyorsítótár használatát és a szerver válaszára várakozást. A Jita-árak és az ipari költségadatok saját haladási sort kapnak. A tervszámítások, keresések, mentések és más lekérések is megjelennek.
+
+A haladási sáv ismert tétel- vagy oldalszámot követ; ismeretlen teljes mennyiségnél mozgó jelzés látszik. Az **eltelt idő** nem várható befejezési idő. Párhuzamos műveletek külön sorban szerepelnek. A háttérfrissítés elindításának visszaigazolása még nem jelenti a frissítés befejezését.
+
+A végén **Elkészült**, **Figyelmeztetés** vagy **Sikertelen** állapot jelenik meg. Egyes karakterek vagy adatfajták hibája részleges eredményként látható. Ha maga az állapotlekérés nem érhető el, a panel ezt jelzi és újrapróbálja; nem állítja, hogy a folyamat elkészült. A feliratok a választott magyar/angol nyelvet követik.
+
 ## Értesítések és macOS-jelzések
 
 A bal oldali **Értesítések** menü összegyűjti a nem tanuló és az 5 napon belül kiürülő sorú karaktereket, az átvehető jobokat, a leállt PI-termelést és a következő **3 napban** esedékes holdkitermeléseket. A jelzésből megnyitható a hozzá tartozó nézet. Az oldalsáv száma a megbízható aktuális jelzések számát mutatja; a kérdőjel ellenőrizendő adatot jelez.
