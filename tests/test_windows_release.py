@@ -165,6 +165,8 @@ class WindowsDistributionTests(unittest.TestCase):
                 for i in range(1001):
                     types.extend({'_key':tid,'published':True,'name':{'en':str(tid)}} for tid in [10000+i,20000+i])
                     recipes.append({'blueprintTypeID':20000+i,'activities':{'manufacturing':{'materials':[{'typeID':34,'quantity':1}],'products':[{'typeID':10000+i,'quantity':1}]}}})
+                output.writestr('groups.jsonl','')
+                output.writestr('typeMaterials.jsonl','')
                 output.writestr('types.jsonl','\n'.join(json.dumps(r) for r in types))
                 output.writestr('blueprints.jsonl','\n'.join(json.dumps(r) for r in recipes))
             with patch('muhely.catalog.sqlite3.connect',side_effect=track),patch('muhely.catalog.os.replace',side_effect=check_replace):import_sde(archive,target)

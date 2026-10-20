@@ -1,0 +1,33 @@
+EVE MŰHELY 1.1.0 – APPLE SILICON MAC
+
+Feltétel: Apple Silicon (M1 vagy újabb), macOS 11 vagy újabb.
+Intel Macre nem használható. Python, Excel és Codex telepítése nem kell.
+
+TELEPÍTÉS
+1. Húzd az EVE Muhely alkalmazást az Applications / Alkalmazások mappába.
+2. Az alkalmazást az Alkalmazások mappából indítsd el.
+3. Ha a macOS blokkolja, a Rendszerbeállítások → Adatvédelem és biztonság
+   oldalon válaszd a Megnyitás mindenképpen lehetőséget, majd erősítsd meg.
+   Az alkalmazásnak nincs Apple Developer ID aláírása és nincs notarizálva.
+   Az ARM-kód kötelező helyi technikai aláírása nem fejlesztői tanúsítvány.
+4. A Műhely saját alkalmazásablakban nyílik meg. A térkép és az intelchat
+   külön ablakba nyitható. EVE-belépéskor a rendszerböngésző nyílik meg.
+
+ELSŐ HASZNÁLAT
+A kiadás üres: nincs benne karakter, mentett terv, készlet, belépési token,
+Client Secret vagy személyes adatbázis. Csak a nyilvános EVE Client ID
+van előre megadva. Az EVE-kapcsolat menüben mindenki a saját karaktereit
+engedélyezi. Az API használatához internet kell; a helyi tervezéshez nem.
+A Client ID nem jelent hozzáférést más karakteréhez: saját EVE-belépés kell.
+A Client ID a kapcsolat oldalon átírható. Callback: http://127.0.0.1:8765/callback
+
+HELYI ADATOK ÉS FRISSÍTÉS
+Saját adatok: ~/Library/Application Support/EVE Muhely/
+Ezek csak az adott Macen jönnek létre. A tokenek titkosítva tárolódnak,
+a kulcsot a macOS Kulcskarika őrzi. A Kulcskarika első belépéskor
+hozzáférést kérhet. Ha már használtad a Műhelyt ezen a Macen,
+a korábbi saját adataid megmaradnak; a tiszta csomag ezeket nem törli.
+Leállítás: a Műhely bal oldali „Alkalmazás leállítása” gombjával.
+
+Az app nem módosít Gatekeeper-beállítást és nem távolít el karanténjelölést.
+Hivatalos Apple-útmutató: https://support.apple.com/102445

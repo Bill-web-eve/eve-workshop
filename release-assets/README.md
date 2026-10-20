@@ -1,6 +1,6 @@
 # Kész csomagok közzététele
 
-A jelenlegi kiadás **1.0.0**, Mac Apple Silicon és Windows 11 x64 csomaggal, magyar–angol felülettel, teljes kézikönyvvel, gyártásütemezővel, holdnaptárral, Jita-árazással, ipari díjakkal és PI-előrejelzéssel. A `v1.0.0/manifest.json` felsorolja a hat ellenőrzött mellékletet és SHA-256 összegüket.
+A jelenlegi kiadás **1.1.0**, Mac Apple Silicon és Windows 11 x64 csomaggal, magyar–angol felülettel, saját ablakos Mac-appal, intel- és bányászati napló funkciókkal, teljes kézikönyvvel, gyártásütemezővel, holdnaptárral, Jita-árazással, ipari díjakkal és PI-előrejelzéssel. A `v1.1.0/manifest.json` felsorolja a hat ellenőrzött mellékletet és SHA-256 összegüket.
 
 A helyi kiadási commit elkészítése után a GitHub Desktopban a **Push origin** indítja a feltöltést. A main ágra érkezett kiadási változás elindítja a **Mac es Windows csomagok kozzetetele** munkafolyamatot. Siker után a csomagok itt tölthetők le: https://github.com/Bill-web-eve/eve-workshop/releases.
 

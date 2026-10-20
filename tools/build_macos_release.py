@@ -62,6 +62,26 @@ def audit_bundle(app):
         if set(json.loads(path.read_text()))!={'client_id'}:raise RuntimeError('Unexpected defaults')
 
 
+
+def install_window_shell(app):
+    """Wrap the frozen service in the same native shell used by the local app."""
+    app=Path(app);contents=app/'Contents';executable=contents/'MacOS/EVE Muhely'
+    backend=contents/'MacOS/eve-backend'
+    if backend.exists():raise RuntimeError('Native shell already installed')
+    executable.rename(backend)
+    subprocess.run(['xcrun','clang','-fobjc-arc','-arch','arm64','-framework','Cocoa',
+                    '-framework','WebKit','-framework','UserNotifications','-mmacosx-version-min=11.0',
+                    str(SOURCE/'tools/macos_launcher.m'),'-o',str(executable)],check=True)
+    executable.chmod(0o755)
+    shutil.copy2(SOURCE/'static/app-window.icns',contents/'Resources/app-window.icns')
+    info=plistlib.loads((contents/'Info.plist').read_bytes())
+    info.update(LSUIElement=False,CFBundleIconFile='app-window.icns',
+                NSAppTransportSecurity={'NSAllowsLocalNetworking':True})
+    (contents/'Info.plist').write_bytes(plistlib.dumps(info))
+    subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(backend)],check=True)
+    subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(app)],check=True)
+
+
 def build(config_file,work,output):
     if sys.platform!='darwin' or platform.machine()!='arm64':raise SystemExit('Apple Silicon Mac szükséges az összeállításhoz.')
     work=Path(work).resolve();output=Path(output).resolve()
@@ -90,7 +110,8 @@ app=BUNDLE(coll,name='EVE Muhely.app',icon={str(staging/'static/app.icns')!r},
 ''',encoding='utf-8')
     subprocess.run([sys.executable,'-m','PyInstaller','--noconfirm','--clean','--distpath',str(work/'dist'),
                     '--workpath',str(work/'build'),str(spec)],check=True,cwd=staging)
-    app=work/'dist/EVE Muhely.app';audit_bundle(app)
+    app=work/'dist/EVE Muhely.app'
+    install_window_shell(app);audit_bundle(app)
     subprocess.run(['/usr/bin/codesign','--verify','--deep','--strict',str(app)],check=True)
     disk=work/'disk';disk.mkdir();shutil.copytree(app,disk/app.name,symlinks=True)
     (disk/'Applications').symlink_to('/Applications',target_is_directory=True)
@@ -106,7 +127,8 @@ TELEPÍTÉS
    oldalon válaszd a Megnyitás mindenképpen lehetőséget, majd erősítsd meg.
    Az alkalmazásnak nincs Apple Developer ID aláírása és nincs notarizálva.
    Az ARM-kód kötelező helyi technikai aláírása nem fejlesztői tanúsítvány.
-4. A Műhely a saját böngésződben nyílik meg: http://127.0.0.1:8765
+4. A Műhely saját alkalmazásablakban nyílik meg. A térkép és az intelchat
+   külön ablakba nyitható. EVE-belépéskor a rendszerböngésző nyílik meg.
 
 ELSŐ HASZNÁLAT
 A kiadás üres: nincs benne karakter, mentett terv, készlet, belépési token,
@@ -136,6 +158,7 @@ Hivatalos Apple-útmutató: https://support.apple.com/102445
     (output/(name+'.sha256')).write_text(checksum+'  '+dmg.name+'\n')
     (output/'EVE_Muhely-Telepites.txt').write_text(instructions,encoding='utf-8')
     (work/'release-manifest.json').write_text(json.dumps({'version':version,'architecture':'arm64','minimum_macos':'11.0',
+        'interface':'native Cocoa/WKWebView window','self_contained_backend':True,
         'signing':'ad-hoc only; no Developer ID; no notarization','client_id_only':True,'characters':0,'saved_plans':0,
         'python':platform.python_version(),'pyinstaller':importlib.metadata.version('pyinstaller'),
         'cryptography':importlib.metadata.version('cryptography'),'sha256':checksum},indent=2)+'\n')

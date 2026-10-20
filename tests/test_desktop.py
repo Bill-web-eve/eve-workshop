@@ -1,4 +1,5 @@
 import json
+import plistlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -6,7 +7,7 @@ from unittest.mock import Mock,patch
 
 import desktop
 from muhely.store import Store
-from tools.build_macos_release import public_config,audit_bundle
+from tools.build_macos_release import public_config,audit_bundle,install_window_shell
 
 
 class CleanReleaseTests(unittest.TestCase):
@@ -41,6 +42,22 @@ class CleanReleaseTests(unittest.TestCase):
                 path=root/name;path.write_bytes(b'private')
                 with self.assertRaises(RuntimeError):audit_bundle(root)
                 path.unlink()
+
+    def test_native_release_wraps_frozen_service_without_developer_runtime_paths(self):
+        with tempfile.TemporaryDirectory() as folder:
+            app=Path(folder)/'EVE Muhely.app';contents=app/'Contents'
+            (contents/'MacOS').mkdir(parents=True);(contents/'Resources').mkdir()
+            executable=contents/'MacOS/EVE Muhely';executable.write_bytes(b'frozen-backend')
+            (contents/'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'hu.eve.muhely.local'}))
+            def compile_or_sign(command,**kwargs):
+                if command[0]=='xcrun':executable.write_bytes(b'native-window')
+            with patch('tools.build_macos_release.subprocess.run',side_effect=compile_or_sign) as run:
+                install_window_shell(app)
+            self.assertEqual((contents/'MacOS/eve-backend').read_bytes(),b'frozen-backend')
+            info=plistlib.loads((contents/'Info.plist').read_bytes())
+            self.assertFalse(info['LSUIElement']);self.assertEqual(info['CFBundleIconFile'],'app-window.icns')
+            self.assertEqual(run.call_args_list[0].args[0][:5],['xcrun','clang','-fobjc-arc','-arch','arm64'])
+            self.assertEqual(len(run.call_args_list),3)
 
     def test_local_health_only_accepts_our_service_and_never_uses_a_proxy(self):
         for raw,valid in [(b'[]',False),(b'{"app":"other"}',False),(b'{"app":"eve-muhely"}',True),(b'not JSON',False)]:

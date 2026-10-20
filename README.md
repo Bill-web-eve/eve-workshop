@@ -1,10 +1,10 @@
 # EVE Műhely
 
-Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple Silicon és Windows 11 x64 rendszerhez. A felület a saját böngésződben nyílik meg: **http://127.0.0.1:8765**.
+Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple Silicon és Windows 11 x64 rendszerhez. Macen saját alkalmazásablakban, Windowson a saját böngésződben nyílik meg. A helyi szolgáltatás címe: **http://127.0.0.1:8765**.
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.0.0**, **Windows 11 x64 1.0.0**, magyar és angol felülettel, Jita-árazással, ipari díjakkal és holdprofit-számítással.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.1.0**, **Windows 11 x64 1.1.0**, magyar és angol felülettel, Jita-árazással, ipari díjakkal és holdprofit-számítással.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -19,6 +19,15 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Skill- és tanulási sor figyelése, PI-áttekintés időalapú termelési becsléssel, sötét mód, rendezhető és szűrhető táblázatok.
 - Jita buy/sell/split alapanyagárak, termékeladási érték, ESI-rendszerindex és beállítható ipari díjak.
 - Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
+
+## Az 1.1.0 kiadás újdonságai
+
+- Önálló Mac-alkalmazás Cocoa/WKWebView ablakkal és beépített futtatókörnyezettel; külön rendszer- és intelchatablakok, OS-értesítések és állítható inteloverlay. A Windows-kiadás továbbra is böngészős.
+- Intelchat-fájlok követése, teljes régiós térkép, ugrástávolság szerinti jelzések, clear-kezelés, pilóták zKillboard-hivatkozása és hajóikonok. A jelentéskártyák három perc után eltűnnek.
+- Személyes és corporation értesítési központ: tanulás, kész jobok, PI és közelgő holdkitermelések. Látható lekérdezési állapotok és adatfrissítési szakaszok.
+- Bányászati napló karakterenként, ércenként és naponta, megőrzött előzményekkel, térfogattal és finomított Jita-értékkel. Nyersérc-árazás és residue-számítás nincs.
+- Karakterenként egyetlen „Authorize all access” jóváhagyással kérhető minden támogatott ESI-jogosultság.
+- Csak repackagelt készlet számít gyártáshoz; javított tervszámítási visszajelzések és készletfrissítési határidők, folyamatban lévő jobok az idővonalon, nézetet megőrző tervváltás és kompaktabb elrendezés.
 
 ## Az 1.0.0 kiadás újdonságai
 
@@ -35,7 +44,7 @@ A teljes útmutató: [Magyar](Hasznalat.md) · [English](UserGuide.en.md). A kia
 
 ## Használat
 
-Az oldalsávban, a sötét mód kapcsolója alatt a **Magyar / English** gombokkal válthatsz nyelvet. A választást a böngésző megjegyzi; a nyelv a megnyitott nézetben is azonnal változik. A beírt értékek, szűrők és még nem mentett módosítások megmaradnak. A karakterek, corporationök, mentett tervek és EVE-tárgyak neve nem változik.
+A **Settings → Appearance and language** oldalon válthatsz sötét/világos témát és magyar/angol nyelvet. A választást az alkalmazásablak vagy a böngésző megjegyzi; a nyelv a megnyitott nézetben is azonnal változik. A beírt értékek, szűrők és még nem mentett módosítások megmaradnak. A karakterek, corporationök, mentett tervek és EVE-tárgyak neve nem változik.
 
 A kész alkalmazás futtatásához nem kell Excel, Codex vagy külön Python. Windowson a teljes ZIP kibontása után indítsd az `EVE_Muhely.exe` fájlt; Macen másold a DMG-ben található alkalmazást az Alkalmazások mappába. A kiadások aláírás és hitelesítés nélkül készülnek. A Windows-csomag tényleges Windows 11 alatti futtatása ezen a fejlesztői gépen még nem volt ellenőrizhető; a mellékelt `Ellenorzes.cmd` külön, ideiglenes profillal ellenőrzi a működést.
 
@@ -75,7 +84,7 @@ PI supply uses factory-local buffers and a route-constrained bipartite maximum f
 
 Saved-plan shortcuts replace the fixed sample products. They open the actual saved ID, quantity and ownership context. `/api/plans/shopping` previews all saved goals against one stock/WIP pool: active reservations retain priority, unreserved goals follow in creation order using remaining stock without persistent activation. It reuses the production allocation pass and aggregates positive purchase shortages by type with per-plan contributions. The all-plans view is independent of the current unsaved target, supports CSV/clipboard and invalidates after state reloads. Tests cover shared stock, active/inactive ordering, no mutation, completed Archon pruning, WIP, deletion and endpoint authentication.
 
-`desktop.py` is the frozen desktop entry point. It starts the bundled server process and opens the user's browser; it never installs Python or packages on the recipient's Mac. `tools/build_macos_release.py` uses PyInstaller in an isolated development environment and an allowlisted source stage. Only `client_id` is allowed in `data/defaults.json`; no user database, vault, character or plan is copied. A fresh browser also starts with an empty product selection. Existing user data and an explicitly saved Client ID continue to override bundle defaults.
+`desktop.py` is the frozen backend entry point. The Mac release wraps it in the native Cocoa/WKWebView shell; Windows opens the user's browser. Neither package installs Python or packages on the recipient's machine. `tools/build_macos_release.py` uses PyInstaller in an isolated development environment and an allowlisted source stage. Only `client_id` is allowed in `data/defaults.json`; no user database, vault, character or plan is copied. A fresh browser also starts with an empty product selection. Existing user data and an explicitly saved Client ID continue to override bundle defaults.
 
 To rebuild an Apple Silicon distribution on a Mac, install `requirements.txt`, `pyinstaller==6.22.3` and `certifi==2026.7.22` into a dedicated Python environment, then run `python tools/build_macos_release.py --client-id-file PUBLIC_CLIENT_JSON --work-dir EMPTY_BUILD_DIR --output-dir RELEASE_DIR`. The public JSON only needs `client_id`; never pass an encrypted vault or user database. The current build uses Python 3.12.14 and cryptography 46.0.7, targets arm64/macOS 11+, and creates a verified DMG with installation instructions and a SHA-256 checksum. Developer ID and notarization are omitted; mandatory ad-hoc signing remains. No Gatekeeper setting or quarantine attribute is modified. The private, already-installed local app is not replaced by this release build.
 
@@ -87,9 +96,9 @@ Corporation planning (`muhely/corporations.py`, `static/corporations.js`): optio
 
 0.8.0: reactions accept up to 100 million output units with compressed job batches. Grouped quantity inputs preserve integer validation. Procurement includes missing BPC runs and noncopyable reaction formulas; saved plans reserve existing BPC capacity by item ID within their own stock owner. Production times use active ESI skills and SDE requirements/bonuses, with per-plan character selection and an explicit manual fallback. Implants and copying/invention job inputs are outside the duration/procurement model.
 
-## Local macOS window preview (not a public release)
+## Native macOS application (1.1.0)
 
-`tools/publish_macos.py DESTINATION --install-local` now builds the native Cocoa/WKWebView shell in `tools/macos_launcher.m`. It preserves the existing Python backend and user profile, while the shared UI appears inside the app window. This preview uses the existing local Python runtime; frozen public releases keep their prior build path until a windowed release is explicitly requested. No Windows package is generated by this change.
+`tools/build_macos_release.py` packages the native Cocoa/WKWebView shell in `tools/macos_launcher.m` with a frozen `eve-backend` executable. The shell starts that bundled executable, so recipients need no developer runtime. Developer installations made with `tools/publish_macos.py DESTINATION --install-local` retain the source/runtime launcher fallback. Both paths preserve the user profile.
 
 Appearance and language controls are under Settings. `static/desktop.js` supplies the platform adapter for clipboard, CSV/ICS/Markdown save dialogs, printing, external links, OAuth return and quit. Native messages are accepted only from the main frame at the exact local origin; local APIs retain session and CSRF protection. EVE login uses a ten-minute one-use browser handoff and authenticated result polling. OAuth codes and tokens are not returned to JavaScript. Closing the window checks pending work and gracefully stops the local service.
 
@@ -190,7 +199,7 @@ Csak a holdkitermelési értesítéseket tároljuk, más értesítések szöveg�
 
 Források: [ESI OpenAPI](https://esi.evetech.net/meta/openapi.json), [goesi notification modellek](https://pkg.go.dev/github.com/antihax/goesi/notification#MoonminingExtractionStarted), [CCP SDE](https://developers.eveonline.com/docs/services/static-data/). A funkciók az 1.0.0 kiadás részei.
 
-## Local notification center (macOS preview, no release)
+## Notification center (native macOS support in 1.1.0)
 
 `muhely/notifications.py` and `/api/notifications` aggregate training, personal/corporation completed jobs, PI stops and upcoming moon extractions (default three days). Training exclusions reuse account tracking; stale, missing and unauthorized data remains review-only. Corporation job identities suppress personal duplicates. Moon scope is inferred from ESI timers or explicitly assigned in Settings; this does not change production inventory scope.
 

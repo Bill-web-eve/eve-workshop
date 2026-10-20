@@ -39,8 +39,16 @@ static BOOL StartService(NSString **logPath) {
     NSFileHandle *output = [NSFileHandle fileHandleForWritingAtPath:log];
     [output seekToEndOfFile];
     NSTask *task = [NSTask new];
-    task.executableURL = [NSURL fileURLWithPath:@"/bin/bash"];
-    task.arguments = @[[NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"eve_muhely/Inditas.command"], @"--no-browser"];
+    NSString *backend = [NSBundle.mainBundle.executablePath.stringByDeletingLastPathComponent stringByAppendingPathComponent:@"eve-backend"];
+    if ([files isExecutableFileAtPath:backend]) {
+        // Public releases carry their own frozen Python service.
+        task.executableURL = [NSURL fileURLWithPath:backend];
+        task.arguments = @[@"--no-browser"];
+    } else {
+        // Developer installations retain their existing source/runtime launcher.
+        task.executableURL = [NSURL fileURLWithPath:@"/bin/bash"];
+        task.arguments = @[[NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"eve_muhely/Inditas.command"], @"--no-browser"];
+    }
     task.standardOutput = output; task.standardError = output;
     task.standardInput = NSFileHandle.fileHandleWithNullDevice;
     NSError *failure = nil;
