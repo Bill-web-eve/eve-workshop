@@ -444,3 +444,36 @@ Két job közé nem kerül kötelező várakozás: amint az anyagok, a slot és 
 - **invalid_scope vagy nincs jogosultság:** a kért scope legyen engedélyezve az EVE Developer alkalmazásban is, majd a megfelelő karaktert az Adathozzáférések alatt engedélyezd újra. Corporationadatokhoz a játékbeli szerepkör is kell. Jelszót és Client Secretet ne írj a Műhelybe.
 - **Nem készül teljes ütemterv:** nézd meg a Nem ütemezhető tételek és a Karakterek ipari kapacitása táblát. Ellenőrizd az aktív skilleket, a friss jobadatot, a fizikai blueprinteket, az Omega dátumát és az anyagok érkezését. A részleges ütemterv nem jelenti azt, hogy a teljes cél fedezett.
 - **Felületi frissítés:** helyi programfrissítés után töltsd újra a lapot (Mac: ⌘R, Windows: Ctrl+R), majd számold újra a tervet vagy ütemezést. Az app leállításához az oldalsáv alján lévő gombot használd; a böngészőlap bezárása nem elegendő.
+
+## Inteltérkép és helyi chatlogfigyelés
+
+Az **Inteltérkép** a bal oldali menüben érhető el, gyártási terv kiválasztása nélkül. A megadott EVE Chatlogs mappát másodpercenként ellenőrzi, az új sorokat a háttérben olvassa; a natív Mac-ablak háttérbe téve is képes rendszerértesítést küldeni. Bezárt app mellett nincs figyelés. Az EVE kliensben a chatnaplózásnak bekapcsolva kell lennie, és csatlakoznod kell a figyelt csatornához. Ez bejelentett intel, nem a játék teljes, biztos helyzetképe.
+
+1. Nyisd meg a **Beállítások → Intelbeállítások** oldalt.
+2. Válaszd ki a **Chatlogmappát**. Macen a **Mappa kiválasztása** natív mappaválasztót nyit. A **Csatornák keresése** a fájlnevekben talált csatornákat kínálja fel; kattintással hozzáadhatók. A **Figyelt csatornák** mezőben soronként egy pontos csatornanevet adj meg.
+3. Kapcsold be a figyelést. Állítsd be a riasztás távolságát (0–30 csillagkapu-jump), az intel érvényességét (1–120 perc) és az azonos rendszerhez tartozó értesítések közti szünetet (0–600 másodperc). A 0 jump csak azonos rendszert jelent.
+4. Jelöld ki a figyelt saját karaktereket. Az **Intelhelyzet engedélyezése** gomb a karakter meglévő EVE-jogosultságai mellé kéri az `esi-location.read_location.v1` és `esi-location.read_online.v1` scope-okat. Ezeket a Client ID EVE Developer alkalmazásában is engedélyezni kell. Az EVE-belépést és az új jogosultságokat te hagyod jóvá.
+5. Alternatíva a **Kézi referenciarendszer**: gépelésre szűkülő listából válassz. Ez rögzített referencia, nem követi a karakter mozgását. Törlésével visszatér az automatikus helyzet.
+6. Mentsd az intelbeállításokat. Az OS-értesítéshez a **Beállítások → Értesítések** alatt a személyes és a **Közeli intel** jelzéseket, valamint a rendszerértesítést is engedélyezd; macOS-hozzájárulás szükséges. Az intelhez külön hang kapcsolható.
+
+A friss ESI-adatból online állapot és rendszer is kell a közelségi riasztáshoz. Hibás, lejárt vagy offline ESI-adat nem számít megbízható élő pozíciónak. A saját karakter Local-naplójának rendszerváltása utolsó ismert helyet ad. A **Friss Local-napló helyzetével is riasszon** kapcsoló külön engedélyezi ezt a kevésbé biztos alternatívát, és csak legfeljebb 5 perces Local-adat használható; ez nem bizonyítja az online állapotot. A helyzet forrása és ideje mindig látható.
+
+## Intelüzenetek értelmezése és clear
+
+A rendszer teljes rendszerneveket és egyértelmű, legalább három karakteres, számot vagy kötőjelet tartalmazó nagybetűs rövidítéseket ismer fel. A rövidítések régiója szűkíthető. A több rendszerre egyszerre utaló bizonytalan üzenetet jelöli, és nem riaszt belőle; egyértelmű nyíllal megadott útvonálnál a célrendszert használja.
+
+- `J5A-IX Pilot Name` egy rendszerhez rendelt bejelentés. A bejelentő neve külön oszlopban marad; nem kerül automatikusan a jelentett pilóták közé.
+- A karakter showinfo-hivatkozásából származó név azonosítóval rendelkezik. Szabad szövegből felismert nevet külön jelöl az app; elírás, szokatlan hajórövidítés vagy beszélgetés téves felismerést okozhat. Az eredeti üzenetet mindig ellenőrizheted, a rendszer nem kér le külső szolgáltatást a szöveg ellenőrzésére.
+- `J5A-IX clr` és `J5A-IX clear` egyaránt tisztára jelöli a rendszert, és megszünteti az ott korábban bejelentett aktív intel közelségi jelzését.
+- `J5A-IX clr?` vagy `clear?` kérdés; nem törli a korábbi bejelentést. A „not clear” sem clear.
+- A lejárt bejelentésből nincs közelségi riasztás. Egy pilóta újabb, egyértelmű rendszerbejelentése felváltja a korábbit.
+
+A program a különböző saját karakterek logjaiban szereplő azonos csatornaüzenetet egyszer dolgozza fel. Induláskor vagy új csatorna kiválasztásakor a régi bejegyzések előzményként jelennek meg; nem indítanak visszamenőleges riasztást. A beolvasási pozíció és az értesítés kézbesítése helyben megmarad újraindítás után. Clear után egy újabb bejelentés új esemény lehet, az értesítési szünet figyelembevételével.
+
+## Az inteltérkép használata
+
+A **Karakter** mező választja ki a követett saját karaktert. A **Térkép környezete** a megjelenített körzetet szabályozza, a riasztási távolságtól függetlenül. A **Régió** egy teljes régiót mutat; a **Karakter követése** visszatér a saját karakter környezetéhez. Mozgasd húzással a térképet, nagyíts a görgővel vagy a +/− gombokkal; a **Teljes nézet** visszaállítja a kezdeti keretezést.
+
+Piros jelölés: aktív bejelentés, zöld: clear, arany: bekapcsolt előzménynézetben lejárt intel. Kék gyűrű: saját karakter beolvasott vagy rögzített helye, a forrásjelzés figyelembevételével. A rendszer melletti nevek a jelentett pilóták. Kattintás vagy billentyűzetes Enter kijelöli a rendszert, alatta az eredeti bejelentések olvashatók. Az **Intelüzenetek** tábla az utolsó 24 órából legfeljebb 500 bejegyzést mutat, a közös rendezési és szűrési lehetőségekkel.
+
+A távolság a nyilvános CCP SDE teljes csillagkapu-hálózatának legrövidebb útja; Ansiblex, wormhole és cyno nem része. A térkép legfeljebb 400 rendszert rajzol, a riasztás továbbra is a teljes hálózatból számol. A nyilvános rendszer- és kapuadat a receptadatbázis frissítésével frissülhet. A chatlog szövege és az intelbeállítások a saját helyi adatprofilban maradnak, a csomagba nem kerülnek. Az app az eredeti naplókat nem módosítja. A naplóforgatást, új fájlokat, UTF-16 kódolást és félkész sorokat kezeli.

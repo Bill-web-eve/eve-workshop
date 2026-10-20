@@ -31,6 +31,8 @@
   <script src="/prices.js" defer></script>
   <script src="/economics.js" defer></script>
   <script src="/documentation.js" defer></script>
+  <script src="/intel-map.js" defer></script>
+  <script src="/intel.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -49,6 +51,7 @@
     </nav>
     <div class="nav-label second-label">A MŰHELYED</div>
     <nav aria-label="Beállítások">
+      <button class="nav" data-view="intel"><span class="nav-icon">⌖</span>Inteltérkép <span id="intel-count" class="nav-count" hidden></span></button>
       <button class="nav" data-view="skills"><span class="nav-icon">◴</span>Skillek és tanulás <span id="skill-count" class="nav-count">–</span></button>
       <button class="nav" data-view="pi"><span class="nav-icon">◎</span>Bolygók és PI <span id="pi-count" class="nav-count">–</span></button>
       <div class="nav-group">
@@ -66,6 +69,7 @@
         <button class="nav" data-view="settings" aria-expanded="false" aria-controls="settings-submenu"><span class="nav-icon">⚙</span><span>Beállítások</span><span class="nav-chevron" aria-hidden="true">▸</span></button>
         <div id="settings-submenu" class="nav-submenu" hidden>
           <button data-settings-nav="notifications">Értesítések</button>
+          <button data-settings-nav="intel">Intelbeállítások</button>
           <button data-settings-nav="appearance">Megjelenés és nyelv</button>
           <button data-settings-nav="structures">Struktúrák és bónuszok</button>
           <button data-settings-nav="connection">EVE-kapcsolat <span id="connection-dot" class="dot"></span></button>

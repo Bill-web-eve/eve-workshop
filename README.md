@@ -201,3 +201,7 @@ The local SQLite event ledger leases pending events and acknowledges only submis
 ## Shared operation progress
 
 `static/activity.js` wraps application API requests and tracks concurrent operations independently of the current view. `/api/activity` provides a lightweight authenticated snapshot of background EVE, Jita and industry work without inventory/planning/catalogue locks. `muhely/progress.py` uses a thread-local observer to report stages, character/corporation counters, resources, cached reads and real pagination. Existing requests, atomic commits and cache expiry remain unchanged. Counts are work units, not elapsed-time percentages or invented ETAs. Completion, partial failures and unavailable status polling remain distinct; no release assets are modified.
+
+## Local intel
+
+Intel map monitors selected EVE Chatlogs channels locally, recognizes system/pilot reports and `clr`/`clear`, and offers configurable stargate-jump alerts with explicit ESI, Local-log or manual location provenance. Enable in Settings → Intel settings. See [research and design notes](Intel-reference.md), [Hungarian guide](Hasznalat.md) and [English guide](UserGuide.en.md). Public topology is rebuilt with `tools/build_intel_universe.py` from the official JSONL SDE; private logs and preferences are never bundled.

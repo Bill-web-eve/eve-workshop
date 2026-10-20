@@ -33,6 +33,7 @@ def stage_source(target,config):
     shutil.copytree(SOURCE/'static',target/'static',ignore=shutil.ignore_patterns('.DS_Store','__pycache__'))
     for name in ['Hasznalat.md','UserGuide.en.md']:shutil.copy2(SOURCE/name,target/name)
     shutil.copy2(SOURCE/'data/catalog.sqlite3',target/'data/catalog.sqlite3')
+    shutil.copy2(SOURCE/'data/intel_universe.json',target/'data/intel_universe.json')
     (target/'data/defaults.json').write_text(json.dumps({'client_id':config['client_id']})+'\n',encoding='utf-8')
     licenses=target/'licenses';licenses.mkdir()
     runtime_license=Path(sys.base_prefix)/'lib'/f'python{sys.version_info.major}.{sys.version_info.minor}'/'LICENSE.txt'

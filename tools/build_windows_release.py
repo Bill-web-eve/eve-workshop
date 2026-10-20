@@ -71,6 +71,7 @@ def stage(root,config):
     shutil.copytree(SOURCE/'static',app/'static',ignore=shutil.ignore_patterns('.DS_Store','__pycache__'))
     for name in ['Hasznalat.md','UserGuide.en.md']:shutil.copy2(SOURCE/name,app/name)
     shutil.copy2(SOURCE/'data/catalog.sqlite3',app/'data/catalog.sqlite3')
+    shutil.copy2(SOURCE/'data/intel_universe.json',app/'data/intel_universe.json')
     (app/'data/defaults.json').write_text(json.dumps(config)+'\n',encoding='utf-8')
 
 

@@ -33,6 +33,24 @@ class ServerTests(unittest.TestCase):
         response=connection.getresponse();raw=response.read();status=response.status;h=dict(response.getheaders());connection.close()
         return status,json.loads(raw) if raw and 'application/json' in h.get('Content-Type','') else raw,h
 
+    def test_intel_routes_keep_settings_private_and_validate_scope(self):
+        self.assertEqual(self.request('/api/intel',Cookie='')[0],403)
+        self.assertEqual(self.request('/api/intel/preferences',{'enabled':False},Origin='https://other.invalid')[0],403)
+        self.assertEqual(self.request('/api/intel/preferences',{'jumps':100})[0],400)
+        status,data,_=self.request('/api/intel');self.assertEqual(status,200);self.assertFalse(data['preferences']['enabled']);self.assertEqual(data['reports'],[])
+        self.assertEqual(self.request('/api/intel?radius=13')[0],400)
+        status,data,_=self.request('/api/intel/systems?q=Jita');self.assertEqual(status,200);self.assertEqual(data[0]['name'],'Jita')
+        status,data,_=self.request('/api/intel/alerts');self.assertEqual(status,200);self.assertFalse(data['enabled']);self.assertEqual(data['items'],[])
+        self.assertEqual(self.request('/api/intel/claim',{})[1]['items'],[])
+        self.assertEqual(self.request('/intel.js')[0],200)
+
+    def test_intel_location_refresh_is_a_separate_background_worker(self):
+        self.app.intel.request_locations=Mock()
+        status,data,_=self.request('/api/intel/locations',{});self.assertEqual(status,200);self.assertIn('intel',data);self.app.intel.request_locations.assert_called_once()
+        self.assertFalse(self.app.task['running'])
+        self.app.eve.finish=Mock(return_value=1);self.app.eve.authorized_feature='intel'
+        self.assertEqual(self.request('/callback?state=test&code=test')[0],303);self.assertEqual(self.app.intel.request_locations.call_count,2)
+
     def test_moon_calendar_and_crystal_routes_are_local_and_validate_ids(self):
         status,body,_=self.request('/extractions.js');self.assertEqual(status,200);self.assertIn(b'renderMoonCalendar',body)
         status,data,_=self.request('/api/moons');self.assertEqual(status,200);self.assertEqual(data['extractions']['events'],[])

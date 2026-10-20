@@ -14,6 +14,7 @@
 @property NSMenu *editMenu;
 @property UNUserNotificationCenter *notificationCenter;
 @property NSTimer *notificationMonitor;
+@property NSTimer *intelMonitor;
 @property NSDictionary *pendingNotification;
 - (BOOL)localURL:(NSURL *)url;
 - (void)startBackend:(void (^)(BOOL))completion;
@@ -63,7 +64,7 @@ static BOOL StartService(NSString **logPath) {
         arguments:@{ @"scope":target[@"scope"]?:@"personal",@"category":target[@"category"]?:@"all" } inFrame:nil inContentWorld:WKContentWorld.pageWorld completionHandler:nil];
 }
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions))done {
-    done(UNNotificationPresentationOptionBanner|UNNotificationPresentationOptionList);
+    done(UNNotificationPresentationOptionBanner|UNNotificationPresentationOptionList|(notification.request.content.sound?UNNotificationPresentationOptionSound:0));
 }
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)(void))done {
     NSDictionary *target=response.notification.request.content.userInfo;
@@ -73,7 +74,7 @@ static BOOL StartService(NSString **logPath) {
     if(!self.notificationCenter){if([body[@"action"] isEqual:@"notify"])reply(nil,@"A macOS-értesítések nincsenek engedélyezve.");else reply(@{ @"status":@"unavailable" },nil);return;}
     NSString *action=body[@"action"];
     if([action isEqual:@"requestNotifications"]){
-        [self.notificationCenter requestAuthorizationWithOptions:UNAuthorizationOptionAlert completionHandler:^(BOOL allowed,NSError *error){
+        [self.notificationCenter requestAuthorizationWithOptions:(UNAuthorizationOptionAlert|UNAuthorizationOptionSound) completionHandler:^(BOOL allowed,NSError *error){
             [self.notificationCenter getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings){dispatch_async(dispatch_get_main_queue(),^{reply(error?nil:@{ @"status":[self notificationStatusName:settings.authorizationStatus] },error?@"A macOS-értesítések engedélyezése nem sikerült.":nil);});}];
         }];return;
     }
@@ -85,10 +86,11 @@ static BOOL StartService(NSString **logPath) {
             [identifier rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._:-"].invertedSet].location==NSNotFound&&
             [title isKindOfClass:NSString.class]&&title.length<=200&&[text isKindOfClass:NSString.class]&&text.length<=1500&&
             [scope isKindOfClass:NSString.class]&&scope.length<=20&&([scope isEqual:@"personal"]||[scope rangeOfCharacterFromSet:NSCharacterSet.decimalDigitCharacterSet.invertedSet].location==NSNotFound)&&
-            [@[@"skills",@"jobs",@"pi",@"moons",@"all"] containsObject:category];
+            [@[@"skills",@"jobs",@"pi",@"moons",@"intel",@"all"] containsObject:category];
         if(!valid){dispatch_async(dispatch_get_main_queue(),^{reply(nil,@"Hibás rendszerértesítés.");});return;}
         UNMutableNotificationContent *content=[UNMutableNotificationContent new];content.title=title;content.body=text;
         content.userInfo=@{ @"scope":scope,@"category":category };
+        if([body[@"sound"] isEqual:@YES])content.sound=UNNotificationSound.defaultSound;
         UNNotificationRequest *request=[UNNotificationRequest requestWithIdentifier:identifier content:content trigger:nil];
         [self.notificationCenter addNotificationRequest:request withCompletionHandler:^(NSError *error){dispatch_async(dispatch_get_main_queue(),^{reply(error?nil:@{ @"queued":@YES },error?@"A macOS nem tudta sorba állítani az értesítést.":nil);});}];
     }];
@@ -127,6 +129,7 @@ static BOOL StartService(NSString **logPath) {
         EveWindow *app=weakSelf;
         if(app.ready&&!app.quitting)[app.web evaluateJavaScript:@"if(typeof refreshNotifications==='function'&&!notificationSettingsBusy)void refreshNotifications()" completionHandler:nil];
     }];
+    self.intelMonitor=[NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer){EveWindow *app=weakSelf;if(app.ready&&!app.quitting)[app.web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts()" completionHandler:nil];}];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [self menu];
     self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,1320,860) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
     self.window.title = @"EVE Műhely"; self.window.minSize = NSMakeSize(900,650); self.window.delegate = self;
@@ -199,6 +202,10 @@ static BOOL StartService(NSString **logPath) {
     if([@[@"notificationStatus",@"requestNotifications",@"notify"] containsObject:action]){[self notificationAction:body reply:reply];return;}
     if ([action isEqual:@"clipboard"] && [body[@"text"] isKindOfClass:NSString.class] && [body[@"text"] length]<8*1024*1024) {
         [NSPasteboard.generalPasteboard clearContents];[NSPasteboard.generalPasteboard setString:body[@"text"] forType:NSPasteboardTypeString];reply(@YES,nil);
+    } else if ([action isEqual:@"chooseIntelFolder"]) {
+        NSOpenPanel *panel=[NSOpenPanel openPanel];panel.canChooseFiles=NO;panel.canChooseDirectories=YES;panel.allowsMultipleSelection=NO;panel.canCreateDirectories=NO;
+        panel.message=[self english]?@"Choose the EVE Chatlogs folder to monitor.":@"Válaszd ki a figyelendő EVE Chatlogs mappát.";
+        [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse result){reply(result==NSModalResponseOK?@{ @"path":panel.URL.path }:@{},nil);}];
     } else if ([action isEqual:@"save"]) [self saveFile:body reply:reply];
     else if ([action isEqual:@"preferences"]) {
         self.language=[body[@"language"] isEqual:@"en"]?@"en":@"hu";

@@ -438,3 +438,36 @@ Official background: [EVE SSO](https://developers.eveonline.com/docs/services/ss
 - **invalid_scope or missing access:** enable the scopes in the Developer application, then authorize that character again under Data access. Corporation endpoints also require in-game roles. Never enter a Client Secret or EVE password into Workshop.
 - **The schedule is partial:** inspect blocked items and character capacity. Check active skills, fresh job snapshots, physical blueprints, Omega dates and material arrival. Partial output does not mean the whole target is covered.
 - **A local update is not visible:** reload the page with ⌘R on Mac or Ctrl+R on Windows, then recalculate the plan or schedule. Use Stop application to shut down; closing the tab is not enough.
+
+## Intel map and local chat log monitoring
+
+Open **Intel map** in the sidebar; no production plan is required. The app checks the configured EVE Chatlogs directory every second and reads newly appended lines. The native Mac window can send system notifications in the background. Monitoring stops when the app closes. Enable chat logging in EVE and join the monitored channels. This is reported intel, not a complete or guaranteed live picture of the game.
+
+1. Open **Settings → Intel settings**.
+2. Select the **Chat log folder**, using the native **Choose folder** button on Mac or entering a path. **Discover channels** lists channel names from filenames; click to add them. Enter one exact name per line in **Monitored channels**.
+3. Enable monitoring. Set the alert radius (0–30 stargate jumps), intel lifetime (1–120 minutes), and notification cooldown for the same system (0–600 seconds). Zero jumps means the same system only.
+4. Select the characters to monitor. **Authorize intel location** adds `esi-location.read_location.v1` and `esi-location.read_online.v1` to the character's existing grants. Enable both scopes in the EVE Developer application for your Client ID. You approve the EVE login and grants yourself.
+5. Alternatively, select a **Manual reference system** from the type-ahead search. This pins a reference; it does not follow movement. Clear it to resume automatic positioning.
+6. Save. For OS alerts, enable **Personal alerts**, **Nearby intel** and system notifications in **Settings → Notifications** and grant macOS permission. Intel notifications have an optional sound.
+
+Reliable ESI positioning requires both a fresh location and an online character. Failed, expired or offline ESI data cannot establish current proximity. Your character's Local system-change log supplies a last known location. **Also alert using a fresh Local log location** explicitly enables this less certain fallback; data must be no older than five minutes and does not prove online status. The location source and its time are shown.
+
+## Intel message interpretation and clear
+
+The parser recognizes full system names and unambiguous uppercase prefixes of at least three characters containing a digit or hyphen. An optional region narrows prefix matching. Reports mentioning several systems are marked ambiguous and do not trigger alerts. A clear arrow route uses its destination system.
+
+- `J5A-IX Pilot Name` reports a pilot in a system. The reporter stays in a separate column and is never automatically counted as the reported pilot.
+- A character showinfo link supplies a name and ID. Names inferred from plain text are marked accordingly. Typos, unusual ship abbreviations and conversation can produce incorrect guesses; the original message remains available. Text is not sent to a third-party service for verification.
+- `J5A-IX clr` and `J5A-IX clear` both mark the system clear and remove proximity alerts from earlier reports there.
+- `J5A-IX clr?` and `clear?` are questions and do not clear previous intel. “Not clear” does not clear it either.
+- Expired reports do not trigger alerts. A newer unambiguous sighting of a pilot replaces their previous system report.
+
+Identical channel messages appearing in multiple characters' logs are deduplicated. Old lines read at startup or after selecting a new channel are marked historical and do not cause retroactive alerts. File offsets and notification acknowledgments persist locally across restarts. A new report after a clear can create a new alert episode, subject to the cooldown.
+
+## Using the intel map
+
+Select an own **Character** to follow. **Map radius** controls the visible neighborhood independently of alert distance. **Region** shows a region; **Follow character** returns to the selected character's neighborhood. Drag to pan, use the wheel or +/− to zoom, and **Fit map** to restore the initial framing.
+
+Red means an active report, green means clear, and gold marks expired intel when history is enabled. A blue ring marks a read or pinned own-character location; check its source. Labels beside systems show reported pilots. Click a system, or focus it and press Enter, to inspect original reports below. The **Intel messages** table displays up to 500 entries from the last 24 hours and supports the shared sorting and filters.
+
+Distance uses the shortest route across the full public CCP SDE stargate network, excluding Ansiblex, wormholes and cynos. The map draws at most 400 systems; alerts still use the complete network. Public system and gate data can update with the recipe database. Chat text and intel settings stay in your local profile and are excluded from distribution packages. Original logs are never modified. File rotation, new files, UTF-16 and incomplete lines are supported.

@@ -1,7 +1,7 @@
 'use strict';
 let notificationData=null,notificationRequest=null,notificationScope='personal',notificationCategory='all',notificationTimer=null,notificationPermission='unknown',notificationSettingsBusy=false;
-const notificationLabels={skills:'Tanulás',jobs:'Elkészült jobok',pi:'PI-termelés',moons:'Holdkitermelések',data:'Ellenőrizendő adatok'};
-const notificationKinds={training_idle:'Nem tanul',training_soon:'5 napon belül leáll a tanulás',job_ready:'Átvehető job',job_expected:'Várhatóan elkészült job',pi_idle:'A bolygó nem termel',pi_estimated:'Becsült PI-leállás',pi_extractor:'Lejárt kitermelőprogram',moon_soon:'Közelgő holdkitermelés',moon_ready:'A holdkitermelés elkészült',unknown:'Frissítés vagy engedélyezés szükséges'};
+const notificationLabels={intel:'Közeli intel',skills:'Tanulás',jobs:'Elkészült jobok',pi:'PI-termelés',moons:'Holdkitermelések',data:'Ellenőrizendő adatok'};
+const notificationKinds={intel_near:'Közeli bejelentés',training_idle:'Nem tanul',training_soon:'5 napon belül leáll a tanulás',job_ready:'Átvehető job',job_expected:'Várhatóan elkészült job',pi_idle:'A bolygó nem termel',pi_estimated:'Becsült PI-leállás',pi_extractor:'Lejárt kitermelőprogram',moon_soon:'Közelgő holdkitermelés',moon_ready:'A holdkitermelés elkészült',unknown:'Frissítés vagy engedélyezés szükséges'};
 function notificationDate(value){return value==null?'–':EveI18n.date(value*1000,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}
 function notificationMatches(a){return notificationScope==='personal'?!a.corporation_id:notificationScope==='corporations'?!!a.corporation_id:a.corporation_id===Number(notificationScope);}
 async function refreshNotifications(deliver=true){
@@ -27,19 +27,20 @@ function scheduleNotificationMonitor(){
   clearInterval(notificationTimer);
   notificationTimer=setInterval(()=>{if(!document.hidden&&!notificationSettingsBusy)void refreshNotifications();},60000);
 }
-async function deliverNotifications(){
-  const data=await api('/api/notifications/claim',{}),groups=new Map();
+async function deliverNotifications(path='/api/notifications/claim'){
+  const data=await api(path,{}),groups=new Map();
   for(const item of data.items){const key=JSON.stringify([item.corporation_id,item.category]);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
   for(const batch of groups.values()){
     const first=batch[0],scope=first.corporation_id?first.scope_name:EveI18n.t('Személyes');
-    const body=batch.slice(0,3).map(a=>EveI18n.t(notificationKinds[a.kind])+': '+a.subject+(a.when!=null?' · '+EveI18n.t(notificationDate(a.when)):'')).join('\n')+(batch.length>3?'\n'+EveI18n.t('További {0} jelzés'.replace('{0}',fmt(batch.length-3))):'');
+    const body=batch.slice(0,3).map(a=>EveI18n.t(notificationKinds[a.kind])+': '+a.subject+(a.category==='intel'?' · '+a.character_name+' · '+a.jumps+' jump':'')+(a.when!=null?' · '+EveI18n.t(notificationDate(a.when)):'')).join('\n')+(batch.length>3?'\n'+EveI18n.t('További {0} jelzés'.replace('{0}',fmt(batch.length-3))):'');
     try{
-      await EveDesktop.notify({id:'eve.'+first.notification_id,title:'EVE '+EveI18n.t('Műhely')+' · '+scope,body,scope:first.corporation_id?String(first.corporation_id):'personal',category:first.category});
+      await EveDesktop.notify({id:'eve.'+first.notification_id,title:'EVE '+EveI18n.t('Műhely')+' · '+scope,body:body.slice(0,1400),scope:first.corporation_id?String(first.corporation_id):'personal',category:first.category,sound:batch.some(a=>a.sound===true)});
       await api('/api/notifications/sent',{receipts:batch.map(a=>a.receipt)});
     }catch(e){notificationPermission='error';if(view==='notifications')error(EveI18n.t('A rendszerértesítés nem küldhető el. A jelzések az alkalmazásban megmaradnak.'));break;}
   }
 }
 function openNotificationCenter(scope='personal',category='all'){
+  if(category==='intel'){navigate('intel');void refreshIntel();return;}
   if(!navigate('notifications'))return;
   notificationScope=scope==='personal'||scope==='corporations'||/^\d+$/.test(String(scope))?String(scope):'personal';
   notificationCategory=Object.prototype.hasOwnProperty.call(notificationLabels,category)?category:'all';render();
@@ -61,7 +62,8 @@ function renderNotifications(content){
   $$('[data-notification-category]').forEach(b=>b.onclick=()=>{notificationCategory=b.dataset.notificationCategory;render();});
   $$('[data-notification-open]').forEach(b=>b.onclick=()=>{
     const a=data.items.find(a=>a.id===b.dataset.notificationOpen);
-    if(a.category==='skills'){skillSelectedId=a.character_id;navigate('skills');}
+    if(a.category==='intel')showIntelSystem(a.system_id);
+    else if(a.category==='skills'){skillSelectedId=a.character_id;navigate('skills');}
     else if(a.category==='pi'){piSelected=`${a.character_id}:${a.planet_id}`;navigate('pi');}
     else if(a.category==='moons')selectMoonTab('calendar');
     else if(a.category==='jobs'){if(Object.keys(dirty).length)return;navigate('jobs');void setProductionScope(a.corporation_id||null);}

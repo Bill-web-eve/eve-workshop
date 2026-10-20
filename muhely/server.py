@@ -21,11 +21,11 @@ import uuid
 import webbrowser
 
 from . import __version__
-from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress
+from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe
 from .market import Market,validate_ids as market_ids
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
-from .esi import EveConnection, EsiError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES
+from .esi import EveConnection, EsiError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES, INTEL_SCOPES
 from .corporations import dashboard as corporation_dashboard
 from .skills import dashboard as skill_dashboard
 from .production import profiles as production_profiles
@@ -56,6 +56,7 @@ class App:
         self.task_lock = threading.RLock()
         self.planning_lock = threading.RLock()
         self.task = {'running': False, 'kind': None, 'message': '', 'finished': None, 'results': []}
+        self.intel=intel.IntelMonitor(self.store,self.catalog,self.eve)
 
     def desktop_auth_start(self, url):
         """One-use browser handoff; OAuth codes and tokens never enter the UI."""
@@ -160,7 +161,8 @@ class App:
         task=self.task_snapshot()
         with self.market.lock:
             market={'running':self.market.running,'done':self.market.done,'total':self.market.total,'errors':len(self.market.errors),'current':getattr(self.market,'current',None),'current_name':self.catalog.name(self.market.current) if getattr(self.market,'current',None) else None,'page':getattr(self.market,'page',None),'pages':getattr(self.market,'pages',None)}
-        return {'task':task,'market':market,'industry':self.industry.status()}
+        with self.intel.lock:intel_status=dict(self.intel.status)
+        return {'task':task,'market':market,'industry':self.industry.status(),'intel':intel_status}
 
     def notification_data(self):
         with self.catalog.lock:
@@ -199,6 +201,7 @@ class App:
             with self.catalog.lock:
                 self.catalog.path = target
                 self.catalog.reload()
+            if intel_universe.build(archive,self.store.folder/'intel_universe.json',build):self.intel.universe=intel_universe.load(self.store)
             archive.unlink(missing_ok=True)
         except PlanningError:
             raise
@@ -503,7 +506,7 @@ class App:
                 'locations': locations, 'jobs': [j for j in jobs if j.get('status') in ['active', 'paused', 'ready']],
                 'blueprint_count': len(bps), 'stale_characters': stale, 'sde': self.catalog.meta,
                 'recipe_count': sum(self.catalog.types.get(i, {}).get('published', 0) for i in self.catalog.recipes),
-                'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES,
+                'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,
                 'crypto_available': crypto_available()}
 
 
@@ -601,7 +604,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -621,6 +624,16 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(200, moon_calendar.export(self.app.store, self.app.catalog, query.get('lang', ['en'])[0]), 'text/calendar; charset=utf-8')
             if not self.authorized():
                 return self.send(403, {'error': 'Nyisd meg az alkalmazás kezdőlapját.'})
+            if path == '/api/intel':
+                center=integer(int(query.get('center',['0'])[0]),'Rendszer',2**31-1,0) or None
+                radius=integer(int(query.get('radius',['5'])[0]),'Jump',12,1)
+                return self.send(200,self.app.intel.dashboard(center,radius,query.get('history',['0'])[0]=='1',region=integer(int(query.get('region',['0'])[0]),'Régió',2**31-1,0) or None))
+            if path == '/api/intel/channels':return self.send(200,{'channels':self.app.intel.channels(query.get('folder',[''])[0])})
+            if path == '/api/intel/systems':
+                q=query.get('q',[''])[0].strip().casefold()
+                rows=[s for s in self.app.intel.universe.systems.values() if q and q in s['name'].casefold()]
+                return self.send(200,sorted(rows,key=lambda s:(not s['name'].casefold().startswith(q),s['name']))[:40])
+            if path == '/api/intel/alerts':return self.send(200,intel.collect_alerts(self.app.store,self.app.intel.universe))
             if path == '/api/activity':return self.send(200,self.app.activity())
             if path == '/api/notifications':
                 return self.send(200,self.app.notification_data())
@@ -633,10 +646,11 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/callback':
                 error = query.get('error')
                 if error==['invalid_scope']:
-                    raise PlanningError('Az EVE Developer alkalmazás nem engedélyezi az egyik kért scope-ot. Add hozzá a naptár, corporation mining és karakterértesítési olvasási engedélyeket a Client ID alkalmazásához, majd lépj be újra.')
+                    raise PlanningError('Az EVE Developer alkalmazás nem engedélyezi az egyik kért scope-ot. Add hozzá a kért naptár-, corporation mining-, karakterértesítési vagy intelhelyzet-olvasási engedélyeket a Client ID alkalmazásához, majd lépj be újra.')
                 if error:
                     raise PlanningError('Az EVE-belépés megszakadt. Az EVE-kapcsolat oldalon újraindítható.')
                 self.app.eve.finish(query.get('state', [''])[0], query.get('code', [''])[0], self.app.cookie)
+                if self.app.eve.authorized_feature=='intel':self.app.intel.request_locations()
                 if self.app.eve.authorized_feature=='moons':
                     try:self.app.start_task('extractions')
                     except PlanningError:pass
@@ -716,7 +730,11 @@ class Handler(BaseHTTPRequestHandler):
             path = urllib.parse.urlsplit(self.path).path
             query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             corporation_id=self.app.scope_id(query.get('corporation_id',[None])[0])
-            if path == '/api/industry/refresh':
+            if path == '/api/intel/preferences':return self.send(200,self.app.intel.configure(data))
+            elif path == '/api/intel/locations':
+                self.app.intel.request_locations();return self.send(200,{'intel':dict(self.app.intel.status)})
+            elif path == '/api/intel/claim':return self.send(200,{'items':notifications.claim(self.app.store,intel.collect_alerts(self.app.store,self.app.intel.universe))})
+            elif path == '/api/industry/refresh':
                 self.app.industry.start();return self.send(200,self.app.industry.status())
             elif path == '/api/industry/estimate':
                 with self.app.catalog.lock:return self.send(200,self.app.industry.estimate(data.get('rows'),self.app.store.settings(),self.app.catalog))
@@ -796,7 +814,7 @@ class Handler(BaseHTTPRequestHandler):
                     if char_id not in {c['id'] for c in self.app.store.characters()}:
                         raise PlanningError('A karakter már nincs hozzáadva.')
                 feature=data.get('feature')
-                if feature not in [None,'skills','pi','corporations','moons']:raise PlanningError('Ismeretlen engedélyezési cél.')
+                if feature not in [None,'skills','pi','corporations','moons','intel']:raise PlanningError('Ismeretlen engedélyezési cél.')
                 url = self.app.eve.start(self.app.cookie, self.app.origin+'/callback',char_id,feature)
                 return self.send(200,self.app.desktop_auth_start(url) if data.get('desktop') is True else {'url':url})
             elif path == '/api/characters/remove':
@@ -853,6 +871,10 @@ class Handler(BaseHTTPRequestHandler):
 class Server(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+
+    def server_close(self):
+        self.app.intel.stop()
+        super().server_close()
 
     def __init__(self, app):
         self.app = app

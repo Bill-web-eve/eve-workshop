@@ -30,7 +30,8 @@ SCOPES = INDUSTRY_SCOPES + SKILL_SCOPES + PI_SCOPES
 CORPORATION_SCOPES = ['esi-assets.read_corporation_assets.v1', 'esi-corporations.read_blueprints.v1',
                       'esi-industry.read_corporation_jobs.v1']
 MOON_SCOPES = ['esi-calendar.read_calendar_events.v1','esi-industry.read_corporation_mining.v1','esi-characters.read_notifications.v1']
-ALL_SCOPES = SCOPES + CORPORATION_SCOPES + MOON_SCOPES
+INTEL_SCOPES=['esi-location.read_location.v1','esi-location.read_online.v1']
+ALL_SCOPES = SCOPES + CORPORATION_SCOPES + MOON_SCOPES + INTEL_SCOPES
 USER_AGENT = 'EveMuhely/0.1 (local personal industry planner)'
 COMPATIBILITY = '2026-10-15'
 
@@ -64,6 +65,10 @@ class MoonScopeError(AuthenticationError):
 
 
 class CorporationScopeError(AuthenticationError):
+    pass
+
+
+class LocationScopeError(AuthenticationError):
     pass
 
 
@@ -265,9 +270,9 @@ class EveConnection:
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
         state = secrets.token_urlsafe(32)
         requested=SCOPES
-        if feature in ['skills','pi','corporations','moons']:
+        if feature in ['skills','pi','corporations','moons','intel']:
             existing=self.vault.read().get(str(character_id),{}) if character_id else {}
-            wanted=set(INDUSTRY_SCOPES+{'skills':SKILL_SCOPES,'pi':PI_SCOPES,'corporations':CORPORATION_SCOPES,'moons':MOON_SCOPES}[feature])
+            wanted=set(INDUSTRY_SCOPES+{'skills':SKILL_SCOPES,'pi':PI_SCOPES,'corporations':CORPORATION_SCOPES,'moons':MOON_SCOPES,'intel':INTEL_SCOPES}[feature])
             wanted.update(set(existing.get('scopes',[])) & set(ALL_SCOPES))
             requested=[scope for scope in ALL_SCOPES if scope in wanted]
         with self.lock:
@@ -300,6 +305,7 @@ class EveConnection:
         if set(SKILL_SCOPES).issubset(tokens['scopes']):self.store.skill_access_granted(char_id)
         if set(PI_SCOPES).issubset(tokens['scopes']):self.store.resource_access_granted(char_id,'pi')
         if set(CORPORATION_SCOPES).issubset(tokens['scopes']):self.store.resource_access_granted(char_id,'corporations')
+        if set(INTEL_SCOPES).issubset(tokens['scopes']):self.store.resource_access_granted(char_id,'intel_location')
         self.authorized_feature=pending.get('feature')
         for domain,scope in [('moon_calendar',MOON_SCOPES[0]),('moon_timers',MOON_SCOPES[1]),('moon_notifications',MOON_SCOPES[2])]:
             if scope in tokens['scopes']:self.store.resource_access_granted(char_id,domain)
@@ -335,6 +341,8 @@ class EveConnection:
                     tokens['scopes'] = claims['scp'].split() if isinstance(claims['scp'],str) else claims['scp']
                     self.vault.set(char_id,tokens)
                 if not set(required_scopes).issubset(tokens['scopes']):
+                    if set(INTEL_SCOPES) & (set(required_scopes)-set(tokens['scopes'])):
+                        raise LocationScopeError('Hiányzik a helyzet- és onlineadatok olvasási engedélye. Engedélyezd az intelhelyzet követését.')
                     if MOON_SCOPES[2] in set(required_scopes)-set(tokens['scopes']):
                         raise MoonScopeError('Hiányzik a karakterértesítések olvasási engedélye. Engedélyezd a holdadatok új értesítési hozzáférését.')
                     if set(MOON_SCOPES) & (set(required_scopes)-set(tokens['scopes'])):

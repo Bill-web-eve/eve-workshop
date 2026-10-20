@@ -14,6 +14,7 @@ async function setup(wait=pending()){
  w.HTMLElement.prototype.scrollIntoView=function(){scrolls.push(this.id);};
  w.fetch=async (url,options)=>{
   calls.push(url);
+  if(url==='/api/intel/alerts')return {ok:true,json:async()=>({enabled:false,items:[]})};
   if(url==='/api/notifications')return {ok:true,json:async()=>notificationFixture};
   if(url==='/api/notifications/claim')return {ok:true,json:async()=>({items:notificationFixture.claims})};
   if(url==='/api/notifications/sent'){notificationFixture.receipts=JSON.parse(options.body).receipts;return {ok:true,json:async()=>({ok:true})};}

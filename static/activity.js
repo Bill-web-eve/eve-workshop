@@ -7,6 +7,7 @@ globalThis.EveActivity=(()=>{
   const detailText=value=>Array.isArray(value)?value.map(p=>p.raw?p.text:t(p.text,...(p.args||[]))).join(' · '):t(value);
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const labels={
+    '/api/intel':'Inteladatok betöltése','/api/intel/channels':'Intelcsatornák keresése','/api/intel/locations':'ESI-helyzetek frissítése',
     '/api/state':'Műhelyadatok betöltése','/api/plan':'Gyártási terv számítása','/api/schedule':'Gyártás ütemezése','/api/search':'Termékkeresés',
     '/api/skills':'Skilladatok összesítése','/api/pi':'PI-adatok összesítése','/api/moons':'Holdadatok összesítése','/api/moons/systems':'Rendszerkeresés',
     '/api/prices':'Jita-árak ellenőrzése','/api/prices/refresh':'Jita-árak frissítése','/api/industry':'Ipari költségadatok ellenőrzése','/api/industry/refresh':'Ipari költségadatok frissítése','/api/industry/estimate':'Gyártási költség számítása','/api/industry/system':'Rendszerindex ellenőrzése',
@@ -73,6 +74,7 @@ globalThis.EveActivity=(()=>{
   function observe(path,data){
     if(!data||typeof data!=='object')return;
     if(data.task)task(data.task);
+    if(data.intel)intel(data.intel);
     const key=base(path);
     if(key.startsWith('/api/prices'))market(data);
     if(key==='/api/industry'||key==='/api/industry/refresh')industry(data);
@@ -91,14 +93,17 @@ globalThis.EveActivity=(()=>{
     const detail=data.running?[part(names[data.current]||'Ipari költségadatok'),part('Ellenőrizve: {0} / {1}',data.done||0,2)]:Object.keys(data.errors||{}).length?'Néhány ipari költségadat nem frissült.':'Az ipari költségadatok ellenőrizve.';
     background('industry','Ipari költségadatok frissítése',data.running,detail,{done:data.done||0,total:2},Object.keys(data.errors||{}).length?'warning':'success');if(data.running)pollSoon();
   }
-  function monitoring(){return [...active.keys()].some(key=>key==='market'||key==='industry'||key==='pending:task'||key.startsWith('task:'));}
+  function intel(data){
+    background('intel','ESI-helyzetek frissítése',!!data.location_refreshing,data.location_character?[{text:data.location_character,raw:true}]:[part('Helyzetadatok ellenőrzése')]);if(data.location_refreshing)pollSoon();
+  }
+  function monitoring(){return [...active.keys()].some(key=>key==='intel'||key==='market'||key==='industry'||key==='pending:task'||key.startsWith('task:'));}
   function pollSoon(delay=700){if(!pollTimer&&!polling)pollTimer=setTimeout(()=>{pollTimer=null;void poll();},delay);}
   async function poll(){
     if(polling)return;polling=true;
     try{
       const response=await fetch('/api/activity');if(!response.ok)throw Error('status');const data=await response.json();monitorFailures=0;
       if(data.task?.kind)task(data.task);else if(active.has('pending:task'))finish('pending:task','success','Nincs folyamatban adatfrissítés.');
-      market(data.market||{});industry(data.industry||{});finish('monitor','success','Az állapotjelzés helyreállt.');
+      market(data.market||{});industry(data.industry||{});intel(data.intel||{});finish('monitor','success','Az állapotjelzés helyreállt.');
     }catch{
       monitorFailures++;
       const row=start('monitor','Az állapot most nem ellenőrizhető.','Újrapróbáljuk az állapot lekérését; a folyamat befejezése még nem igazolt.');row.state='warning';render();
@@ -106,7 +111,7 @@ globalThis.EveActivity=(()=>{
   }
   async function run(path,operation){
     const key='request:'+(++serial),route=base(path);
-    const quiet=route==='/api/activity'||(route==='/api/state'&&monitoring())||(route==='/api/prices'&&active.has('market'));
+    const quiet=route==='/api/intel/alerts'||route==='/api/intel/claim'||route==='/api/intel'||route==='/api/activity'||(route==='/api/state'&&monitoring())||(route==='/api/prices'&&active.has('market'));
     if(!quiet)start(key,label(path));
     try{const result=await operation();observe(path,result);if(!quiet)finish(key);return result;}
     catch(error){if(!quiet)finish(key,'error',error.message||'A kérés nem sikerült.');throw error;}

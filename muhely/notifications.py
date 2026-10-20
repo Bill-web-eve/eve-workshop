@@ -7,7 +7,7 @@ import time
 from . import skills, pi, extractions
 from .planner import PlanningError
 
-CATEGORIES=('skills','jobs','pi','moons')
+CATEGORIES=('skills','jobs','pi','moons','intel')
 DEFAULTS={'os_enabled':False,'auto_refresh':True,'moon_days':3,'personal':True,'corporations':True,
           'categories':{k:True for k in CATEGORIES},'moon_owners':{}}
 
@@ -17,7 +17,8 @@ def schema(store):
         db.executescript('''CREATE TABLE IF NOT EXISTS notification_preferences(id INTEGER PRIMARY KEY,data TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS notification_events(id TEXT PRIMARY KEY,domain TEXT NOT NULL,fingerprint TEXT NOT NULL,
             episode INTEGER NOT NULL,active INTEGER NOT NULL,sent INTEGER NOT NULL DEFAULT 0,
-            lease TEXT,lease_until REAL NOT NULL DEFAULT 0,updated REAL NOT NULL);''')
+            lease TEXT,lease_until REAL NOT NULL DEFAULT 0,updated REAL NOT NULL);
+          CREATE TABLE IF NOT EXISTS intel_alarm_sent(owner TEXT PRIMARY KEY,at REAL NOT NULL);''')
 
 
 def preferences(store):
@@ -135,6 +136,10 @@ def collect(store,catalog,now=None):
             key=f"moon:{m['moon_id']}:{e.get('structure_id',0)}:{int(at)}"
             add(key,domain,'moons','moon_ready' if at<=now else 'moon_soon',name,when=at,scope=scope,checked=e.get('checked'),reliable=valid,
                 moon_record_id=mid,volume=e.get('volume'),estimated=e.get('volume_source')=='duration_estimate',ownership_unknown=scope is None and mid not in prefs['moon_owners'])
+    from .intel import collect_alerts
+    intel_data=collect_alerts(store,now=now)
+    observed.update(intel_data['observed_domains'])
+    for item in intel_data['items']:alerts[item['id']]=item
     rows=sorted(alerts.values(),key=lambda a:(not a['reliable'],a['when'] is None,a['when'] or 0,a['subject'].casefold(),a['id']))
     return {'items':rows,'observed_domains':sorted(observed),'corporations':[{'id':cid,'name':name} for cid,name in sorted(corps.items(),key=lambda x:x[1])],
             'moons':moon_rows,'preferences':prefs,'calculated_at':now,
@@ -154,9 +159,12 @@ def claim(store,data,now=None):
         for a in eligible:
             if len(result)>=2000:break
             if not prefs['categories'][a['category']] or not prefs['corporations' if a['corporation_id'] else 'personal']:continue
+            if a['category']=='intel':
+                owner=':'.join(a['id'].split(':')[:3]);sent=db.execute('SELECT at FROM intel_alarm_sent WHERE owner=?',(owner,)).fetchone()
+                if sent and now-sent['at']<a.get('cooldown',20):continue
             # Stable job/moon identity suppresses repeated snapshots and the
             # expected-to-confirmed transition for the same completed job.
-            fingerprint=str(int(a['when'])) if a['category']=='skills' and a['when'] is not None else ''
+            fingerprint=a.get('episode_key','') if a['category']=='intel' else str(int(a['when'])) if a['category']=='skills' and a['when'] is not None else ''
             old=db.execute('SELECT * FROM notification_events WHERE id=?',(a['id'],)).fetchone()
             episode=old['episode'] if old else 1
             if old and (not old['active'] or old['fingerprint']!=fingerprint):episode+=1;old=None
@@ -173,4 +181,7 @@ def acknowledge(store,receipts):
     if not isinstance(receipts,list) or len(receipts)>2000 or any(not isinstance(v,str) or len(v)>100 for v in receipts):raise PlanningError('Hibás értesítési visszaigazolás.')
     schema(store)
     with store.db() as db:
-        for receipt in receipts:db.execute('UPDATE notification_events SET sent=1,lease=NULL,lease_until=0 WHERE lease=?',(receipt,))
+        for receipt in receipts:
+            row=db.execute('SELECT id FROM notification_events WHERE lease=?',(receipt,)).fetchone()
+            if row and row['id'].startswith('intel:'):db.execute('INSERT OR REPLACE INTO intel_alarm_sent VALUES(?,?)',(':'.join(row['id'].split(':')[:3]),time.time()))
+            db.execute('UPDATE notification_events SET sent=1,lease=NULL,lease_until=0 WHERE lease=?',(receipt,))
