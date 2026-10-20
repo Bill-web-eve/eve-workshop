@@ -46,6 +46,17 @@ class CorporationPlanningTests(unittest.TestCase):
         self.assertEqual([self.row(p,590)['wip'] for p in [personal,a,b]],[1,2,0])
         self.assertEqual([self.row(p,590)['parameters']['me'] for p in [personal,a,b]],[10,2,5])
         self.assertEqual([self.row(p,590)['parameters']['te'] for p in [personal,a,b]],[20,4,10])
+
+    def test_assembled_finished_products_are_excluded_in_both_inventory_pools(self):
+        for singleton,expected in [(True,0),(False,1)]:
+            finished={**asset(9000,1),'type_id':590,'is_singleton':singleton}
+            self.app.store.save_snapshots(1,{'assets':snapshot([finished])})
+            self.app.store.save_corporation_snapshots(A,1,{'assets':snapshot([finished])})
+            for cid in [None,A]:
+                with self.subTest(singleton=singleton,corporation=cid):
+                    row=self.row(self.plan(cid),590)
+                    self.assertEqual(row['on_hand'],expected)
+                    self.assertEqual(row['used_stock'],expected)
     def test_manual_overrides_are_separate_even_when_personal_mode_is_manual(self):
         self.app.store.save_settings({'source':'manual'})
         self.app.store.save_mapping('inventory',{34:{'quantity':9999}})

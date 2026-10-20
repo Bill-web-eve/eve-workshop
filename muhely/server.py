@@ -116,7 +116,7 @@ class App:
                         message+=f" Corp-adatok: {sum(r['ok'] for r in corp_results)} sikeres lekérés; részletek a Corporationok oldalon."
                     if include_moons:
                         moon_results=phase('Holdak és naptár',lambda:extractions.sync(self.eve))
-                        if any(not r['ok'] for r in moon_results):message+=' Néhány holdadat nem frissült; ellenőrizd a Kitermelési naptár hozzáféréseit.'
+                        if any(not r['ok'] for r in moon_results):message+=' Néhány holdadat nem frissült; ellenőrizd a Kitermelési naptár hozzáféréseit. Ez a holdadat-figyelmeztetés önmagában nem akadályozza a gyártási terv számítását.'
                 elif kind == 'skills':
                     if not self.store.characters():
                         raise PlanningError('Előbb adj hozzá karaktert az EVE-kapcsolat oldalon.')

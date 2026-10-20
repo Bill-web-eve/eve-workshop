@@ -1,6 +1,18 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Terv számítása…": "Calculating plan…",
+  "A terv elkészült. Hátralévő gyártandó tételek: {0}.": "Plan calculated. Remaining production items: {0}.",
+  "A terv elkészült. Nincs hátralévő gyártás: {0} db becsomagolt késztermék és {1} db folyamatban lévő kimenet fedezi a célt.": "Plan calculated. No production remains: {0} packaged finished products and {1} units from active jobs cover the target.",
+  "Becsomagolt késztermékből felhasználva:": "Packaged finished products used:",
+  "Folyamatban lévő kimenetből:": "Output from active jobs used:",
+  "Hátralévő célmennyiség:": "Remaining target quantity:",
+  "Kézzel félretett késztermék:": "Manually set aside finished products:",
+  "A kibontott példányokat nem használjuk fel. A becsomagolt késztermékeket a Készlet oldalon a Másra foglalva (kézi) mezőben teheted félre; ez minden tervre érvényes.": "Assembled items are excluded. To keep packaged finished products, use the Reserved elsewhere (manual) field on Inventory; this applies to every plan.",
+  "Az EVE-készletből csak a becsomagolt példányokat használjuk fel. A kibontott hajók és modulok nem fedezik a célt és nem használhatók fel alapanyagként. A BPO/BPC-példányokat külön kezeljük; a kézi készletfelülírás továbbra is érvényes.": "Only packaged items from EVE inventory are used. Assembled ships and modules neither cover the target nor supply production materials. BPO/BPC ownership is handled separately; manual inventory overrides still apply.",
+  "Néhány holdadat nem frissült; ellenőrizd a Kitermelési naptár hozzáféréseit.": "Some moon data could not be refreshed; check Extraction calendar permissions.",
+  "Ez a holdadat-figyelmeztetés önmagában nem akadályozza a gyártási terv számítását.": "This moon data warning does not itself prevent production planning.",
+
   "Teljes régiótérkép, jelölt jumptávolság és jelentett pilóták hajóadatokkal.": "Full region map, marked jump range and reported pilots with ship details.",
   "Térkép külön ablakban": "Open map window",
   "Intelchat külön ablakban": "Open intel chat window",

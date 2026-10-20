@@ -198,6 +198,38 @@ class LiveTests(unittest.TestCase):
         bad=dict(snap,assets=[dict(item_id=10,type_id=200,location_id=20),dict(item_id=20,type_id=200,location_id=10)])
         with self.assertRaises(PlanningError):live_inventory(self.c,[bad])
 
+    def test_assembled_target_and_modules_are_not_production_stock(self):
+        self.c.recipe(100,{110:2,200:3})
+        assets=[dict(item_id=10,type_id=100,location_id=900,quantity=1,is_singleton=True),
+                dict(item_id=20,type_id=110,location_id=10,quantity=1,is_singleton=True),
+                dict(item_id=30,type_id=200,location_id=900,quantity=3,is_singleton=False)]
+        snap=dict(character_id=1,assets=assets,blueprints=[],jobs=[])
+        stock,wip,bps,jobs,_=live_inventory(self.c,[snap,snap])
+        result=Planner(self.c).calculate(100,1,DEFAULT_SETTINGS,stock=stock,wip=wip,blueprints=bps,jobs=jobs)
+        rows={r['id']:r for r in result['rows']}
+        self.assertEqual((rows[100]['used_stock'],rows[100]['runs']),(0,1))
+        self.assertEqual(rows[110]['buy'],2)
+        self.assertEqual(rows[200]['buy'],0)
+        # Repackaging changes eligibility without a manual stock override.
+        assets[0]['is_singleton']=False
+        stock,*_=live_inventory(self.c,[snap])
+        self.assertEqual(Planner(self.c).calculate(100,1,DEFAULT_SETTINGS,stock=stock)['queue'],[])
+
+    def test_packaged_contents_and_blueprints_survive_assembled_filter(self):
+        bp=dict(item_id=40,type_id=1130,location_id=20,quantity=-2,runs=4,
+                material_efficiency=3,time_efficiency=2)
+        assets=[dict(item_id=10,type_id=100,location_id=900,quantity=1,is_singleton=True),
+                dict(item_id=20,type_id=110,location_id=10,quantity=1,is_singleton=True),
+                dict(item_id=30,type_id=200,location_id=20,quantity=57,is_singleton=False),
+                dict(item_id=40,type_id=1130,location_id=20,quantity=1,is_singleton=True)]
+        snap=dict(character_id=1,assets=assets,blueprints=[bp],jobs=[])
+        stock,_,bps,_,locations=live_inventory(self.c,[snap,snap],[900])
+        self.assertEqual(dict(stock),{200:57})
+        self.assertEqual(locations,[900])
+        self.assertEqual(len(bps),1)
+        self.assertEqual((bps[0]['runs'],bps[0]['material_efficiency'],bps[0]['time_efficiency']),(4,3,2))
+        self.assertFalse(live_inventory(self.c,[snap],[901])[0])
+
 
 class RealCatalogTests(unittest.TestCase):
     @classmethod

@@ -216,11 +216,14 @@ function scheduleTaskPoll() {
     } catch(e) { error(e.message); }
   },1200);
 }
-async function calculate(refreshState=true) {
+async function calculate(refreshState=true,announce=false) {
   if(Object.keys(dirty).length && !confirmUI('Az új számítás eldobja a még nem alkalmazott módosításokat. Folytatod?')) return;
   const generation=++planGeneration;
   const targetId=productId, targetName=productName, quantity=targetQuantity();
   $('#calculate').disabled=true;
+  const feedback=$('#calculation-feedback');
+  feedback.hidden=!announce;
+  feedback.textContent=announce?'Terv számítása…':'';
   error('');
   try {
     if(refreshState) await reloadState();
@@ -239,10 +242,17 @@ async function calculate(refreshState=true) {
     status.className='banner warn';
     status.textContent='Korábbi EVE-adatokból számolunk: '+plan.stale_characters.join(', ')+'. Frissítsd az EVE-adatokat; a legutóbbi sikeres pillanatkép addig megmarad.';
     render();
+    if(announce) {
+      const target=next.rows?.find(r=>r.id===next.product_id);
+      feedback.textContent=next.summary.items===0 && target
+        ?`A terv elkészült. Nincs hátralévő gyártás: ${fmt(target.used_stock)} db becsomagolt késztermék és ${fmt(target.used_wip)} db folyamatban lévő kimenet fedezi a célt.`
+        :`A terv elkészült. Hátralévő gyártandó tételek: ${fmt(next.summary.items)}.`;
+    }
     return next;
   } catch(e) {
     if(generation!==planGeneration) return;
     plan=null;
+    feedback.hidden=true;
     if(e.delivery_wait){deliveryWait=e.delivery_wait;scheduleDeliveryCheck();}
     error(e.message);
     $('#queue-count').textContent='–';
@@ -346,13 +356,12 @@ function renderQueue(content) {
   const s=plan.summary;
   content.innerHTML=`<div class="metrics"><div class="metric"><div class="metric-label">Gyártandó tételek</div><strong>${fmt(s.items)}</strong><small>termék</small></div><div class="metric"><div class="metric-label">Elindítandó jobok</div><strong>${fmt(s.jobs)}</strong><small>job</small></div><div class="metric"><div class="metric-label">Hátralévő runok</div><strong>${fmt(s.runs)}</strong><small>run</small></div><div class="metric"><div class="metric-label">Összes munkaóra</div><strong>${hours(s.seconds)}</strong><small>óra</small></div></div>`;
   const materialValues=EveCosts.materials(plan);
-  content.innerHTML+=costSummary('plan-materials',materialValues,'A gyártás anyagköltsége','A hátralévő gyártáshoz felhasznált anyagok Jita-értéke, a meglévő és folyamatban lévő bemenetekkel együtt. A helyben gyártott köztes terméket nem számoljuk el még egyszer az alapanyagai mellett. A job cost külön sorban jelenik meg a rendszer indexével és a struktúra díjaival.',true,planEconomics(plan));
   const rows=plan.queue.map(r=>`<tr><td><span class="stage">${r.stage}</span></td><td>${item(r)}</td><td>${badge(r)}</td><td class="num">${fmt(r.available)}</td><td class="num">${fmt(r.wip)}</td><td class="num">${fmt(r.missing)}</td><td class="num"><strong>${fmt(r.runs)}</strong></td><td class="num">${fmt(r.manufactured)}</td><td class="num">${fmt(r.jobs)}<div class="batch-note">${esc(batchText(r))}</div></td><td><span class="badge ${r.warning.length?'warn':'good'}" title="${esc(r.warning.join(' '))}">${r.parameters.kind}${r.warning.length?' · ellenőrizd':''}</span></td><td>${productionTime(r)}</td><td class="num" data-sort-value="${r.seconds}">${hours(r.seconds)}</td></tr>`);
   const target=plan.rows.find(r=>r.id===plan.product_id);
   if(target && (target.used_stock || target.used_wip || target.manual_reserved)) {
-    const coverage=`A ${fmt(plan.quantity)} db ${plan.name} célból ${fmt(target.used_stock)} db-ot meglévő késztermék, ${fmt(target.used_wip)} db-ot folyamatban lévő gyártás fedez. ${fmt(target.missing)} db van még hátra.`;
-    content.innerHTML+=`<div class="banner reservation-context"><div><strong>${esc(coverage).replace(esc(plan.name),itemName(plan.name))}</strong>${target.manual_reserved?`<div>A kész ${itemName(plan.name)} készletéből ${fmt(target.manual_reserved)} db kézzel félretéve; ezt a terv nem használja fel.</div>`:''}<div>Ha a meglévő késztermékeket megtartanád, a Készlet oldalon a Másra foglalva (kézi) mezőben teheted félre őket. Ez minden tervre érvényes.</div></div><button class="button compact" id="target-stock-settings">Késztermék-készlet beállítása</button></div>`;
+    content.innerHTML+=`<div class="banner reservation-context"><div><strong>${itemName(plan.name)}</strong><div><span>Becsomagolt késztermékből felhasználva:</span> ${fmt(target.used_stock)} · <span>Folyamatban lévő kimenetből:</span> ${fmt(target.used_wip)} · <span>Hátralévő célmennyiség:</span> ${fmt(target.missing)}</div>${target.manual_reserved?`<div><span>Kézzel félretett késztermék:</span> ${fmt(target.manual_reserved)}</div>`:''}<div>A kibontott példányokat nem használjuk fel. A becsomagolt késztermékeket a Készlet oldalon a Másra foglalva (kézi) mezőben teheted félre; ez minden tervre érvényes.</div></div><button class="button compact" id="target-stock-settings">Késztermék-készlet beállítása</button></div>`;
   }
+  content.innerHTML+=costSummary('plan-materials',materialValues,'A gyártás anyagköltsége','A hátralévő gyártáshoz felhasznált anyagok Jita-értéke, a meglévő és folyamatban lévő bemenetekkel együtt. A helyben gyártott köztes terméket nem számoljuk el még egyszer az alapanyagai mellett. A job cost külön sorban jelenik meg a rendszer indexével és a struktúra díjaival.',true,planEconomics(plan));
   content.innerHTML+=panel(`${plan.name} · ${fmt(plan.quantity)} db`,`${fmt(s.items)} tétel a hátralévő gyártásban`, rows.length?table(['Szint','Termék','Tevékenység','Elérhető (db)','Folyamatban (db)','Hiány (db)','Run','Kimenet (db)','Jobfelosztás','Blueprint','Gyártó / skillidő','Munkaóra'],rows,'queue-table'):empty('Nincs több gyártandó tétel','A célmennyiséget a meglévő készlet és a folyamatban lévő kimenetek fedezik.'),plan.name);
   content.innerHTML+='<p class="footnote">A szint a receptfüggőségeket jelzi: az alacsonyabb szintű tételekkel kezdd. A munkaórák összege nem naptári átfutási idő; a jobok párhuzamosan is futhatnak. A kézi vagy hiányzó blueprintadatokat a Blueprint oldalon ellenőrizd.</p>';
   if(plan.queue.some(r=>r.producer?.status!=='verified'))content.insertAdjacentHTML('afterbegin','<div class="banner warn">Egyes gyártási idők becslések: hiányzó skilladat, hiányzó gyártási skill vagy kézi időszorzó miatt. A Gyártó / skillidő oszlop jelzi a forrást. A Skillek és tanulás menüben engedélyezheted és frissítheted a karakteradatokat.</div>');
@@ -509,6 +518,7 @@ function renderInventory(content) {
   const rows=plan.rows.map(r=>{const local=state.inventory[r.id]||{}; return `<tr data-search="${esc(r.name.toLowerCase())}"><td>${item(r)}</td><td class="num">${fmt(r.required)}</td><td class="num">${fmt(r.available)}${r.manual_stock?'<div class="batch-note">kézi</div>':''}</td><td class="num" aria-label="${esc(r.name)} – Más tervek foglalása">${held(r.plan_reserved,r.plan_wip_reserved)}</td><td class="num" aria-label="${esc(r.name)} – Saját terv foglalása">${held(r.own_reserved,r.own_wip_reserved)}</td><td>${numberInput(r,'quantity',local.quantity,state.settings.source==='eve'?'EVE':'0')}</td><td>${numberInput(r,'reserved',local.reserved??0)}</td><td class="num">${fmt(r.wip)}${r.manual_wip?'<div class="batch-note">kézi</div>':''}</td><td>${numberInput(r,'wip',local.wip,state.settings.source==='eve'?'EVE-job':'0')}</td></tr>`;});
   content.innerHTML=panel('A terv készlete',`${fmt(rows.length)} termék és alapanyag`, `<div class="panel-head"><div class="inline-filter"><input type="search" id="row-filter" placeholder="Szűrés terméknévre…" aria-label="Készlet szűrése"><span class="muted">Forrás: ${corporationId?'Corp: '+esc(state.scope_label):state.settings.source==='eve'?'személyes EVE-készlet':'kézi készlet'}</span></div></div>`+table(['Termék','Szükséglet','Elérhető','Más tervek foglalása','Saját terv foglalása','Kézi készlet','Másra foglalva (kézi)','Folyamatban','Kézi folyamatban'],rows,'inventory-table'));
   content.innerHTML+='<p class="footnote">Az Elérhető és a Folyamatban oszlopból más aktív tervek foglalásait már levontuk; a saját mentett terv foglalása felhasználható. A foglalási oszlopok felső értéke a készlet, az alsó a folyamatban lévő kimenet. Az üres kézi mező az EVE-adatot használja, kézi módban 0. A kézi Másra foglalva ezen felüli, külön levonás. Frissítéskor a tervfoglalások újraszámolódnak, a kézi felülírások megmaradnak.</p>';
+  content.innerHTML+='<p class="footnote">Az EVE-készletből csak a becsomagolt példányokat használjuk fel. A kibontott hajók és modulok nem fedezik a célt és nem használhatók fel alapanyagként. A BPO/BPC-példányokat külön kezeljük; a kézi készletfelülírás továbbra is érvényes.</p>';
   bindDirty(); bindFilter(); $('#apply-inventory').onclick=()=>applyMapping('inventory');
 }
 function renderBlueprints(content) {
@@ -685,7 +695,7 @@ function csv(rows, headers, name) {
   const url=URL.createObjectURL(blob), a=document.createElement('a');a.href=url;a.download='eve-'+name+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
-$('#plan-form').onsubmit=event=>{event.preventDefault();if(!productId)return error('Előbb válassz egy terméket a találatok közül.');calculate();};
+$('#plan-form').onsubmit=event=>{event.preventDefault();if(!productId)return error('Előbb válassz egy terméket a találatok közül.');calculate(true,true);};
 $$('.nav').forEach(el=>el.onclick=()=>{
   if(el.dataset.view==='moons'&&view==='moons'){setMoonMenu($('#moon-submenu').hidden);return;}
   if(el.dataset.view==='settings'&&view==='settings'){setSettingsMenu($('#settings-submenu').hidden);return;}

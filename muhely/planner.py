@@ -93,8 +93,12 @@ def live_inventory(catalog, snapshots, locations=()):
             if locations and location not in locations:
                 continue
             if a['item_id'] not in seen_assets:
-                stock[int(a['type_id'])] += max(0, int(a.get('quantity', 0)))
                 seen_assets.add(a['item_id'])
+                # Assembled ships/modules are in use, not production supplies.
+                # Keep them in the location graph so packaged container contents
+                # still resolve correctly. Blueprint ownership is read separately.
+                if not a.get('is_singleton', False):
+                    stock[int(a['type_id'])] += max(0, int(a.get('quantity', 0)))
         for bp in snapshot['blueprints']:
             location = resolve_location(bp['location_id'], assets)
             if locations and location not in locations:

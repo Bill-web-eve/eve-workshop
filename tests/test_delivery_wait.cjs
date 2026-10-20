@@ -9,7 +9,7 @@ async function setup(wait=pending()){
  const saved={id:'saved-redeemer',name:'Redeemer',product_name:'Redeemer',product_id:22428,quantity:3,reserve_active:true,manufacturer_id:0};
  const fixture={csrf:'test',version:'1.0.0',corporations:[],plans:[saved],production_characters:[],characters:[],jobs:[],settings:{source:'eve'},task:{running:false},sde:{buildNumber:1},recipe_count:1,delivery_wait:wait};
  const notificationFixture={items:[],counts:{skills:0,jobs:0,pi:0,moons:0,data:0},task:{running:false},next_sync_at:9999999999,corporations:[],moons:[],preferences:{os_enabled:false,auto_refresh:true,personal:true,corporations:true,moon_days:3,categories:{skills:true,jobs:true,pi:true,moons:true},moon_owners:{}},claims:[]};
- const calls=[],scrolls=[];let currentWait=wait;
+ const calls=[],scrolls=[];let currentWait=wait,calculationResult=null;
  w.localStorage.setItem('eve-muhely-language','en');w.confirm=()=>true;
  w.HTMLElement.prototype.scrollIntoView=function(){scrolls.push(this.id);};
  w.fetch=async (url,options)=>{
@@ -20,14 +20,14 @@ async function setup(wait=pending()){
   if(url==='/api/notifications/sent'){notificationFixture.receipts=JSON.parse(options.body).receipts;return {ok:true,json:async()=>({ok:true})};}
   if(url==='/api/notifications/preferences'){Object.assign(notificationFixture.preferences,JSON.parse(options.body));return {ok:true,json:async()=>notificationFixture.preferences};}
   if(url==='/api/state')return {ok:true,json:async()=>({...fixture,delivery_wait:currentWait})};
-  if(url.startsWith('/api/plan?'))return currentWait?{ok:false,json:async()=>({error:'untranslated server fallback',delivery_wait:currentWait})}:{ok:true,json:async()=>({product_id:Number(new URL(url,w.location.href).searchParams.get('product_id')),activity:'manufacturing',summary:{items:1},stale_characters:[],calculated_at:1000})};
+  if(url.startsWith('/api/plan?'))return currentWait?{ok:false,json:async()=>({error:'untranslated server fallback',delivery_wait:currentWait})}:{ok:true,json:async()=>(calculationResult||{product_id:Number(new URL(url,w.location.href).searchParams.get('product_id')),activity:'manufacturing',summary:{items:1},stale_characters:[],calculated_at:1000})};
   throw Error('Unexpected request: '+url);
  };
  for(const script of d.querySelectorAll('script[src]'))run(fs.readFileSync(path.join(root,script.getAttribute('src')),'utf8'));
  await tick();await tick();
  run('productId=22428;productName="Redeemer";activePlanId="saved-redeemer";$("#product-search").value="Redeemer";EveNumbers.set($("#target-quantity"),3);navigate("schedule");');
  await tick();
- return {dom,w,d,run,calls,scrolls,saved,fixture,notificationFixture,setWait:value=>{currentWait=value;}};
+ return {dom,w,d,run,calls,scrolls,saved,fixture,notificationFixture,setResult:value=>{calculationResult=value;},setWait:value=>{currentWait=value;}};
 }
 test('Calculate plan visibly reports the wait and exact local retry time from the scheduler',async t=>{
  const {dom,w,d,run,calls,scrolls,fixture}=await setup();t.after(()=>w.close());
@@ -155,4 +155,28 @@ test('notification settings preserve unsaved preferences while saving moon owner
  assert.equal(n.preferences.moon_owners.moon1,99);assert.equal(d.querySelector('#notification-preferences').elements.moon_days.value,'7');assert.equal(run('dirty.notification_preferences'),true);
  prefs.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
  assert.equal(n.preferences.moon_days,7);assert.equal(run('Object.keys(dirty).length'),0);assert(!/[áéíóöőúüű]/i.test(d.querySelector('#settings-content').textContent));
+});
+
+
+test('Calculate confirms remaining work and explains packaged-stock coverage in both languages',async t=>{
+ const {w,d,run,setResult}=await setup(null);t.after(()=>w.close());
+ d.querySelector('#calculate').click();await tick();await tick();
+ const feedback=d.querySelector('#calculation-feedback');
+ assert.equal(feedback.hidden,false);assert.equal(feedback.getAttribute('role'),'status');
+ assert.equal(feedback.textContent,'Plan calculated. Remaining production items: 1.');
+ setResult({product_id:22428,activity:'manufacturing',summary:{items:0},rows:[{id:22428,used_stock:2,used_wip:1}],stale_characters:[],calculated_at:1001});
+ d.querySelector('#calculate').click();await tick();await tick();
+ assert.equal(feedback.textContent,'Plan calculated. No production remains: 2 packaged finished products and 1 units from active jobs cover the target.');
+ w.EveI18n.setLanguage('hu');await tick();assert(feedback.textContent.includes('2 db becsomagolt késztermék'));
+ w.EveI18n.setLanguage('en');await tick();assert(!/[áéíóöőúüű]/i.test(feedback.textContent));
+ await run('calculate(false)');assert.equal(feedback.hidden,true);
+});
+
+test('compound partial moon refresh warning is fully translated and explains planning is available',async t=>{
+ const {w}=await setup(null);t.after(()=>w.close());
+ const message='Az EVE-adatok frissítve. Corp-adatok: 1 sikeres lekérés; részletek a Corporationok oldalon. Néhány holdadat nem frissült; ellenőrizd a Kitermelési naptár hozzáféréseit. Ez a holdadat-figyelmeztetés önmagában nem akadályozza a gyártási terv számítását.';
+ const english=w.EveI18n.t(message);
+ assert(english.includes('Some moon data could not be refreshed; check Extraction calendar permissions.'));
+ assert(english.includes('This moon data warning does not itself prevent production planning.'));
+ assert(!/[áéíóöőúüű]/i.test(english),english);
 });

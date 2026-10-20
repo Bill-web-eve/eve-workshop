@@ -41,6 +41,8 @@ The packaged Mac and Windows distributions include their runtime. A source insta
 
 Manual changes are saved when you use the corresponding **Apply** button. A blank manual inventory or work-in-progress field uses automatic EVE data; in manual stock mode it means zero. An explicit **0** is an override and remains after refreshes. **Reserved elsewhere** removes stock from the amount available to plans. Clear an override to return to automatic data.
 
+Automatic EVE inventory uses only **packaged** items for both personal and corporation production. Assembled ships and modules are considered in use: they neither cover the target nor supply production inputs. Packaged materials inside ships or containers still count. BPO/BPC ownership is handled separately. Manual stock overrides remain an explicit exception. After **Calculate plan**, a status below the target fields confirms the result; when no production remains, it explains how packaged finished products or active jobs cover the target.
+
 ## Corporation inventory and production
 
 Open **Corporations** and use **Discover and refresh corporation data** to identify the corporations of your added characters. Inventory, blueprints and industry jobs are downloaded once per corporation. Adding several members does not multiply corporation stock. Personal character and location filters do not restrict discovery.

@@ -42,6 +42,8 @@ A csomagolt Mac- és Windows-kiadás tartalmazza a futtatókörnyezetet. Forrás
 
 A kézi módosítások az **alkalmazás** gomb megnyomásakor mentődnek. A kézi készlet és folyamatban mező üresen automatikus EVE-adatot, kézi készletmódban nullát jelent. A beírt **0 valódi felülírás**. A **Másra foglalva** az elérhető készletet csökkenti.
 
+Az automatikus EVE-készletből csak a **becsomagolt** példányok használhatók fel, személyes és corporation-gyártásnál is. A kibontott hajók és modulok használatban lévőnek számítanak: nem fedezik a célt és nem szolgálnak gyártási bemenetként. A bennük vagy konténerekben lévő becsomagolt anyagok továbbra is számítanak. A BPO/BPC-tulajdont külön kezeljük. A kézi készletfelülírás szándékos kivétel. A **Terv kiszámítása** után a célmező alatt megjelenik a számítás eredménye; üres gyártási lista esetén jelzi, ha becsomagolt késztermék vagy folyamatban lévő job fedezi a célt.
+
 ## Corporation készletek és corp gyártás
 
 A **Corporationok** menüpontban kérheted le a hozzáadott karakterek corporationjeit. A **Corp-adatok felderítése és frissítése** gomb felderíti a tagságukat, majd corporationönként egyszer tölti le a teljes készletet, blueprintlistát és ipari joblistát. Több hozzáadott tag nem többszörözi meg ugyanazt a corp készletet. A személyes karakter-/helyszűrő nem korlátozza ezt a lekérést.
