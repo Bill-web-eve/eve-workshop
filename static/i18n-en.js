@@ -1,6 +1,7 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Árazási tudnivalók": "Pricing details",
   "Skillek, PI, corporation és mining ledger olvasási engedélyek": "Read permissions for skills, PI, corporations and mining ledgers",
   "Dátum": "Date",
   "Bányászati napló": "Mining ledger",
