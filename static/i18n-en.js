@@ -1,6 +1,12 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Az alkalmazásablak nem válaszol. Próbáld újra.": "The application window is not responding. Please try again.",
+  "Az átlátszó inteljelző ebben a Windows-verzióban még nem érhető el. A külön térkép- és chatablak használható.": "The transparent intel overlay is not available in this Windows version yet. The separate map and chat windows are available.",
+  "Az intel csak futó alkalmazás és íródó EVE-chatlog mellett frissül. A rendszerértesítéseket az alkalmazás és az operációs rendszer beállításai szabályozzák.": "Intel updates require the app to be running and EVE chat logs to be written. System notifications are controlled by the app and operating system settings.",
+  "Az operációs rendszer letiltotta": "Blocked by the operating system",
+  "A rendszerértesítéseket külön engedélyezheted. Ugyanazt az eseményt egy aktív időszakban egyszer jelezzük; az újraindítás és az ismételt adatfrissítés nem küldi újra. Több egyidejű jelzést típusonként és tulajdonosonként összevonunk.": "You can enable system notifications separately. Each event is reported once per active period; restarting or refreshing does not send it again. Simultaneous alerts are grouped by category and owner.",
+  "Bezárt alkalmazás mellett nincs új EVE-ellenőrzés és nincs új rendszerértesítés. Az operációs rendszer Fókusz / Ne zavarjanak módja és értesítési beállításai befolyásolják a megjelenést. Az EVE gyorsítótárát tiszteletben tartjuk.": "When the app is closed there are no EVE checks or new system notifications. The operating system’s Focus / Do not disturb mode and notification settings affect delivery. EVE caching is respected.",
   "Minden hozzáférés": "All access",
   "Minden hozzáférés engedélyezése": "Authorize all access",
   "Minden hozzáférés: személyes készlet, blueprintek, jobok, skillek, PI, corporationadatok, holdadatok, intel és mining ledger egyetlen EVE-jóváhagyással.": "All access: personal inventory, blueprints, jobs, skills, PI, corporation data, moon data, intel and mining ledger in a single EVE approval.",

@@ -1,0 +1,39 @@
+name: Windows native window
+on:
+  push:
+    branches: [main]
+    paths:
+      - muhely/windows_window.py
+      - windows_desktop.py
+      - windows_window_smoke.py
+      - static/desktop.js
+      - tools/windows-runtime-lock.json
+      - tools/windows_ci_smoke.py
+      - tools/build_windows_release.py
+      - .github/workflows/windows-window.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-window:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Ensure Microsoft WebView2 Runtime
+        shell: pwsh
+        run: |
+          $runtimeKey = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $present = @("HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$runtimeKey", "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$runtimeKey", "HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$runtimeKey") | Where-Object { Test-Path $_ }
+          if (!$present) {
+            $installer = Join-Path $env:RUNNER_TEMP 'MicrosoftEdgeWebview2Setup.exe'
+            Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $installer
+            $signature = Get-AuthenticodeSignature $installer
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') { throw 'WebView2 installer signature invalid' }
+            $process = Start-Process $installer -ArgumentList '/silent','/install' -Wait -PassThru
+            if ($process.ExitCode -notin @(0,3010)) { throw "WebView2 installer failed: $($process.ExitCode)" }
+          }
+      - name: Test pinned embedded x64 runtime and real WebView2 windows
+        run: python -m tools.windows_ci_smoke

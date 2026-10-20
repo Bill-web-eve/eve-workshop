@@ -1,5 +1,13 @@
 # EVE Workshop – complete user guide
 
+## Native Windows application (1.2.0)
+
+Extract the entire Windows ZIP and start **EVE_Muhely.exe**. Workshop opens in its own window. EVE authorization uses the system browser; return to Workshop after approval. Choose theme and language under **Settings → Appearance and language**. Clipboard, native file saving, printing and separate intel map/chat windows are supported.
+
+Microsoft Edge WebView2 Runtime and .NET Framework are required and are normally present on Windows 11. If WebView2 is missing, startup displays Microsoft's official download page. No system components are installed automatically. Windows system notifications are opt-in and are also affected by Windows notification and Do not disturb settings. The transparent intel overlay is not supported in this Windows version yet.
+
+Closing checks unsaved edits and running requests. Profiles remain in **%LOCALAPPDATA%\EVE Muhely**. Stop the old app before replacing the package; existing personal data is preserved. **Ellenorzes_ablak.cmd** checks the actual native window, exports and intel windows using an isolated empty profile. An optional browser fallback is available with the launcher's `--browser` argument.
+
 ## Using the documentation
 
 Open **Documentation** at the bottom of the left menu to read the complete guide inside the application. It is available without an EVE login or a selected production plan. The bundled guide also works offline while the local app is running. Its language follows the Magyar / English switch, and its appearance follows light or dark mode.

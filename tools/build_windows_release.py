@@ -8,6 +8,7 @@ from pathlib import Path,PurePosixPath
 import runpy
 import shutil
 import struct
+import tarfile
 import subprocess
 import urllib.parse
 import urllib.request
@@ -60,14 +61,47 @@ def pe_info(path):
     machine=struct.unpack_from('<H',data,offset+4)[0]
     magic=struct.unpack_from('<H',data,offset+24)[0]
     subsystem=struct.unpack_from('<H',data,offset+24+68)[0]
-    if machine!=0x8664 or magic!=0x20b:raise ValueError('Non-x64 binary: '+str(path))
-    return {'machine':'AMD64','format':'PE32+','subsystem':subsystem}
+    if machine==0x8664 and magic==0x20b:return {'machine':'AMD64','format':'PE32+','subsystem':subsystem}
+    # AnyCPU managed assemblies are valid in an x64 CLR, unlike x86 native DLLs.
+    if machine==0x14c and magic==0x10b:
+        directory=offset+24+96
+        cli_rva,cli_size=struct.unpack_from('<II',data,directory+14*8)
+        sections=offset+24+struct.unpack_from('<H',data,offset+20)[0]
+        for index in range(struct.unpack_from('<H',data,offset+6)[0]):
+            size,va,rawsize,raw=struct.unpack_from('<IIII',data,sections+index*40+8)
+            if cli_rva and cli_size>=20 and va<=cli_rva<va+max(size,rawsize):
+                flags=struct.unpack_from('<I',data,raw+cli_rva-va+16)[0]
+                if flags&1 and not flags&(2|0x20000):return {'machine':'AnyCPU','format':'managed IL','subsystem':subsystem}
+    raise ValueError('Non-x64/non-AnyCPU binary: '+str(path))
+
+
+def stage_source_package(record,cache,packages):
+    if record['name']!='proxy_tools' or record['version']!='0.1.0':raise ValueError('Unreviewed source dependency')
+    with tarfile.open(fetch(record,cache)) as archive:
+        member=archive.getmember('proxy_tools-0.1.0/proxy_tools/__init__.py')
+        if not member.isfile() or member.size>100000:raise ValueError('Unsafe source dependency')
+        target=packages/'proxy_tools';target.mkdir()
+        (target/'__init__.py').write_bytes(archive.extractfile(member).read())
+        license_info=archive.getmember('proxy_tools-0.1.0/PKG-INFO')
+        if not license_info.isfile() or license_info.size>100000:raise ValueError('Unsafe license metadata')
+        (target/'PACKAGE-INFO.txt').write_bytes(archive.extractfile(license_info).read())
+
+
+def trim_other_architectures(packages):
+    # Universal wheels contain optional x86/ARM and unused legacy browser helpers.
+    for name in ['webview/lib/runtimes/win-arm64','webview/lib/runtimes/win-x86',
+                 'clr_loader/ffi/dlls/x86']:
+        path=packages/name
+        if path.exists():shutil.rmtree(path)
+    for name in ['WebBrowserInterop.x86.dll','WebBrowserInterop.x64.dll']:
+        (packages/'webview/lib'/name).unlink(missing_ok=True)
+
 
 
 def stage(root,config):
     app=root/'app';(app/'muhely').mkdir(parents=True);(app/'data').mkdir()
     for file in (SOURCE/'muhely').glob('*.py'):shutil.copy2(file,app/'muhely'/file.name)
-    for name in ['desktop.py','windows_desktop.py','windows_smoke_test.py']:shutil.copy2(SOURCE/name,app/name)
+    for name in ['desktop.py','windows_desktop.py','windows_smoke_test.py','windows_window_smoke.py']:shutil.copy2(SOURCE/name,app/name)
     shutil.copytree(SOURCE/'static',app/'static',ignore=shutil.ignore_patterns('.DS_Store','__pycache__'))
     for name in ['Hasznalat.md','UserGuide.en.md']:shutil.copy2(SOURCE/name,app/name)
     shutil.copy2(SOURCE/'data/catalog.sqlite3',app/'data/catalog.sqlite3')
@@ -85,6 +119,8 @@ def build(config_file,work,output,zig,cache):
     runtime=root/'runtime';runtime.mkdir();extract(fetch(lock['python'],cache),runtime)
     packages=runtime/'Lib/site-packages';packages.mkdir(parents=True)
     for wheel in lock['wheels']:extract(fetch(wheel,cache),packages)
+    for record in lock.get('sources',[]):stage_source_package(record,cache,packages)
+    trim_other_architectures(packages)
     # _pth isolation ignores global Python, user site-packages and registry paths.
     pth=runtime/'python313._pth'
     if not pth.exists():raise ValueError('Unexpected embedded runtime layout.')
@@ -92,7 +128,8 @@ def build(config_file,work,output,zig,cache):
     version=runpy.run_path(str(root/'app/muhely/__init__.py'))['__version__']
     from PIL import Image
     icon=work/'app.ico'
-    with Image.open(SOURCE/'static/app.icns') as source:source.save(icon,sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
+    with Image.open(SOURCE/'static/app-window.icns') as source:source.save(icon,sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
+    shutil.copy2(icon,root/'app/data/app.ico')
     resource=work/'windows.rc';numbers=version.replace('.',',')+',0'
     resource.write_text(f'''1 ICON "app.ico"
 1 VERSIONINFO
@@ -122,12 +159,18 @@ END
                     str(SOURCE/'tools/windows_launcher.c'),str(resource),'-o',str(root/'EVE_Muhely.exe')],env=env,cwd=work,check=True)
     (root/'Inditas.cmd').write_bytes(b'@echo off\r\nstart "" "%~dp0runtime\\pythonw.exe" -I -X utf8 "%~dp0app\\windows_desktop.py"\r\n')
     (root/'Ellenorzes.cmd').write_bytes(b'@echo off\r\n"%~dp0runtime\\python.exe" -I -X utf8 "%~dp0app\\windows_smoke_test.py" --online\r\necho.\r\npause\r\n')
+    (root/'Ellenorzes_ablak.cmd').write_bytes(b'@echo off\r\n"%~dp0runtime\\python.exe" -I -X utf8 "%~dp0app\\windows_window_smoke.py" --report "%TEMP%\\eve-window-smoke.json"\r\necho.\r\npause\r\n')
     instructions=f'''EVE MŰHELY {version} – WINDOWS 11 64 BIT
 
 1. A ZIP-en jobb kattintás → Az összes kibontása.
 2. Nyisd meg a kibontott EVE Muhely mappát.
 3. Indítsd el az EVE_Muhely.exe fájlt. A teljes mappát tartsd együtt.
-4. A műhely a saját böngésződben nyílik meg: http://127.0.0.1:8765
+4. A műhely saját Windows-ablakban nyílik meg. Az EVE-belépéshez
+   ideiglenesen a rendszerböngészőt használja, majd az appba térsz vissza.
+5. Windows 11-en a Microsoft Edge WebView2 Runtime és a .NET Framework
+   szükséges (általában már telepítve vannak). WebView2 hiányakor az app
+   jelzi a Microsoft hivatalos letöltési oldalát:
+   https://developer.microsoft.com/microsoft-edge/webview2/
 
 Külön Python, Excel és Codex telepítése nem szükséges. Rendszergazdai
 telepítés nem kell. Internet az EVE-belépéshez és frissítéshez szükséges.
@@ -147,6 +190,8 @@ védi. Másik gépen vagy másik Windows-fiókkal új EVE-belépés szükséges.
 Leállítás: a bal oldali Alkalmazás leállítása gombbal.
 
 ELLENŐRZÉS ÉS NAPLÓK
+Az Ellenorzes_ablak.cmd külön, üres tesztprofillal ellenőrzi a saját ablakot,
+a vágólapot, exportot, külön intelablakokat és a belépés visszatérését.
 Az Ellenorzes.cmd ideiglenes, üres tesztprofillal ellenőrzi a futtatást,
 a Windows titkosítását, a helyi API-t, a tervmentést és az EVE HTTPS-t.
 A saját karaktereidet és mentett terveidet nem módosítja.
@@ -182,7 +227,8 @@ ellenőrizve; ezen a Macen natív Windows 11 futtatási próba nem történt.
     (output/'EVE_Muhely-Windows-Telepites.txt').write_text(instructions,encoding='utf-8-sig')
     manifest={'version':version,'platform':'Windows 11','architecture':'x86_64','portable':True,'publisher_signed':False,
         'python':lock['python'],'wheels':lock['wheels'],'zig':subprocess.check_output([str(zig),'version'],text=True).strip(),
-        'pe64_binaries_checked':len(binaries),'dll_dependencies_checked':True,'characters':0,'saved_plans':0,'client_id_only':True,'windows_runtime_test':'not_run',
+        'pe64_binaries_checked':len(binaries),'dll_dependencies_checked':True,'characters':0,'saved_plans':0,'client_id_only':True,'windows_runtime_test':'not_run','interface':'native WinForms/WebView2 window',
+        'managed_assemblies_checked':sum(pe_info(p)['machine']=='AnyCPU' for p in binaries),
         'archive_sha256':checksum}
     (work/'release-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print('Clean Windows x64 release: '+str(archive),flush=True)

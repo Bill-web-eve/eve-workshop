@@ -4,7 +4,7 @@ from pathlib import Path
 import struct
 import sys
 
-SYSTEM_DLLS=set('advapi32.dll bcrypt.dll bcryptprimitives.dll crypt32.dll iphlpapi.dll kernel32.dll kernelbase.dll ntdll.dll ole32.dll oleaut32.dll propsys.dll rpcrt4.dll shell32.dll user32.dll version.dll winmm.dll ws2_32.dll ucrtbase.dll msvcrt.dll'.split())
+SYSTEM_DLLS=set('advapi32.dll bcrypt.dll bcryptprimitives.dll crypt32.dll iphlpapi.dll kernel32.dll kernelbase.dll ntdll.dll ole32.dll oleaut32.dll propsys.dll rpcrt4.dll shell32.dll user32.dll version.dll winmm.dll ws2_32.dll ucrtbase.dll msvcrt.dll mscoree.dll shlwapi.dll gdi32.dll comdlg32.dll comctl32.dll'.split())
 
 
 def imports(path):
@@ -16,7 +16,10 @@ def imports(path):
             size,va,rawsize,raw=struct.unpack_from('<IIII',data,sections+i*40+8)
             if va<=rva<va+max(size,rawsize):return raw+rva-va
         raise ValueError('Invalid PE import RVA.')
-    rva,size=struct.unpack_from('<II',data,optional+120)
+    magic=struct.unpack_from('<H',data,optional)[0]
+    directory=112 if magic==0x20b else 96 if magic==0x10b else None
+    if directory is None:raise ValueError('Invalid PE optional header')
+    rva,size=struct.unpack_from('<II',data,optional+directory+8)
     if not rva:return []
     cursor=offset(rva);result=[]
     for _ in range(4096):

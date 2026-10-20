@@ -1,5 +1,13 @@
 # EVE Műhely – teljes felhasználói kézikönyv
 
+## Saját ablakos Windows-alkalmazás (1.2.0)
+
+Bontsd ki a teljes Windows ZIP-et, és indítsd az **EVE_Muhely.exe** fájlt. A felület saját ablakban nyílik meg. Az EVE engedélykérése a rendszerböngészőt használja; jóváhagyás után térj vissza a Műhelybe. A sötét/világos téma és a nyelv a **Settings → Appearance and language** oldalon állítható. A vágólap, a mentési párbeszédablak, a nyomtatás és a külön intel-térkép/chatablak támogatott.
+
+Microsoft Edge WebView2 Runtime és .NET Framework szükséges; ezek Windows 11-en rendszerint már megvannak. WebView2 hiányakor az indító a Microsoft hivatalos oldalát jelzi. Az app nem telepít rendszerkomponenseket automatikusan. A Windows rendszerértesítései külön engedélyezhetők; megjelenésüket a Windows értesítési és Ne zavarjanak beállításai is befolyásolják. Az átlátszó inteloverlay ebben a Windows-változatban még nem támogatott.
+
+Leállításkor az app figyelmeztet a nem mentett módosításokra és a futó lekérésekre. A helyi profil továbbra is a **%LOCALAPPDATA%\EVE Muhely** mappában van. A teljes ZIP cseréje előtt állítsd le a régi appot; a személyes adatok megmaradnak. Az **Ellenorzes_ablak.cmd** elkülönített, üres profilon vizsgálja a natív ablakot, az exportot és az intelablakokat. Opcionális böngészős tartalékindítás: az indító `--browser` kapcsolóval.
+
 ## A dokumentáció használata
 
 A bal oldali menü alján található **Dokumentáció** a teljes kézikönyvet az alkalmazáson belül nyitja meg. A kézikönyv EVE-belépés és kiválasztott terv nélkül, internet nélkül is olvasható, ha a helyi app fut. A nyelve követi a Magyar / English választást, megjelenése a világos vagy sötét módot.

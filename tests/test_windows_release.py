@@ -107,7 +107,7 @@ class WindowsDistributionTests(unittest.TestCase):
             self.assertEqual(desktop.background_options(),{'start_new_session':True})
 
     def test_windowless_startup_errors_are_logged_and_streams_are_restored(self):
-        with tempfile.TemporaryDirectory() as folder,patch('muhely.store.default_data_dir',return_value=Path(folder)),patch('desktop.main',side_effect=RuntimeError('startup test')):
+        with tempfile.TemporaryDirectory() as folder,patch('muhely.store.default_data_dir',return_value=Path(folder)),patch('muhely.windows_window.main',side_effect=RuntimeError('startup test')):
             original=windows_desktop.sys.stderr
             self.assertEqual(windows_desktop.main(),1)
             self.assertIs(windows_desktop.sys.stderr,original)
@@ -138,6 +138,20 @@ class WindowsDistributionTests(unittest.TestCase):
             file.write_bytes(data);self.assertEqual(pe_info(file)['subsystem'],2)
             struct.pack_into('<H',data,132,0xaa64);file.write_bytes(data)
             with self.assertRaises(ValueError):pe_info(file)
+
+    def test_managed_anycpu_assemblies_are_allowed_but_32bit_required_is_rejected(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'managed.dll';data=bytearray(1024)
+            data[:2]=b'MZ';struct.pack_into('<I',data,0x3c,128);data[128:132]=b'PE\0\0'
+            struct.pack_into('<HH',data,132,0x14c,1);struct.pack_into('<H',data,148,224)
+            struct.pack_into('<H',data,152,0x10b);struct.pack_into('<H',data,220,2)
+            struct.pack_into('<II',data,152+96+14*8,0x2000,72)
+            struct.pack_into('<IIII',data,152+224+8,512,0x2000,512,512)
+            struct.pack_into('<I',data,512+16,1);path.write_bytes(data)
+            self.assertEqual(pe_info(path)['machine'],'AnyCPU')
+            for flags in [0,3,0x20001]:
+                struct.pack_into('<I',data,512+16,flags);path.write_bytes(data)
+                with self.subTest(flags=flags),self.assertRaises(ValueError):pe_info(path)
 
     def test_catalog_read_connections_are_closed_for_windows_file_replacement(self):
         connect=sqlite3.connect;connections=[]

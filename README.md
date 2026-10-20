@@ -1,6 +1,6 @@
 # EVE Műhely
 
-Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple Silicon és Windows 11 x64 rendszerhez. Macen saját alkalmazásablakban, Windowson a saját böngésződben nyílik meg. A helyi szolgáltatás címe: **http://127.0.0.1:8765**.
+Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple Silicon és Windows 11 x64 rendszerhez. A jelenlegi Mac-kiadás és a fejlesztés alatt álló 1.2.0 Windows-változat saját alkalmazásablakban nyílik meg. A korábbi Windows 1.1.0 kiadás böngészős. A helyi szolgáltatás címe: **http://127.0.0.1:8765**.
 
 ## Letöltés
 
@@ -216,3 +216,10 @@ The local SQLite event ledger leases pending events and acknowledges only submis
 Intel map monitors selected EVE Chatlogs channels locally, recognizes system/pilot reports and `clr`/`clear`, and offers configurable stargate-jump alerts with explicit ESI, Local-log or manual location provenance. Enable in Settings → Intel settings. See [research and design notes](Intel-reference.md), [Hungarian guide](Hasznalat.md) and [English guide](UserGuide.en.md). Public topology is rebuilt with `tools/build_intel_universe.py` from the official JSONL SDE; private logs and preferences are never bundled.
 
 Intel windows: the complete selected region is shown with shortest-stargate-distance highlighting from the selected own character. Activity cards include exact-ID zKillboard links and CCP ship icons. Public ESI name resolution receives inferred names only, with positive/negative local caching; full chat text stays local. The Mac shell opens separate map and aggregated read-only chat windows sharing cookies/theme/language while keeping OS delivery in the main window. Child windows close independently.
+
+
+## Native Windows window (1.2.0 development build)
+
+The Windows launcher now opens the shared interface in a WinForms/WebView2 window through pinned pywebview/pythonnet dependencies. The portable package includes Python and all Python dependencies; Microsoft WebView2 Runtime and .NET Framework are OS prerequisites. EVE consent opens the system browser and returns to the selected app view. Clipboard, native file save/folder dialogs, print UI, theme/language, independent map/chat windows and opt-in Windows notification-area alerts are supported. The transparent intel overlay remains Mac-only.
+
+The bridge uses WebView2 WebMessageReceived/PostWebMessageAsJson directly, checks the exact loopback origin and keeps the existing CSP without unsafe-eval. Remote/file navigation and unapproved child-window actions are blocked; no Python API object is exposed to page scripts. The shell preserves local profiles and DPAPI token storage. `windows_window_smoke.py` exercises the real renderer with a temporary blank profile; `.github/workflows/windows-window.yml` runs that test on Windows using the same pinned embedded runtime and trimmed dependencies as the distributable. A local `Ellenorzes_ablak.cmd` is included. Building on Mac verifies PE/managed architecture, imports, hashes and ZIP integrity; it does not count as a native Windows run.

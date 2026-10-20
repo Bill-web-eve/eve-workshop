@@ -1,7 +1,19 @@
 'use strict';
-// Platform adapter. Browser and future Windows clients keep their current paths.
+// Shared native adapter: Cocoa/WKWebView on Mac, WebView2 messages on Windows.
 globalThis.EveDesktop=(()=>{
-  const handler=globalThis.webkit?.messageHandlers?.eveDesktop;
+  const macHandler=globalThis.webkit?.messageHandlers?.eveDesktop;
+  const windows=!!globalThis.chrome?.webview&&/EVEWorkshopDesktop\/Windows/.test(navigator.userAgent);
+  const pending=new Map();let sequence=0;
+  if(windows)chrome.webview.addEventListener('message',event=>{
+    const reply=event.data;if(!reply||reply.eveDesktop!==1||!Number.isSafeInteger(reply.id))return;
+    const call=pending.get(reply.id);if(!call)return;pending.delete(reply.id);clearTimeout(call.timer);
+    if(reply.error)call.reject(Error(reply.error));else call.resolve(reply.value);
+  });
+  const handler=macHandler||(windows?{postMessage:payload=>new Promise((resolve,reject)=>{
+    const id=++sequence,timer=setTimeout(()=>{pending.delete(id);reject(Error('Az alkalmazásablak nem válaszol. Próbáld újra.'));},180000);
+    pending.set(id,{resolve,reject,timer});
+    try{chrome.webview.postMessage({eveDesktop:1,id,payload});}catch(e){clearTimeout(timer);pending.delete(id);reject(e);}
+  })}:null);
   const active=!!handler;let authGeneration=0;
   const send=(action,data={})=>handler?Promise.resolve(handler.postMessage({action,...data})):Promise.reject(Error('Desktop window unavailable'));
   const preferences=()=>{if(active)void send('preferences',{theme:document.documentElement.dataset.theme||'dark',language:document.documentElement.lang||'hu'}).catch(()=>{});};
@@ -47,7 +59,7 @@ globalThis.EveDesktop=(()=>{
     }catch(e){if(e instanceof TypeError)await send('stopped');else await send('quitFailed');}
   }
   if(active){
-    document.documentElement.dataset.desktop='mac';
+    document.documentElement.dataset.desktop=windows?'windows':'mac';
     Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:text=>send('clipboard',{text:String(text)})}});
     document.addEventListener('click',event=>{
       const link=event.target.closest('a[download]');if(!link)return;
@@ -66,6 +78,6 @@ globalThis.EveDesktop=(()=>{
     const query=new URLSearchParams({intel_window:kind});for(const key of ['character_id','region','center'])if(Number.isSafeInteger(options[key])&&options[key]>0)query.set(key,options[key]);if(options.history)query.set('history','1');
     const child=window.open('/?'+query,'eve-intel-'+kind,'popup,width='+(kind==='map'?1200:700)+',height=800');return child?Promise.resolve({opened:true}):Promise.reject(Error('A külön ablakot a böngésző letiltotta. Engedélyezd a felugró ablakokat.'));
   }
-  return {active,saveBlob,openIntelWindow,intelOverlayStatus:()=>send('intelOverlayStatus'),configureIntelOverlay:options=>send('configureIntelOverlay',{options}),syncIntelOverlay:data=>send('syncIntelOverlay',{data}),openExternal:url=>send('external',{url}),chooseIntelFolder:()=>send('chooseIntelFolder'),authorize,prepareQuit,shutdown,notificationStatus:()=>send('notificationStatus'),requestNotifications:()=>send('requestNotifications'),notify:content=>send('notify',content),quit:()=>send('stopped')};
+  return {active,platform:windows?'windows':macHandler?'mac':'browser',overlayAvailable:!!macHandler,saveBlob,openIntelWindow,intelOverlayStatus:()=>send('intelOverlayStatus'),configureIntelOverlay:options=>send('configureIntelOverlay',{options}),syncIntelOverlay:data=>send('syncIntelOverlay',{data}),openExternal:url=>send('external',{url}),chooseIntelFolder:()=>send('chooseIntelFolder'),authorize,prepareQuit,shutdown,notificationStatus:()=>send('notificationStatus'),requestNotifications:()=>send('requestNotifications'),notify:content=>send('notify',content),quit:()=>send('stopped')};
 })();
 async function openEveAuthorization(auth){return EveDesktop.authorize(auth);}
