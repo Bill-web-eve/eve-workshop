@@ -1,6 +1,13 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Holdadatok: naptár {0}, értesítések {1}, corporation-időzítők {2} sikeres olvasó.": "Moon data: calendar {0}, notifications {1}, corporation timers {2} successful readers.",
+  "Kihagyott holdadatforrások: {0} karakter még nem engedélyezte.": "Skipped moon sources: {0} characters have not authorized access.",
+  "Nem elérhető corporation-időzítők: {0} karakter (403 / Station Manager).": "Unavailable corporation timers: {0} characters (403 / Station Manager).",
+  "A naptár és az értesítések ettől függetlenül használhatók.": "Calendar and notification access can still be used.",
+  "Sikertelen holdadat-lekérések: {0}; a korábbi adatok megmaradtak.": "Failed moon data requests: {0}; previous data has been preserved.",
+  "Részletek: Beállítások → Adathozzáférések.": "Details: Settings → Data access.",
+  "Holdadat-hiba · {0} · {1}: {2}": "Moon data error · {0} · {1:t}: {2:t}",
   "ESI-naptárból ismert kitermelési időpont:": "Extraction time known from the ESI calendar:",
   "A naptár az érkezés idejét közli; ércmennyiséget és széttörési időt nem feltétlenül ad meg.": "The calendar provides the arrival time; it may not provide ore quantities or fracture time.",
   "ESI naptár · kitermelési időpont": "ESI calendar · extraction time",

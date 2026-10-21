@@ -40,3 +40,10 @@ test('calendar renders ESI time and details without inventing ore volume',async 
  assert.match(w.document.querySelector('#extraction-details').textContent,/matched using its ESI ID/);
  assert.match(w.document.querySelector('#extraction-details').textContent,/does not provide ore quantities/);
 });
+test('optional corporation timer access is informational; real failures stay highlighted',t=>{
+ const {w}=page();t.after(()=>w.close());
+ for(const [optional,expected] of [[true,'muted'],[false,'warning-text']]){
+  w.document.querySelector('main').innerHTML=w.moonAccessStatus({scope_granted:true,error:'Station Manager',optional_unavailable:optional});
+  assert.equal(w.document.querySelector('main span').className,expected);
+ }
+});

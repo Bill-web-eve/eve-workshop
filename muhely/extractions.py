@@ -7,13 +7,41 @@ import math
 import re
 import time
 
-from .esi import ESI, EsiError, AuthenticationError
+from .esi import ESI, EsiError, AuthenticationError, MoonScopeError
 from . import moon_notifications as notices
 from . import progress
 
 CALENDAR_SCOPE='esi-calendar.read_calendar_events.v1'
 MINING_SCOPE='esi-industry.read_corporation_mining.v1'
 MOON_SCOPES=[CALENDAR_SCOPE,MINING_SCOPE,notices.SCOPE]
+TIMER_ROLE_ERROR='Az ESI elutasította a corporation időzítőinek olvasását (403). A fúró tulajdonos corporationjében Station Manager szerepkör szükséges; a naptár olvasási engedélye önmagában nem elég.'
+
+
+def refresh_failure(eve,cid,kind,error,role_denied=False):
+    domain={'calendar':'moon_calendar','notifications':'moon_notifications','timers':'moon_timers'}[kind]
+    # An optional source that has never been available is not a broken refresh.
+    # Lost access to an existing source remains a warning, as do network/SSO errors.
+    optional=not eve.store.snapshot(cid,domain) and (isinstance(error,MoonScopeError) or role_denied)
+    message=TIMER_ROLE_ERROR if role_denied else str(error) if isinstance(error,EsiError) else 'Hibás ESI kitermelési lapozás.'
+    eve.store.resource_error(cid,domain,message,isinstance(error,AuthenticationError) and not role_denied)
+    return {'id':cid,'kind':kind,'ok':False,'error':message,'warning':not optional,
+            'reason':'role_denied' if role_denied else 'missing_scope' if isinstance(error,MoonScopeError) else 'request_failed'}
+
+
+def refresh_summary(results,characters):
+    names={c['id']:c['name'] for c in characters}
+    counts={kind:sum(r['ok'] and r['kind']==kind for r in results) for kind in ['calendar','notifications','timers']}
+    parts=[f"Holdadatok: naptár {counts['calendar']}, értesítések {counts['notifications']}, corporation-időzítők {counts['timers']} sikeres olvasó."]
+    skipped={r['id'] for r in results if r.get('reason')=='missing_scope' and not r.get('warning',True)}
+    if skipped:parts.append(f'Kihagyott holdadatforrások: {len(skipped)} karakter még nem engedélyezte.')
+    denied={r['id'] for r in results if r.get('reason')=='role_denied' and not r.get('warning',True)}
+    if denied:parts.append(f'Nem elérhető corporation-időzítők: {len(denied)} karakter (403 / Station Manager). A naptár és az értesítések ettől függetlenül használhatók.')
+    failed=[r for r in results if not r['ok'] and r.get('warning',True)]
+    if failed:
+        parts.append(f'Sikertelen holdadat-lekérések: {len(failed)}; a korábbi adatok megmaradtak. Részletek: Beállítások → Adathozzáférések.')
+        labels={'calendar':'Naptár','notifications':'Ércértesítések','timers':'Corporation időzítők'}
+        for row in failed[:3]:parts.append(f"Holdadat-hiba · {names.get(row['id'],str(row['id']))} · {labels[row['kind']]}: {row['error']}")
+    return '\n'.join(parts)
 
 
 def stamp(value):
@@ -120,12 +148,13 @@ def sync(eve):
                 eve.store.save_snapshots(cid,{'moon_notification_response':{**raw,'data':filtered},'moon_notifications':{**raw,'data':{'notifications':list(combined.values())}}},domain='moon_notifications')
                 results.append({'id':cid,'kind':'notifications','ok':True})
             except EsiError as error:
-                eve.store.resource_error(cid,'moon_notifications',str(error),isinstance(error,AuthenticationError));results.append({'id':cid,'kind':'notifications','ok':False,'error':str(error)})
+                results.append(refresh_failure(eve,cid,'notifications',error))
             # Calendar access remains useful even without corporation mining roles.
             try:
                 sync_calendar(eve,cid);results.append({'id':cid,'kind':'calendar','ok':True})
             except EsiError as error:
-                eve.store.resource_error(cid,'moon_calendar',str(error),isinstance(error,AuthenticationError));results.append({'id':cid,'kind':'calendar','ok':False,'error':str(error)})
+                results.append(refresh_failure(eve,cid,'calendar',error))
+            timer_request=False
             try:
                 progress.resource('Corporation holdidőzítői')
                 token=eve.token(cid,required_scopes=[MINING_SCOPE])
@@ -144,7 +173,9 @@ def sync(eve):
                         if old and old['expires']>now:
                             chunk=old['data']['rows'];pages=old['data']['pages'];part=old
                         else:
+                            timer_request=True
                             chunk,h=eve.http.request(f'{ESI}/corporation/{corp}/mining/extractions?page={page}',token=token,headers={'If-None-Match':old['etag']} if old and old.get('etag') else {})
+                            timer_request=False
                             if chunk is None:
                                 if not old:raise EsiError('Hiányzó korábbi holdadat.')
                                 chunk=old['data']['rows']
@@ -165,9 +196,8 @@ def sync(eve):
                     parts['moon_timers']=snap;eve.store.save_snapshots(cid,parts,domain='moon_timers');done[corp]=snap
                 eve.store.save_snapshots(cid,{'moon_timers':snap},domain='moon_timers');results.append({'id':cid,'kind':'timers','ok':True})
             except (EsiError,ValueError) as error:
-                role_denied=getattr(error,'status_code',None)==403
-                message='Az ESI elutasította a corporation időzítőinek olvasását (403). A fúró tulajdonos corporationjében Station Manager szerepkör szükséges; a naptár olvasási engedélye önmagában nem elég.' if role_denied else str(error) if isinstance(error,EsiError) else 'Hibás ESI kitermelési lapozás.'
-                eve.store.resource_error(cid,'moon_timers',message,isinstance(error,AuthenticationError) and not role_denied);results.append({'id':cid,'kind':'timers','ok':False,'error':message})
+                role_denied=timer_request and getattr(error,'status_code',None)==403
+                results.append(refresh_failure(eve,cid,'timers',error,role_denied))
         return results
     finally:eve.sync_lock.release()
 
@@ -255,6 +285,7 @@ def report(store,catalog,now=None,access_scopes=None):
             entry[kind]={'fetched':(snap or {}).get('fetched'),'expires':(snap or {}).get('expires'),'error':status.get('error'),'needs_auth':bool(status.get('needs_auth')),'stale':not snap or snap['expires']<=now or bool(status.get('error'))}
             scope={'moon_calendar':CALENDAR_SCOPE,'moon_timers':MINING_SCOPE,'moon_notifications':notices.SCOPE}[kind]
             entry[kind]['scope_granted']=scope in access_scopes.get(char['id'],[]) if access_scopes is not None else None
+            entry[kind]['optional_unavailable']=kind=='moon_timers' and not snap and status.get('error')==TIMER_ROLE_ERROR
             entry[kind]['count']=len(snap['data'].get('notifications',[])) if snap and kind=='moon_notifications' else len(snap['data'].get('rows',[])) if snap and kind=='moon_timers' else len(snap['data']) if snap else 0
             if not snap or kind=='moon_notifications':continue
             if kind=='moon_timers':

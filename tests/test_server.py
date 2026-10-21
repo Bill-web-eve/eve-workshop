@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import threading
 import time
-from unittest.mock import Mock
+from unittest.mock import Mock,patch
 import unittest
 
 from muhely.server import App,Server
@@ -496,6 +496,28 @@ class ServerTests(unittest.TestCase):
             time.sleep(.01)
         task=self.request('/api/activity')[1]['task']
         self.assertFalse(task['running']);self.assertEqual(task['outcome'],'error');self.assertFalse(task['results'][0]['ok'])
+
+    def test_optional_moon_sources_do_not_mark_refresh_failed_but_real_errors_do(self):
+        self.app.store.add_character(1,'Moon Reader')
+        optional=[{'id':1,'kind':'calendar','ok':True}, {'id':1,'kind':'notifications','ok':True},
+                  {'id':1,'kind':'timers','ok':False,'warning':False,'reason':'role_denied','error':'Station Manager'}]
+        for kind in ['extractions','sync']:
+            self.app.eve.sync=Mock(return_value=[{'id':1,'ok':True}])
+            self.app.eve.sync_skills=Mock(return_value=[]);self.app.eve.sync_pi=Mock(return_value=[])
+            self.app.store.save_snapshots(1,{'moon_calendar':{'data':[],'fetched':time.time(),'expires':time.time()+600,'etag':None}},domain='moon_calendar')
+            for fail in [False,True]:
+                rows=optional+[{'id':1,'kind':'calendar','ok':False,'error':'offline'}] if fail else optional
+                with self.subTest(kind=kind,fail=fail),patch('muhely.server.extractions.sync',return_value=rows):
+                    self.app.start_task(kind)
+                    for _ in range(200):
+                        if not self.app.task['running']:break
+                        time.sleep(.01)
+                    task=self.app.task_snapshot()
+                    self.assertFalse(task['running']);self.assertEqual(task['outcome'],'warning' if fail else 'success')
+                    self.assertIn('naptár 1, értesítések 1',task['message'])
+                    self.assertIn('Station Manager',task['message'])
+                    self.assertNotIn('Néhány holdadat nem frissült',task['message'])
+                    if fail:self.assertIn('Moon Reader · Naptár: offline',task['message'])
 
 
 if __name__=='__main__':unittest.main()

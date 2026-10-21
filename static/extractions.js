@@ -11,7 +11,7 @@ function moonSource(source){return source==='esi_notification'?'ESI értesítés
 function moonAccessStatus(resource){
   if(!resource)return '<span class="muted">Még nincs lekérdezés</span>';
   if(resource.scope_granted===false)return '<span class="muted">Nincs engedélyezve</span>';
-  if(resource.error)return `<span class="${resource.scope_granted===false?'muted':'warning-text'}">${esc(resource.error)}</span>`;
+  if(resource.error)return `<span class="${resource.optional_unavailable?'muted':'warning-text'}">${esc(resource.error)}</span>`;
   if(!resource.fetched)return `<span>${resource.scope_granted?'Engedélyezve · frissítésre vár':'Még nincs lekérdezés'}</span>`;
   return `<span class="badge ${resource.stale?'warn':'good'}">${resource.stale?'Frissítés szükséges':'Rendben'}</span> <span>${fmt(resource.count||0)}</span> <span>bejegyzés</span> · ${date(resource.fetched)}`;
 }

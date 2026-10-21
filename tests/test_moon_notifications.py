@@ -7,7 +7,7 @@ from muhely.store import Store
 from muhely.moons import validate_moon,dashboard
 from muhely.extractions import report,sync,crystal_plan
 from muhely.moon_notifications import parse,text_fields,eve_time,SCOPE
-from muhely.esi import EveConnection,Transport,AuthenticationError,EsiError,MOON_SCOPES
+from muhely.esi import EveConnection,Transport,AuthenticationError,EsiError,MOON_SCOPES,MoonScopeError
 ROOT=Path(__file__).resolve().parents[1]
 iso=lambda t:datetime.fromtimestamp(t,timezone.utc).isoformat()
 def ticks(t):return str(round((t+11644473600)*10_000_000))
@@ -102,7 +102,30 @@ class NotificationTests(unittest.TestCase):
             if '/mining/extractions' in url:raise denied
             if '/notifications' in url or '/calendar' in url:return ([],{})
             return ({'corporation_id':98},{})
-        eve.http.request.side_effect=request;sync(eve);status=self.s.resource_status(1,'moon_timers');self.assertFalse(status['needs_auth']);self.assertIn('Station Manager',status['error'])
+        eve.http.request.side_effect=request;results=sync(eve);status=self.s.resource_status(1,'moon_timers');self.assertFalse(status['needs_auth']);self.assertIn('Station Manager',status['error'])
+        timer=next(r for r in results if r['kind']=='timers');self.assertFalse(timer['warning']);self.assertEqual(timer['reason'],'role_denied')
+        self.assertTrue(report(self.s,self.c)['access'][0]['moon_timers']['optional_unavailable'])
+        self.s.save_snapshots(1,{'moon_timers':snap({'corporation_id':98,'rows':[self.timer()]})},domain='moon_timers')
+        timer=next(r for r in sync(eve) if r['kind']=='timers');self.assertTrue(timer['warning'])
+        self.assertEqual(self.s.snapshot(1,'moon_timers')['data']['rows'],[self.timer()])
+        self.assertFalse(report(self.s,self.c)['access'][0]['moon_timers']['optional_unavailable'])
+
+    def test_never_authorized_sources_are_skipped_but_lost_access_remains_a_warning(self):
+        eve=EveConnection(self.s,vault=Mock(),transport=Mock());eve.token=Mock(side_effect=MoonScopeError('Missing moon permission'))
+        results=sync(eve);self.assertEqual(len(results),3)
+        self.assertTrue(all(not r['ok'] and not r['warning'] and r['reason']=='missing_scope' for r in results))
+        eve.http.request.assert_not_called()
+        self.seed([self.note()]);results=sync(eve)
+        self.assertTrue(next(r for r in results if r['kind']=='notifications')['warning'])
+        self.assertEqual(len(self.s.snapshot(1,'moon_notifications')['data']['notifications']),1)
+
+    def test_network_and_sso_failures_are_not_masked_as_optional_access(self):
+        for error in [EsiError('offline'),AuthenticationError('Login expired')]:
+            eve=EveConnection(self.s,vault=Mock(),transport=Mock());eve.token=Mock(side_effect=error)
+            self.assertTrue(all(r['warning'] and r['reason']=='request_failed' for r in sync(eve)))
+        denied=AuthenticationError('SSO rejected');denied.status_code=403
+        eve.token.side_effect=denied
+        self.assertTrue(all(r['warning'] and r['reason']=='request_failed' for r in sync(eve)))
     def test_scope_metadata_does_not_expose_tokens(self):
         vault=Mock();vault.read.return_value={'1':dict(scopes=MOON_SCOPES,access_token='never-expose',refresh_token='secret')};eve=EveConnection(self.s,vault=vault)
         self.assertEqual(eve.granted_scopes(),{1:MOON_SCOPES});self.assertNotIn('never-expose',json.dumps(eve.granted_scopes()))

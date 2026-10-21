@@ -2,6 +2,8 @@
 
 A kitermelési naptár a „Moon extraction for …” EVE-esemény leírásából kiolvasott holdazonosító alapján párosít. Csak a nyilvántartásba már felvett Athanor-holdak szerepelnek; idegen holdat nem vesz fel automatikusan. Üzemanyag- és egyéb naptárriasztások nem számítanak kitermelésnek. A naptárbejegyzés időpontot adhat ércmennyiség nélkül is; ettől a mennyiség nem lesz nulla vagy automatikusan ismert. Az app UTC-t mutat, az ICS-előfizetés helyi időzónát használ.
 
+A holdadat-frissítés külön összesíti a sikeres naptár-, értesítés- és corporationidőzítő-olvasókat. A még nem engedélyezett adatforrások és a korábban sem hozzáférhető corporationidőzítők 403-as szerepkörhiánya tájékoztatásként jelennek meg. A hálózati vagy belépési hiba, illetve egy korábban használt adatforrás hozzáférésének elvesztése továbbra is figyelmeztetés, a karakter és az adatforrás megnevezésével.
+
 ## Saját ablakos Windows-alkalmazás (1.2.0)
 
 Bontsd ki a teljes Windows ZIP-et, és indítsd az **EVE_Muhely.exe** fájlt. A felület saját ablakban nyílik meg. Az EVE engedélykérése a rendszerböngészőt használja; jóváhagyás után térj vissza a Műhelybe. A sötét/világos téma és a nyelv a **Settings → Appearance and language** oldalon állítható. A vágólap, a mentési párbeszédablak, a nyomtatás és a külön intel-térkép/chatablak támogatott.

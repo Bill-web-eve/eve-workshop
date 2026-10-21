@@ -117,7 +117,7 @@ class App:
                         message+=f" Corp-adatok: {sum(r['ok'] for r in corp_results)} sikeres lekérés; részletek a Corporationok oldalon."
                     if include_moons:
                         moon_results=phase('Holdak és naptár',lambda:extractions.sync(self.eve))
-                        if any(not r['ok'] for r in moon_results):message+=' Néhány holdadat nem frissült; ellenőrizd a Kitermelési naptár hozzáféréseit. Ez a holdadat-figyelmeztetés önmagában nem akadályozza a gyártási terv számítását.'
+                        message+=' '+extractions.refresh_summary(moon_results,self.store.characters())
                     if include_mining:
                         mining_results=phase('Bányászati naplók',lambda:mining.sync(self.eve))
                         message+=f" Bányászati naplók frissítve: {sum(r['ok'] for r in mining_results)}/{len(mining_results)} karakter."
@@ -139,7 +139,7 @@ class App:
                     message='A holdak rendszeradatai frissítve.' if all(r['ok'] for r in result) else 'Néhány rendszer ESI-adata nem frissült. A korábbi adatok megmaradtak.'
                 elif kind == 'extractions':
                     result=phase('Holdak és naptár',lambda:extractions.sync(self.eve))
-                    message='A holdnaptár és a kitermelési időzítők ellenőrizve.'
+                    message=extractions.refresh_summary(result,self.store.characters())
                 elif kind == 'corporations':
                     if not self.store.characters():raise PlanningError('Előbb adj hozzá egy corp-hozzáférésre jogosult karaktert.')
                     result=phase('Corporationok',self.eve.sync_corporations);ok_count=sum(r['ok'] for r in result)
@@ -148,7 +148,7 @@ class App:
                     phase('Receptadatbázis',self.update_catalog)
                     result, message = [], 'Az EVE-receptadatbázis naprakész.'
                 with self.task_lock:
-                    self.task.update(running=False,message=message,results=result,finished=time.time(),updated=time.time(),outcome='warning' if any(not row.get('ok',True) for row in outcomes) else 'success')
+                    self.task.update(running=False,message=message,results=result,finished=time.time(),updated=time.time(),outcome='warning' if any(not row.get('ok',True) and row.get('warning',True) for row in outcomes) else 'success')
             except Exception as error:
                 message = str(error) if isinstance(error, (PlanningError, EsiError)) else 'A frissítés nem sikerült. Az előző adatok megmaradtak.'
                 with self.task_lock:

@@ -3,6 +3,16 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {JSDOM}=require('jsdom');
 const root=path.join(__dirname,'../static');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
+test('moon refresh distinguishes optional access from real errors in English',async t=>{
+ const dom=await page(),i=dom.window.EveI18n;t.after(()=>dom.window.close());i.setLanguage('en');
+ const message='Holdadatok: naptár 5, értesítések 5, corporation-időzítők 0 sikeres olvasó. Kihagyott holdadatforrások: 5 karakter még nem engedélyezte. Nem elérhető corporation-időzítők: 5 karakter (403 / Station Manager). A naptár és az értesítések ettől függetlenül használhatók.';
+ const en=i.t(message);assert.match(en,/Moon data: calendar 5, notifications 5, corporation timers 0 successful readers/);
+ assert.match(en,/Skipped moon sources: 5 characters/);assert.match(en,/Unavailable corporation timers: 5 characters/);
+ assert(!/[áéőű]/i.test(en));
+ const error=i.t('Sikertelen holdadat-lekérések: 1; a korábbi adatok megmaradtak. Részletek: Beállítások → Adathozzáférések.\nHoldadat-hiba · Reader · Naptár: A karakter belépése hiányzik. Engedélyezd újra a karaktert.');
+ assert.match(error,/Failed moon data requests: 1/);assert.match(error,/Settings → Data access/);assert.match(error,/Moon data error · Reader · Calendar:/);
+ assert(!/[áéőű]/i.test(error));
+});
 async function page(html='',saved=null){
   const dom=new JSDOM(`<html lang="hu"><body><div class="language-control" data-i18n-skip><button data-ui-language="hu">Magyar</button><button data-ui-language="en">English</button></div>${html}</body></html>`,{url:'http://127.0.0.1:8765',runScripts:'outside-only'});
   if(saved)dom.window.localStorage.setItem('eve-muhely-language',saved);
