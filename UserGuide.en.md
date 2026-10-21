@@ -1,5 +1,7 @@
 # EVE Workshop – complete user guide
 
+Extraction calendar events titled “Moon extraction for …” are matched using the moon ID in the EVE event description. Only registered Athanor moons are included; unrelated moons are never registered automatically. Fuel and other calendar alarms are excluded. A valid arrival time does not imply known ore quantities. The app shows UTC; calendar subscriptions display the subscriber’s local time zone.
+
 ## Native Windows application (1.2.0)
 
 Extract the entire Windows ZIP and start **EVE_Muhely.exe**. Workshop opens in its own window. EVE authorization uses the system browser; return to Workshop after approval. Choose theme and language under **Settings → Appearance and language**. Clipboard, native file saving, printing and separate intel map/chat windows are supported.

@@ -27,6 +27,51 @@ class ExtractionTests(unittest.TestCase):
         parts={'moon_timers':snap({'corporation_id':98,'rows':[self.timer] if rows is None else rows})}
         if event:parts['moon_calendar']=snap([self.event])
         self.s.save_snapshots(1,parts,domain='moon_timers')
+    def calendar_completion(self,moon_id=None,**updates):
+        return dict(self.event,title='Moon extraction for RP2-OQ - Private - 0',
+            text='The moon chunk extraction for <a href="showinfo:35835//900001">RP2-OQ - Private drill</a> at '
+                 f'<a href="showinfo:14//{moon_id or self.mid}">RP2-OQ VI - Moon 7</a> in '
+                 f'<a href="showinfo:5//{self.sid}">RP2-OQ</a> will complete at this time. '
+                 'The moon chunk will be available for fracturing after this time into a minable asteroid field.',**updates)
+
+    def test_standard_truncated_calendar_title_matches_moon_id_without_timer_or_ore_scan(self):
+        self.s.save_snapshots(1,{'moon_calendar':snap([self.calendar_completion()])},domain='moon_calendar')
+        result=report(self.s,self.c,self.now)
+        self.assertEqual(len(result['events']),1)
+        event=result['events'][0]
+        self.assertEqual(event['date'],self.timer['chunk_arrival_time'])
+        self.assertEqual(event['timing_source'],'esi_calendar')
+        self.assertIsNone(event['volume']);self.assertEqual(event['ores'],[])
+        self.assertEqual(result['moons'][self.moon['id']]['status'],'calendar_only')
+
+    def test_unregistered_moon_is_not_added_even_if_link_caption_matches_registered_name(self):
+        self.s.save_snapshots(1,{'moon_calendar':snap([self.calendar_completion(moon_id=99999999)])},domain='moon_calendar')
+        self.assertEqual(report(self.s,self.c,self.now)['events'],[])
+        self.assertEqual(len(self.s.moon_records()),1)
+
+    def test_fuel_alarm_at_registered_moon_is_not_an_extraction(self):
+        event=dict(self.calendar_completion(),title='Control tower in RP2-OQ goes offline')
+        event['text']=f'Shadow Control Tower will run out of fuel. Moon: <a href="showinfo:14//{self.mid}">RP2-OQ VI - Moon 7</a>'
+        self.s.save_snapshots(1,{'moon_calendar':snap([event])},domain='moon_calendar')
+        self.assertEqual(report(self.s,self.c,self.now)['events'],[])
+
+    def test_explicit_moon_id_takes_priority_over_caption_and_conflicting_system_is_rejected(self):
+        event=self.calendar_completion();event['text']=event['text'].replace('RP2-OQ VI - Moon 7','renamed link caption')
+        self.s.save_snapshots(1,{'moon_calendar':snap([event])},domain='moon_calendar')
+        self.assertEqual(len(report(self.s,self.c,self.now)['events']),1)
+        event['text']=event['text'].replace('showinfo:5//'+str(self.sid),'showinfo:5//30000142')
+        self.s.save_snapshots(1,{'moon_calendar':snap([event])},domain='moon_calendar')
+        self.assertEqual(report(self.s,self.c,self.now)['events'],[])
+
+    def test_calendar_readers_and_local_calendar_export_do_not_duplicate_the_pull(self):
+        from muhely.moon_calendar import export
+        self.s.add_character(2,'Second calendar reader')
+        for cid in [1,2]:self.s.save_snapshots(cid,{'moon_calendar':snap([self.calendar_completion()])},domain='moon_calendar')
+        raw=export(self.s,self.c)
+        self.assertEqual(raw.count(b'BEGIN:VEVENT'),1)
+        self.assertIn(b'Extraction time source: ESI calendar event.',raw)
+        self.assertIn(self.timer['chunk_arrival_time'][:10].replace('-','').encode(),raw)
+
     def test_natural_decay_is_not_ore_expiry(self):
         self.seed();e=report(self.s,self.c,self.now)['events'][0]
         self.assertEqual(e['volume'],1000000);self.assertEqual(e['volume_source'],'esi_calendar')

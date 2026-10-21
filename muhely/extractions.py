@@ -79,6 +79,31 @@ def validate_event(data):
     if not isinstance(data,dict) or not positive(data.get('event_id')) or stamp(data.get('date')) is None or not isinstance(data.get('title'),str) or len(data['title'])>2000 or not isinstance(data.get('text'),str) or len(data['text'])>200000:raise EsiError('Hibás ESI naptáresemény.')
 
 
+def sync_calendar(eve,cid):
+    """Refresh one calendar; the caller holds eve.sync_lock."""
+    token=eve.token(cid,required_scopes=[CALENDAR_SCOPE]);parts={};events=[];cursor=None;seen=set()
+    for page in range(20):
+        url=f'{ESI}/characters/{cid}/calendar'+(f'?from_event={cursor}' if cursor else '')
+        key='moon_calendar_page:'+str(cursor or 0)
+        listing=cached(eve,cid,key,url,token,validate_calendar);parts[key]=listing
+        rows=listing['data']
+        for row in rows:
+            if row['event_id'] in seen:raise EsiError('Ismétlődő ESI naptároldal.')
+            seen.add(row['event_id'])
+            detail=cached(eve,cid,'moon_event:'+str(row['event_id']),f"{ESI}/characters/{cid}/calendar/{row['event_id']}",token,validate_event)
+            if detail['data']['event_id']!=row['event_id']:raise EsiError('Hibás ESI naptáresemény.')
+            parts['moon_event:'+str(row['event_id'])]=detail
+            events.append(detail['data'])
+        if len(rows)<50:break
+        cursor=rows[-1]['event_id']
+    else:raise EsiError('A naptár túl nagy; a korábbi teljes adat megmaradt.')
+    previous=eve.store.snapshot(cid,'moon_calendar')
+    live_ids={e['event_id'] for e in events}
+    events.extend(dict(e,historical=True) for e in (previous or {}).get('data',[]) if e['event_id'] not in live_ids and stamp(e['date']) is not None and time.time()-90*86400<stamp(e['date'])<=time.time())
+    parts['moon_calendar']={'data':events,'fetched':time.time(),'expires':min(p['expires'] for p in parts.values()),'etag':None}
+    eve.store.save_snapshots(cid,parts,domain='moon_calendar')
+
+
 def sync(eve):
     if not eve.sync_lock.acquire(blocking=False):raise EsiError('Az EVE-frissítés már folyamatban van.')
     results=[];done={}
@@ -98,27 +123,7 @@ def sync(eve):
                 eve.store.resource_error(cid,'moon_notifications',str(error),isinstance(error,AuthenticationError));results.append({'id':cid,'kind':'notifications','ok':False,'error':str(error)})
             # Calendar access remains useful even without corporation mining roles.
             try:
-                token=eve.token(cid,required_scopes=[CALENDAR_SCOPE]);parts={};events=[];cursor=None;seen=set()
-                for page in range(20):
-                    url=f'{ESI}/characters/{cid}/calendar'+(f'?from_event={cursor}' if cursor else '')
-                    key='moon_calendar_page:'+str(cursor or 0)
-                    listing=cached(eve,cid,key,url,token,validate_calendar);parts[key]=listing
-                    rows=listing['data']
-                    for row in rows:
-                        if row['event_id'] in seen:raise EsiError('Ismétlődő ESI naptároldal.')
-                        seen.add(row['event_id'])
-                        detail=cached(eve,cid,'moon_event:'+str(row['event_id']),f"{ESI}/characters/{cid}/calendar/{row['event_id']}",token,validate_event)
-                        if detail['data']['event_id']!=row['event_id']:raise EsiError('Hibás ESI naptáresemény.')
-                        parts['moon_event:'+str(row['event_id'])]=detail
-                        events.append(detail['data'])
-                    if len(rows)<50:break
-                    cursor=rows[-1]['event_id']
-                else:raise EsiError('A naptár túl nagy; a korábbi teljes adat megmaradt.')
-                previous=eve.store.snapshot(cid,'moon_calendar')
-                live_ids={e['event_id'] for e in events}
-                events.extend(dict(e,historical=True) for e in (previous or {}).get('data',[]) if e['event_id'] not in live_ids and stamp(e['date']) is not None and time.time()-90*86400<stamp(e['date'])<=time.time())
-                parts['moon_calendar']={'data':events,'fetched':time.time(),'expires':min(p['expires'] for p in parts.values()),'etag':None}
-                eve.store.save_snapshots(cid,parts,domain='moon_calendar');results.append({'id':cid,'kind':'calendar','ok':True})
+                sync_calendar(eve,cid);results.append({'id':cid,'kind':'calendar','ok':True})
             except EsiError as error:
                 eve.store.resource_error(cid,'moon_calendar',str(error),isinstance(error,AuthenticationError));results.append({'id':cid,'kind':'calendar','ok':False,'error':str(error)})
             try:
@@ -176,6 +181,41 @@ class Plain(HTMLParser):
         if tag in ['tr','p','div']:self.parts.append('\n')
         elif tag in ['td','th']:self.parts.append(' ')
     def handle_data(self,text):self.parts.append(text)
+
+
+class CalendarLinks(Plain):
+    def __init__(self):super().__init__();self.links={}
+    def handle_starttag(self,tag,attrs):
+        super().handle_starttag(tag,attrs)
+        if tag!='a':return
+        href=dict(attrs).get('href') or ''
+        match=re.fullmatch(r'showinfo:(\d+)//(\d+)',href,re.I)
+        if match and positive(int(match[2])):self.links.setdefault(int(match[1]),set()).add(int(match[2]))
+
+
+def calendar_identity(event):
+    """Recognize extraction completion, excluding unrelated calendar alarms."""
+    parser=CalendarLinks();parser.feed(event.get('text',''))
+    title=event.get('title','');body=''.join(parser.parts)
+    standard=bool(re.search(r'\bthe moon chunk extraction for\b',body,re.I) and re.search(r'\bwill complete at this time\b',body,re.I))
+    titled=bool(re.match(r'^\s*Moon extraction for\b',title,re.I))
+    legacy=bool(re.search(r'\bextraction\b',title,re.I) and not re.search(r'\b(?:fuel|offline|reinforced|cancelled|canceled|aborted)\b',title,re.I))
+    if not (standard or titled or legacy):return None
+    return {'moon_ids':parser.links.get(14,set())|parser.links.get(0,set()),
+            'system_ids':parser.links.get(5,set()),
+            'structure_ids':parser.links.get(35835,set())|parser.links.get(35836,set()),
+            'plain':title+' '+body}
+
+
+def matches_calendar(event,moon,name,structure_ids):
+    identity=calendar_identity(event)
+    if identity is None:return False
+    # Explicit ESI object IDs are authoritative, even when link captions/titles
+    # are truncated, renamed or contain another moon's name.
+    if identity['moon_ids']:
+        return identity['moon_ids']=={moon['moon_id']} and (not identity['system_ids'] or identity['system_ids']=={moon['system_id']})
+    if len(identity['structure_ids'])==1 and identity['structure_ids']&structure_ids:return True
+    return bool(re.search(r'(?<!\w)'+re.escape(name)+r'(?!\w)',identity['plain'],re.I))
 
 
 def event_ores(event,catalog):
@@ -237,11 +277,9 @@ def report(store,catalog,now=None,access_scopes=None):
         name=next((r['name'] for r in catalog.moon_locations(moon['system_id']) if r['id']==moon['moon_id']),str(moon['moon_id']))
         matches=[r for r in timers.values() if r['moon_id']==moon['moon_id'] and stamp(r['natural_decay_time'])+moon.get('belt_lifetime_hours',48)*3600>now]
         matched_events=[]
+        structure_ids={r['structure_id'] for r in timers.values() if r['moon_id']==moon['moon_id']}
         for event in events.values():
-            body=event['title']+' '+event['text']
-            structure_ids={r['structure_id'] for r in timers.values() if r['moon_id']==moon['moon_id']}
-            linked_structure=any(re.search(r'showinfo:\d+//'+str(sid)+r'(?!\d)',body) for sid in structure_ids)
-            if linked_structure or re.search(r'(?<!\w)'+re.escape(name)+r'(?!\d)',body,re.I) or re.search(r'showinfo:(?:14|0)//'+str(moon['moon_id'])+r'(?!\d)',body):matched_events.append(event)
+            if moon['structure']=='Athanor' and matches_calendar(event,moon,name,structure_ids):matched_events.append(event)
         used_notices=set()
         for timer in matches:
             arrival=stamp(timer['chunk_arrival_time'])
@@ -274,7 +312,7 @@ def report(store,catalog,now=None,access_scopes=None):
             if any(abs(stamp(event['date'])-stamp(t['chunk_arrival_time']))<=3600 for t in matches) or any(r['moon_record_id']==moon['id'] and abs(stamp(r['date'])-stamp(event['date']))<=3600 for r in output):continue
             if stamp(event['date'])<now-90*86400:continue
             ores=event_ores(event,catalog)
-            output.append({'id':'calendar:'+str(event['event_id']),'event_id':event['event_id'],'moon_record_id':moon['id'],'moon_name':name,'date':event['date'],'volume':sum(o['volume'] for o in ores) if ores else None,'ores':[dict(o,name=catalog.name(o['id']),percent=o['volume']/sum(x['volume'] for x in ores)*100) for o in ores] if ores else [],'composition_source':'esi_calendar' if ores else 'unknown','volume_source':'esi_calendar' if ores else 'unknown','kind':'calendar_history' if event.get('historical') or stamp(event['date'])<=now else 'calendar','stale':event['stale'],'checked':event['checked'],'belt_earliest_expiry':None,'belt_latest_expiry':None,'expiry_source':'unknown'})
+            output.append({'id':'calendar:'+str(event['event_id']),'event_id':event['event_id'],'moon_record_id':moon['id'],'moon_name':name,'date':event['date'],'timing_source':'esi_calendar','calendar_title':event['title'],'volume':sum(o['volume'] for o in ores) if ores else None,'ores':[dict(o,name=catalog.name(o['id']),percent=o['volume']/sum(x['volume'] for x in ores)*100) for o in ores] if ores else [],'composition_source':'esi_calendar' if ores else 'unknown','volume_source':'esi_calendar' if ores else 'unknown','kind':'calendar_history' if event.get('historical') or stamp(event['date'])<=now else 'calendar','stale':event['stale'],'checked':event['checked'],'belt_earliest_expiry':None,'belt_latest_expiry':None,'expiry_source':'unknown'})
         current=[r for r in output if r['moon_record_id']==moon['id']]
         fresh=any(not r['stale'] and r['kind'] in ['extraction','notification'] and (r.get('fractured_at') is None) for r in current)
         calendar_only=any(not r['stale'] and r['kind']=='calendar' for r in current)

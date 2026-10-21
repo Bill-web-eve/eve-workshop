@@ -1,6 +1,10 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "ESI-naptárból ismert kitermelési időpont:": "Extraction time known from the ESI calendar:",
+  "A naptár az érkezés idejét közli; ércmennyiséget és széttörési időt nem feltétlenül ad meg.": "The calendar provides the arrival time; it may not provide ore quantities or fracture time.",
+  "ESI naptár · kitermelési időpont": "ESI calendar · extraction time",
+  "A kitermelés időpontja az EVE naptáreseményéből származik. A holdat az ESI-azonosítója alapján párosítjuk.": "The extraction time comes from the EVE calendar event. The moon is matched using its ESI ID.",
   "Az alkalmazásablak nem válaszol. Próbáld újra.": "The application window is not responding. Please try again.",
   "Az átlátszó inteljelző ebben a Windows-verzióban még nem érhető el. A külön térkép- és chatablak használható.": "The transparent intel overlay is not available in this Windows version yet. The separate map and chat windows are available.",
   "Az intel csak futó alkalmazás és íródó EVE-chatlog mellett frissül. A rendszerértesítéseket az alkalmazás és az operációs rendszer beállításai szabályozzák.": "Intel updates require the app to be running and EVE chat logs to be written. System notifications are controlled by the app and operating system settings.",

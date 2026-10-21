@@ -68,6 +68,8 @@ def calendar(events, language='en', now=None):
         seen.add(uid)
         description = [('A holdkőzet megérkezése; a naptár helyi időzónában mutatja.' if hu else
                         'Moon chunk arrival; displayed in your calendar’s local time zone.')]
+        if event.get('timing_source')=='esi_calendar':
+            description.append('Kitermelési időpont forrása: ESI naptáresemény.' if hu else 'Extraction time source: ESI calendar event.')
         if event.get('volume') is not None:
             description.append(('Érctérfogat' if hu else 'Ore volume') + f": {event['volume']:,.0f} m³")
         for ore in event.get('raw_ores') or event.get('ores', []):
