@@ -1,10 +1,10 @@
 # EVE Műhely
 
-Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple Silicon és Windows 11 x64 rendszerhez. A jelenlegi Mac-kiadás és a fejlesztés alatt álló 1.2.0 Windows-változat saját alkalmazásablakban nyílik meg. A korábbi Windows 1.1.0 kiadás böngészős. A helyi szolgáltatás címe: **http://127.0.0.1:8765**.
+Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple Silicon és Windows 11 x64 rendszerhez. Mindkét platformon saját alkalmazásablakban nyílik meg. A helyi szolgáltatás címe: **http://127.0.0.1:8765**.
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.1.0**, **Windows 11 x64 1.1.0**, magyar és angol felülettel, Jita-árazással, ipari díjakkal és holdprofit-számítással.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.2.0**, **Windows 11 x64 1.2.0**, magyar és angol felülettel, Jita-árazással, ipari díjakkal és holdprofit-számítással.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -19,6 +19,14 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Skill- és tanulási sor figyelése, PI-áttekintés időalapú termelési becsléssel, sötét mód, rendezhető és szűrhető táblázatok.
 - Jita buy/sell/split alapanyagárak, termékeladási érték, ESI-rendszerindex és beállítható ipari díjak.
 - Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
+
+## Az 1.2.0 kiadás újdonságai
+
+- A Windows-verzió is saját ablakban fut: WebView2-felület, natív vágólap, fájl- és mappaválasztás, nyomtatás, külön intel-térkép és intelchat.
+- Az EVE engedélyezése a rendszerböngészőben történik; utána a kiválasztott alkalmazásnézet marad nyitva.
+- Téma és nyelv a Settings alatt, külön engedélyezhető Windows-rendszerértesítések, figyelmeztetés nem mentett módosításokra és futó lekérésekre bezáráskor.
+- Rögzített, ellenőrzött Windows-függőségek; sikeres Windowsos futtatási próba a tényleges beépített Python és WebView2 használatával. A hibásan hiányzó WebView2-keresőkönyvtárak javítva.
+- A Mac Apple Silicon-verzió továbbra is saját ablakos. Az átlátszó inteloverlay jelenleg csak Macen támogatott.
 
 ## Az 1.1.0 kiadás újdonságai
 
@@ -112,7 +120,7 @@ Build with `python tools/build_windows_release.py --client-id-file PUBLIC_CLIENT
 
 Windows stores profiles under `%LOCALAPPDATA%\EVE Muhely`. `muhely/windows_security.py` protects the Fernet vault key with current-user Windows DPAPI and fixed application entropy. It does not use machine-wide protection or a plaintext-key fallback. Existing legacy plaintext keys are verified against the encrypted token file before migrating. Failure to decrypt never replaces the vault. macOS continues to use Keychain; POSIX fallback behaviour is unchanged.
 
-`windows_desktop.py` writes startup diagnostics and calls the common desktop entry point. Windows backend processes run without a console and with isolated Python paths; source/catalogue SQLite connections close before replacement so SDE updates work with Windows file locking. `windows_smoke_test.py` plus `Ellenorzes.cmd` run a recipient-side smoke test against a temporary blank profile: actual DPAPI, HTTP/CSRF, large reaction planning, plan persistence and optional public EVE HTTPS. It never logs in a real character or changes the user's plans. Windows runtime execution has not been verified on this build host; `release-manifest.json` records that limitation explicitly.
+`windows_desktop.py` writes startup diagnostics and calls the common desktop entry point. Windows backend processes run without a console and with isolated Python paths; source/catalogue SQLite connections close before replacement so SDE updates work with Windows file locking. `windows_smoke_test.py` plus `Ellenorzes.cmd` run a recipient-side smoke test against a temporary blank profile: actual DPAPI, HTTP/CSRF, large reaction planning, plan persistence and optional public EVE HTTPS. It never logs in a real character or changes the user's plans. The 1.2.0 pinned embedded runtime and real WebView2 window passed the Windows-hosted CI smoke test, including clipboard, export, OAuth return, separate map/chat windows and graceful shutdown. This Mac build host does not itself execute Windows binaries.
 
 ## Interface languages (0.9.0)
 
@@ -218,7 +226,7 @@ Intel map monitors selected EVE Chatlogs channels locally, recognizes system/pil
 Intel windows: the complete selected region is shown with shortest-stargate-distance highlighting from the selected own character. Activity cards include exact-ID zKillboard links and CCP ship icons. Public ESI name resolution receives inferred names only, with positive/negative local caching; full chat text stays local. The Mac shell opens separate map and aggregated read-only chat windows sharing cookies/theme/language while keeping OS delivery in the main window. Child windows close independently.
 
 
-## Native Windows window (1.2.0 development build)
+## Native Windows window (1.2.0 release)
 
 The Windows launcher now opens the shared interface in a WinForms/WebView2 window through pinned pywebview/pythonnet dependencies. The portable package includes Python and all Python dependencies; Microsoft WebView2 Runtime and .NET Framework are OS prerequisites. EVE consent opens the system browser and returns to the selected app view. Clipboard, native file save/folder dialogs, print UI, theme/language, independent map/chat windows and opt-in Windows notification-area alerts are supported. The transparent intel overlay remains Mac-only.
 
