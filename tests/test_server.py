@@ -94,7 +94,7 @@ class ServerTests(unittest.TestCase):
         status,_,_=self.request('/api/moons/crystals?moon_id=unknown');self.assertEqual(status,400)
         self.app.start_task=Mock()
         status,_,_=self.request('/api/moons/extractions/sync',{},Origin='http://other.local');self.assertEqual(status,403);self.app.start_task.assert_not_called()
-        status,_,_=self.request('/api/moons/extractions/sync',{});self.assertEqual(status,200);self.app.start_task.assert_called_once_with('extractions')
+        status,_,_=self.request('/api/moons/extractions/sync',{});self.assertEqual(status,200);self.app.start_task.assert_called_once_with('extractions',manual=False)
 
     def test_accounts_and_scheduler_routes_require_local_authorization(self):
         self.assertEqual(self.request('/api/accounts')[0],200)

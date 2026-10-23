@@ -61,19 +61,19 @@ async function refreshJobCosts(){
   catch(e){if(view==='queue')error(e.message);}
   finally{jobCostRequest=null;if(economicPanels.get('plan-materials')?.key!==c.key)void refreshJobCosts();}
 }
-async function loadIndustry(){
+async function loadIndustry(manual=false){
   if(industryRequest)return;
   clearTimeout(industryTimer);industryRequest=api('/api/industry');
   try{
     industryData=await industryRequest;
-    if(!industryData.running&&Object.values(industryData.resources).some(r=>r.stale)&&(industryData.retry_after||0)<=Date.now()/1000)industryData=await api('/api/industry/refresh',{});
+    if(!industryData.running&&(manual||Object.values(industryData.resources).some(r=>r.stale))&&(manual||(industryData.retry_after||0)<=Date.now()/1000))industryData=await api('/api/industry/refresh',{manual});
     applyEconomics();if(view==='settings')void updateFacilityIndices();
     await refreshJobCosts();
   }catch(e){if(view==='queue'||view==='settings')error(e.message);}
   finally{industryRequest=null;if(industryData?.running&&['queue','settings'].includes(view))industryTimer=setTimeout(()=>void loadIndustry(),1500);}
 }
 function bindEconomics(){
-  $$('[data-industry-refresh]').forEach(b=>b.onclick=()=>void loadIndustry());
+  $$('[data-industry-refresh]').forEach(b=>b.onclick=()=>void loadIndustry(true));
   $$('[data-cost-settings]').forEach(b=>b.onclick=()=>navigate('settings'));
   applyEconomics();void loadIndustry();
 }
@@ -102,6 +102,6 @@ function bindFacilitySystems(){
     input.onkeydown=e=>{if(e.key==='Escape'){result.hidden=true;input.setAttribute('aria-expanded','false');}else if(e.key==='ArrowDown'){e.preventDefault();result.querySelector('button')?.focus();}else if(e.key==='Enter'&&!result.hidden){e.preventDefault();result.querySelector('button')?.click();}};
     result.onkeydown=e=>{const bs=[...result.querySelectorAll('button')],i=bs.indexOf(document.activeElement);if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();bs[(i+(e.key==='ArrowDown'?1:-1)+bs.length)%bs.length]?.focus();}if(e.key==='Escape'){result.hidden=true;input.focus();input.setAttribute('aria-expanded','false');}};
   });
-  $$('[data-industry-refresh]').forEach(b=>b.onclick=()=>void loadIndustry());
+  $$('[data-industry-refresh]').forEach(b=>b.onclick=()=>void loadIndustry(true));
   void updateFacilityIndices();void loadIndustry();
 }

@@ -77,8 +77,9 @@ def collect(store,catalog,now=None):
     # Confirmed ownership wins, even when one of the copies is stale.
     corporate_ids=set();corp_parts=[]
     for corp in store.corporations():
-        snap=store.corporation_snapshot(corp['id'],'jobs');corp_parts.append((corp,snap))
+        snap=store.corporation_snapshot(corp['id'],'jobs')
         if snap:corporate_ids.update(j['job_id'] for j in snap['data'])
+        if corp['monitoring_enabled']:corp_parts.append((corp,snap))
     def jobs(rows,snapshot,domain,scope=None,char=None,error=False):
         valid=fresh(snapshot,now,error)
         if valid:observed.add(domain)
@@ -132,6 +133,7 @@ def collect(store,catalog,now=None):
             if at>now+prefs['moon_days']*86400 or at<now-86400:continue
             inferred=structure_corps.get(e.get('structure_id'),set())
             scope=prefs['moon_owners'].get(mid,e.get('corporation_id') or (next(iter(inferred)) if len(inferred)==1 else None))
+            if scope and not store.corporation_monitored(scope):continue
             if scope and scope not in corps:corps[scope]='Corporation '+str(scope)
             valid=not e['stale'] and e['kind'] in ['extraction','notification']
             key=f"moon:{m['moon_id']}:{e.get('structure_id',0)}:{int(at)}"

@@ -134,7 +134,7 @@ function scheduleDeliveryCheck(){
     if(!deliveryWait)return;
     const now=Date.now();
     if(!document.hidden&&!state.task.running&&!Object.keys(dirty).length&&now>=deliveryWait.retry_at*1000&&now>=deliveryRetryAfter){
-      deliveryRetryAfter=now+60000;await startTask('/api/sync');
+      deliveryRetryAfter=now+900000;await startTask('/api/sync',false);
     }
     scheduleDeliveryCheck();
   },delay);
@@ -675,15 +675,16 @@ function renderReservationDetails() {
     empty('A foglalás most nem számolható','Ellenőrizd a fenti üzenetet és az EVE-adatokat.'));
   if(a?.blueprint_usage?.length)target.innerHTML+=panel('Lefoglalt BPC-runok', 'Csak ennek a gyártási körnek a másolatai',table(['Blueprint','Item ID','Lefoglalt run'],a.blueprint_usage.map(u=>`<tr><td>${itemName(u.name)}</td><td>${u.item_id||'Kézi runkeret'}</td><td class="num">${fmt(u.runs)}</td></tr>`)));
 }
-async function startTask(path) {
+async function startTask(path,manual=true) {
   if(path==='/api/sync'&&corporationId)path='/api/corporations/sync';
   try {
     error('');
     if(Object.keys(dirty).length) throw new Error('A frissítés előtt alkalmazd a megadott módosításokat.');
-    await api(path,{}); await reloadState();
+    await api(path,{manual}); await reloadState();
+    if(!manual&&!state.task.running)return;
     if(['mining','skills','pi','corporations','moons','settings'].includes(view))render();
     if(!state.task.running) {
-      toast(state.task.message);
+      if(manual)toast(state.task.message);
       if(view==='settings'&&settingsTab==='access')void loadSettingsAccess();
       if(!['skills','pi','notifications','mining'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
       if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else if(view==='settings')render();else await calculate(false);}

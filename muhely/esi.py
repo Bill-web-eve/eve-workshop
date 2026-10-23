@@ -517,6 +517,7 @@ class EveConnection:
             self.sync_lock.release()
 
     def corporation_resource(self, corporation_id, kind, token):
+        if not self.store.corporation_monitored(corporation_id):raise EsiError('Ennek a corporationnek a figyelése ki van kapcsolva.')
         from .corporations import validate_resource
         old=self.store.corporation_snapshot(corporation_id,kind);now=time.time()
         progress.resource({'assets':'Corp-készlet','blueprints':'Corp-blueprintek','jobs':'Corp-jobok'}[kind],bool(old and old['expires']>now))
@@ -554,10 +555,12 @@ class EveConnection:
         try:
             groups={};names={};results=[]
             for char in progress.items(self.store.characters()):
+                if not self.store.corporation_monitored(char.get('corporation_id')):continue
                 try:
                     profile,_=self.http.request(f"{ESI}/characters/{char['id']}")
                     cid=positive_id(profile.get('corporation_id')) if isinstance(profile,dict) else None
                     if cid is None:raise EsiError('A karakter corporation tagsága nem ellenőrizhető.')
+                    if not self.store.corporation_monitored(cid):continue
                     if cid not in names:
                         details,_=self.http.request(f'{ESI}/corporations/{cid}')
                         if not isinstance(details,dict) or not isinstance(details.get('name'),str) or not details['name']:
@@ -570,6 +573,7 @@ class EveConnection:
                     if char.get('corporation_id'):self.store.corporation_error(char['corporation_id'],str(error))
                     results.append({'id':char['id'],'ok':False,'error':str(error)})
             for cid,chars in progress.items(groups.items(),name=lambda row:names[row[0]]):
+                if not self.store.corporation_monitored(cid):continue
                 success=False;failures=[]
                 for char in chars:
                     try:

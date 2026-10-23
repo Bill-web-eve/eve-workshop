@@ -174,6 +174,15 @@ class CorporationConnectionTests(unittest.TestCase):
         if path.endswith('/blueprints'):return [blueprint(9,self.bp)],headers
         if path.endswith('/industry/jobs'):return [job(1,self.bp,2)],headers
         raise AssertionError(url)
+    def test_disabled_corporation_is_never_requested_even_on_explicit_sync(self):
+        for cid in [1,2]:self.app.store.character_corporation(cid,A,'Alpha Corp')
+        self.app.store.set_corporation_monitoring(A,False)
+        self.http.request.side_effect=self.response
+        self.assertEqual(self.eve.sync_corporations(),[]);self.http.request.assert_not_called()
+        self.assertFalse(self.app.store.corporation(A)['monitoring_enabled'])
+        self.app.store.set_corporation_monitoring(A,True)
+        self.assertTrue(self.eve.sync_corporations()[0]['ok']);self.http.request.assert_called()
+
     def test_sync_pages_once_per_corporation_and_never_writes_personal_snapshots(self):
         self.http.request.side_effect=self.response;result=self.eve.sync_corporations()
         self.assertTrue(result[0]['ok']);self.assertEqual(len(result),1)

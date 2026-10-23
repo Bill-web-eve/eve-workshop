@@ -1,6 +1,23 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "A jelzés a jelenleg betöltött sorból számolt első megszakadásra vonatkozik, nem csak a legutolsó sorvégre. Hibás vagy 20 percnél régebbi adatból nem állítjuk, hogy a karakter biztosan nem tanul. A helyi állapot percenként újraszámolódik, automatikus ESI-lekérés legfeljebb 15 percenként indul; bezárt alkalmazás mellett nincs figyelés.": "The indicator uses the first interruption in the loaded queue, rather than only its final end. Failed data or data older than 20 minutes cannot confirm idle training. Local status is recalculated every minute; automatic ESI requests are at least 15 minutes apart. There is no monitoring while the app is closed.",
+  "Ennek a corporationnek a figyelése ki van kapcsolva.": "Monitoring is disabled for this corporation.",
+  "Figyelés": "Monitoring",
+  "Figyelés kikapcsolva": "Monitoring disabled",
+  "Corporationfigyelés bekapcsolva.": "Corporation monitoring enabled.",
+  "Corporationfigyelés kikapcsolva.": "Corporation monitoring disabled.",
+  "Hibás corporationfigyelési beállítás.": "Invalid corporation monitoring setting.",
+  "Várd meg a folyamatban lévő frissítést a figyelés módosítása előtt.": "Wait for the current refresh to finish before changing monitoring.",
+  "Kikapcsolt figyelésnél nem kérünk le corporationkészletet, blueprinteket, jobokat vagy corp holdidőzítőket. A korábbi helyi adatok megmaradnak. Az automatikus ESI-frissítések között legalább 15 perc telik el; a frissítés gomb kézi ellenőrzést indít.": "When monitoring is disabled, corporation inventory, blueprints, jobs and corporation moon timers are not requested. Previous local data is retained. Automatic ESI refreshes are at least 15 minutes apart; the refresh button starts a manual check.",
+  "Egyes forrásoknál a 15 perces automatikus frissítési időköz még nem telt le; a mentett adatok láthatók.": "Some sources are still within the 15-minute automatic refresh interval; saved data is shown.",
+  "EVE-adatok automatikus ellenőrzése 15 percenként": "Automatically check EVE data every 15 minutes",
+  "Intelértesítések: kikapcsolva": "Intel notifications: off",
+  "Intelértesítések: bekapcsolva": "Intel notifications: on",
+  "Intelértesítések beállítása mentve.": "Intel notification setting saved.",
+  "Az ESI-helyzeteket és pilótaazonosítókat automatikusan legfeljebb 15 percenként kérjük le. A helyi chatlog olvasása folyamatos marad; a kézi frissítés külön indítható.": "ESI locations and pilot IDs are requested automatically at most every 15 minutes. Local chat log monitoring continues; you can refresh manually.",
+  "Az automatikus árlekérés 15 perces időköze még nem telt le.": "The 15-minute automatic price refresh interval has not elapsed.",
+
   "Helyi gyár termelésétől függ": "Depends on local factory production",
   "Kitermelő bolygó": "Extraction planet",
   "Gyártó bolygó": "Factory planet",

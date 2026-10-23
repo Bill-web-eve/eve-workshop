@@ -32,7 +32,7 @@ def dashboard(store):
         members=[{**c,'access':store.resource_status(c['id'],'corporations')} for c in chars if c.get('corporation_id')==corp['id']]
         parts={k:store.corporation_snapshot(corp['id'],k) for k in ['assets','blueprints','jobs']}
         ready=bool(any(c['id']==corp['provider_id'] for c in members) and all(parts.values()) and not corp['error'])
-        rows.append({**corp,'members':members,'ready':ready,
+        rows.append({**corp,'monitoring_enabled':bool(corp['monitoring_enabled']),'members':members,'ready':ready,
                      'stale':bool(ready and min(p['expires'] for p in parts.values())<=time.time()),
                      'data_times':{k:(p or {}).get('fetched') for k,p in parts.items()},
                      'asset_count':len(parts['assets']['data']) if parts['assets'] else None,

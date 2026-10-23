@@ -34,6 +34,20 @@ class ExtractionTests(unittest.TestCase):
                  f'<a href="showinfo:5//{self.sid}">RP2-OQ</a> will complete at this time. '
                  'The moon chunk will be available for fracturing after this time into a minable asteroid field.',**updates)
 
+    def test_disabled_corporation_skips_timer_calls_but_keeps_personal_calendar(self):
+        self.s.character_corporation(1,98,'Disabled Corp');self.s.set_corporation_monitoring(98,False)
+        eve=EveConnection(self.s,vault=Mock(),transport=Mock());eve.token=Mock(return_value='test')
+        def response(url,**kw):
+            if url.endswith('/notifications'):return [],{}
+            if url.endswith('/calendar'):return [],{}
+            raise AssertionError('Disabled corporation must not be requested: '+url)
+        eve.http.request.side_effect=response
+        results=sync(eve)
+        timer=next(r for r in results if r['kind']=='timers')
+        self.assertTrue(timer['skipped']);self.assertEqual(timer['reason'],'monitoring_disabled')
+        self.assertEqual(len(eve.http.request.call_args_list),2)
+        self.assertTrue(next(r for r in results if r['kind']=='calendar')['ok'])
+
     def test_standard_truncated_calendar_title_matches_moon_id_without_timer_or_ore_scan(self):
         self.s.save_snapshots(1,{'moon_calendar':snap([self.calendar_completion()])},domain='moon_calendar')
         result=report(self.s,self.c,self.now)

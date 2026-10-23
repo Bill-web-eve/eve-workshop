@@ -56,8 +56,8 @@ async function loadJita(refresh=false){
   try{
     const data=await request;Object.assign(jitaData.quotes,data.quotes);jitaData={...data,quotes:jitaData.quotes};
     const now=Date.now()/1000;
-    const needed=ids.filter(id=>{const q=data.quotes[id];return (!q||q.stale)&&(data.retry_after[id]||0)<=now&&(refresh||(jitaAttempted.get(id)||0)<=now);});
-    if(needed.length){needed.forEach(id=>jitaAttempted.set(id,now+60));const started=await api('/api/prices/refresh',{ids:needed});Object.assign(jitaData.quotes,started.quotes);jitaData={...started,quotes:jitaData.quotes};}
+    const needed=ids.filter(id=>{const q=data.quotes[id];return (refresh||!q||q.stale)&&(data.retry_after[id]||0)<=now&&(refresh||(jitaAttempted.get(id)||0)<=now);});
+    if(needed.length){needed.forEach(id=>jitaAttempted.set(id,now+900));const started=await api('/api/prices/refresh',{ids:needed,manual:refresh});Object.assign(jitaData.quotes,started.quotes);jitaData={...started,quotes:jitaData.quotes};}
     restart=jitaData.running;
   }catch(e){jitaData.fetch_error=true;}
   finally{jitaRequest=null;applyJita();clearTimeout(jitaTimer);if(key!==jitaWanted.join(','))void loadJita();else if(restart)jitaTimer=setTimeout(()=>void loadJita(),1200);}

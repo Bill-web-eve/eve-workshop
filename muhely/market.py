@@ -9,6 +9,8 @@ import time
 from .esi import ESI, EsiError, Transport
 from .planner import PlanningError, integer
 
+from .refresh_policy import RefreshPolicy,AUTO_SECONDS
+
 REGION=10000002
 STATION=60003760
 CACHE_SECONDS=300
@@ -54,12 +56,20 @@ def best_quotes(orders):
 class Market:
     def __init__(self,store,http=None,clock=None):
         self.store=store;self.http=http or Transport();self.clock=clock or time.time
-        self.lock=threading.RLock();self.pending=set();self.running=False
+        self.refresh_policy=RefreshPolicy(store)
+        self.lock=threading.RLock();self.pending=set();self.manual_pending=set();self.running=False
         self.total=0;self.done=0;self.errors={};self.retry_after={};self.current=None;self.page=None;self.pages=None
 
-    def quote(self,tid):
+    def quote(self,tid,manual=False):
         old=self.store.market_quote(tid);now=self.clock()
-        if old and old.get('next_check',old['expires'])>now:return old
+        if old and (old['expires'] if manual else old.get('next_check',old['expires']))>now:return old
+        if not self.refresh_policy.claim(['market:'+str(tid)],manual,now):
+            if old:return old
+            raise EsiError('Az automatikus árlekérés 15 perces időköze még nem telt le.')
+        try:return self._fetch_quote(tid,old,now)
+        finally:self.refresh_policy.claim(['market:'+str(tid)],manual=True,now=self.clock())
+
+    def _fetch_quote(self,tid,old,now):
         pages=[];count=1;page=1
         while page<=count:
             with self.lock:self.page=page;self.pages=count if page>1 else None
@@ -82,7 +92,7 @@ class Market:
         buys=[Decimal(p['quotes']['buy']) for p in pages if p['quotes']['buy'] is not None]
         sells=[Decimal(p['quotes']['sell']) for p in pages if p['quotes']['sell'] is not None]
         result={'id':tid,'buy':format(max(buys),'f') if buys else None,'sell':format(min(sells),'f') if sells else None,
-                'checked':now,'expires':min(p['expires'] for p in pages),'next_check':now+CACHE_SECONDS,'pages':pages}
+                'checked':now,'expires':min(p['expires'] for p in pages),'next_check':now+AUTO_SECONDS,'pages':pages}
         # Failed pages never replace a previously complete quote.
         self.store.save_market_quote(tid,result)
         return result
@@ -100,14 +110,15 @@ class Market:
                     'retry_after':{str(k):v for k,v in self.retry_after.items() if k in ids},
                     'station_id':STATION,'region_id':REGION}
 
-    def start(self,ids):
+    def start(self,ids,manual=False):
         with self.lock:
             now=self.clock();needed=[]
             for tid in ids:
                 old=self.store.market_quote(tid)
-                if (not old or old.get('next_check',old['expires'])<=now) and self.retry_after.get(tid,0)<=now and tid not in self.pending:needed.append(tid)
+                if (not old or (old['expires'] if manual else old.get('next_check',old['expires']))<=now) and (manual or self.retry_after.get(tid,0)<=now) and tid not in self.pending:needed.append(tid)
             if not needed:return
             if not self.running:self.total=0;self.done=0;self.errors={}
+            if manual:self.manual_pending.update(needed)
             self.pending.update(needed);self.total+=len(needed)
             if self.running:return
             self.running=True
@@ -119,11 +130,11 @@ class Market:
                 if not self.pending:self.running=False;self.current=None;self.page=None;self.pages=None;return
                 tid=min(self.pending);self.current=tid;self.page=None;self.pages=None
             try:
-                self.quote(tid)
+                self.quote(tid,manual=tid in self.manual_pending)
                 with self.lock:self.errors.pop(tid,None);self.retry_after.pop(tid,None)
             except Exception as exc:
                 with self.lock:
                     self.errors[tid]=str(exc) if isinstance(exc,EsiError) else 'A Jita-ár nem frissült.'
-                    self.retry_after[tid]=max(self.clock()+60,getattr(self.http,'blocked_until',0))
+                    self.retry_after[tid]=max(self.clock()+AUTO_SECONDS,getattr(self.http,'blocked_until',0))
             finally:
-                with self.lock:self.pending.discard(tid);self.done+=1
+                with self.lock:self.pending.discard(tid);self.manual_pending.discard(tid);self.done+=1

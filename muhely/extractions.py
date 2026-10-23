@@ -30,7 +30,7 @@ def refresh_failure(eve,cid,kind,error,role_denied=False):
 
 def refresh_summary(results,characters):
     names={c['id']:c['name'] for c in characters}
-    counts={kind:sum(r['ok'] and r['kind']==kind for r in results) for kind in ['calendar','notifications','timers']}
+    counts={kind:sum(r['ok'] and not r.get('skipped') and r['kind']==kind for r in results) for kind in ['calendar','notifications','timers']}
     parts=[f"Holdadatok: naptár {counts['calendar']}, értesítések {counts['notifications']}, corporation-időzítők {counts['timers']} sikeres olvasó."]
     skipped={r['id'] for r in results if r.get('reason')=='missing_scope' and not r.get('warning',True)}
     if skipped:parts.append(f'Kihagyott holdadatforrások: {len(skipped)} karakter még nem engedélyezte.')
@@ -154,6 +154,9 @@ def sync(eve):
                 sync_calendar(eve,cid);results.append({'id':cid,'kind':'calendar','ok':True})
             except EsiError as error:
                 results.append(refresh_failure(eve,cid,'calendar',error))
+            if not eve.store.corporation_monitored(char.get('corporation_id')):
+                results.append({'id':cid,'kind':'timers','ok':True,'skipped':True,'reason':'monitoring_disabled'})
+                continue
             timer_request=False
             try:
                 progress.resource('Corporation holdidőzítői')
@@ -161,6 +164,9 @@ def sync(eve):
                 profile,_=eve.http.request(f'{ESI}/characters/{cid}')
                 corp=profile.get('corporation_id') if isinstance(profile,dict) else None
                 if not positive(corp):raise EsiError('A karakter corporation tagsága nem ellenőrizhető.')
+                if not eve.store.corporation_monitored(corp):
+                    results.append({'id':cid,'kind':'timers','ok':True,'skipped':True,'reason':'monitoring_disabled'})
+                    continue
                 if corp in done:
                     snap=done[corp]
                 else:
@@ -290,6 +296,7 @@ def report(store,catalog,now=None,access_scopes=None):
             if not snap or kind=='moon_notifications':continue
             if kind=='moon_timers':
                 corp=snap['data']['corporation_id']
+                if not store.corporation_monitored(corp):continue
                 if corp not in corp_snapshots or snap['fetched']>corp_snapshots[corp][0]['fetched'] or snap['fetched']==corp_snapshots[corp][0]['fetched'] and not entry[kind]['stale']:
                     corp_snapshots[corp]=(snap,entry[kind]['stale'])
             else:

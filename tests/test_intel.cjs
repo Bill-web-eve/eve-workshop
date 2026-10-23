@@ -8,9 +8,9 @@ async function fixture(mode=null){
  const position={id:1,name:'Own Pilot',system_id:300001,system_name:'J5A-IX',source:'manual',alertable:true};
  const intel={preferences:prefs,manual_system_names:{'1':'J5A-IX'},status:{checked:1800000000,files:1,done:1},characters:[position],center:300001,universe_build:1,regions:[[10,'Test Region']],nodes:[{id:300001,name:'J5A-IX',x:0,y:0,state:'contact',characters:['Own Pilot'],pilots:['Reported Pilot'],distance:0,in_range:true,contacts:[{timestamp:1800000000,pilots:[{id:359618261,name:'Reported Pilot'}],ships:[{name:'Buzzard',type_id:11192}]}]}],edges:[],alerts:[],reports:[{id:'report',timestamp:1800000000,channel:'Test Intel',systems:[300001],system_names:['J5A-IX'],pilots:[{name:'Reported Pilot',verified:false}],state:'contact',reporter:'Reporter',message:'J5A-IX Reported Pilot <script>fake</script>',historical:true}]};
  const state={csrf:'test',version:'1.0.0',characters:[{id:1,name:'Own Pilot'}],corporations:[],production_characters:[],plans:[],jobs:[],settings:{source:'manual'},task:{running:false},sde:{buildNumber:1},recipe_count:1};
- const notifications={items:[],counts:{data:0},task:{running:false},corporations:[],moons:[],preferences:{os_enabled:false,categories:{intel:true}}};
+ const notifications={items:[],counts:{data:0},task:{running:false},corporations:[],moons:[],preferences:{os_enabled:false,categories:{intel:true,jobs:true,skills:true,pi:true,moons:true}}};
  w.localStorage.setItem('eve-muhely-language','en');w.confirm=()=>true;w.Date.now=()=>1800000000000;
- w.fetch=async (url,opts)=>{calls.push(url);const value=url==='/api/state'?state:url==='/api/notifications'?notifications:url==='/api/intel/alerts'?{enabled:true,items:intel.alerts}:url==='/api/intel/preferences'?Object.assign(prefs,JSON.parse(opts.body)):url.startsWith('/api/intel?')?intel:url.startsWith('/api/intel/channels?')?{channels:['Test Intel','Other Intel']}:url.startsWith('/api/intel/systems?')?[{id:300002,name:'L-A5XP',region:'Test Region'}]:url==='/api/intel/claim'?{items:intel.alerts}:null;if(value===null)throw Error('Unexpected '+url);return {ok:true,json:async()=>value};};
+ w.fetch=async (url,opts)=>{calls.push(url);const value=url==='/api/state'?state:url==='/api/notifications'?notifications:url==='/api/notifications/preferences'?(intel.notifications_enabled=JSON.parse(opts.body).categories.intel,Object.assign(notifications.preferences.categories,JSON.parse(opts.body).categories),notifications.preferences):url==='/api/intel/alerts'?{enabled:true,items:intel.alerts}:url==='/api/intel/preferences'?Object.assign(prefs,JSON.parse(opts.body)):url.startsWith('/api/intel?')?intel:url.startsWith('/api/intel/channels?')?{channels:['Test Intel','Other Intel']}:url.startsWith('/api/intel/systems?')?[{id:300002,name:'L-A5XP',region:'Test Region'}]:url==='/api/intel/claim'?{items:intel.alerts}:null;if(value===null)throw Error('Unexpected '+url);return {ok:true,json:async()=>value};};
  for(const tag of d.querySelectorAll('script[src]'))run(fs.readFileSync(path.join(root,tag.getAttribute('src')),'utf8'));
  await tick();await tick();run('error("Old production error");navigate("intel")');await tick();await tick();return {w,d,run,calls,intel,notifications};
 }
@@ -103,11 +103,25 @@ test('intel overlay receives fresh report details independently of OS notificati
  const {w,run,intel,notifications,calls}=await fixture();t.after(()=>w.close());const sent=[];
  w.EveDesktop.active=true;w.EveDesktop.syncIntelOverlay=async data=>sent.push(data);notifications.preferences.os_enabled=false;
  intel.alerts=[{system_id:300001,system_name:'J5A-IX',character_name:'Own Pilot',jumps:2,overlay_reports:[{id:'new-report',when:1800000000,pilots:['Reported Pilot'],ships:['Buzzard']}]}];
- const original=w.fetch;w.fetch=async(url,options)=>url==='/api/intel/alerts'?{ok:true,json:async()=>({enabled:true,overlay:{enabled:true,seconds:75},items:intel.alerts})}:original(url,options);
+ const original=w.fetch;w.fetch=async(url,options)=>url==='/api/notifications/preferences'?(intel.notifications_enabled=JSON.parse(opts.body).categories.intel,Object.assign(notifications.preferences.categories,JSON.parse(opts.body).categories),notifications.preferences):url==='/api/intel/alerts'?{ok:true,json:async()=>({enabled:true,overlay:{enabled:true,seconds:75},items:intel.alerts})}:original(url,options);
  await run('pollIntelAlerts()');assert.equal(sent.length,1);assert.equal(sent[0].seconds,75);assert.equal(sent[0].items[0].system,'J5A-IX');assert.equal(sent[0].items[0].pilots,'Reported Pilot');assert.equal(sent[0].items[0].ships,'Buzzard');assert(!calls.includes('/api/intel/claim'));
 });
 test('overlay settings expose monitor selection, exact seconds and explicit move/lock controls',async t=>{
  const {w,d,run}=await fixture();t.after(()=>w.close());w.EveDesktop.active=true;
  w.EveDesktop.intelOverlayStatus=async()=>({screens:[{id:'1',name:'Test monitor',width:1920,height:1080,placement:{x:20,y:40,width:330}}],screen_id:'1',placement:{x:20,y:40,width:330},editing:false});
  run('openSettingsTab("intel")');await tick();await tick();const form=d.querySelector('#intel-overlay-form');assert(form);assert.equal(form.elements.overlay_seconds.value,'60');assert.equal(form.elements.screen_id.value,'1');assert(d.querySelector('#intel-overlay-move'));assert(d.querySelector('#intel-overlay-lock'));assert(!/[áéíóöőúüű]/i.test(d.querySelector('#intel-overlay-settings').textContent));
+});
+
+test('intel notification toggle changes only intel and keeps the map and chat enabled',async t=>{
+ const {w,d,calls,intel,notifications}=await fixture();t.after(()=>w.close());
+ const button=d.querySelector('#intel-notifications');assert.equal(button.getAttribute('aria-pressed'),'true');
+ button.click();await tick();await tick();await tick();
+ assert.equal(d.querySelector('#intel-notifications').getAttribute('aria-pressed'),'false');
+ assert.equal(d.querySelector('#intel-notifications').textContent,'Intel notifications: off');
+ assert.equal(intel.preferences.enabled,true);assert.equal(intel.preferences.channels[0],'Test Intel');
+ assert.equal(notifications.preferences.categories.intel,false);
+ for(const key of ['jobs','skills','pi','moons'])assert.equal(notifications.preferences.categories[key],true);
+ assert(d.querySelector('#intel-map'));assert(calls.includes('/api/notifications/preferences'));
+ d.querySelector('#intel-notifications').click();await tick();await tick();await tick();
+ assert.equal(notifications.preferences.categories.intel,true);
 });

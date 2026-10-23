@@ -166,10 +166,11 @@ def active_state(reports,now,ttl,owned=()):
 
 
 def collect_alerts(store,universe=None,now=None):
+    from .notifications import preferences as notification_preferences
     now=time.time() if now is None else now;p=preferences(store);universe=universe or intel_universe.load(store)
     with store.db() as db:row=db.execute('SELECT data FROM intel_status WHERE id=1').fetchone()
     status=json.loads(row['data']) if row else {}
-    if not p['enabled'] or status.get('error') or now-(status.get('checked') or 0)>10:return {'items':[],'observed_domains':[],'enabled':p['enabled'],'overlay':{'enabled':p['overlay_enabled'],'seconds':p['overlay_seconds']}}
+    if not p['enabled'] or status.get('error') or now-(status.get('checked') or 0)>10:return {'items':[],'observed_domains':[],'enabled':p['enabled'],'notifications_enabled':notification_preferences(store)['categories']['intel'],'overlay':{'enabled':p['overlay_enabled'],'seconds':p['overlay_seconds']}}
     pos=positions(store,universe,p,now);reports=read_reports(store,p,now);owned={c['name'].casefold() for c in store.characters()}
     active,cleared=active_state(reports,now,p['ttl_minutes']*60,owned);items=[];domains=[]
     by_system=defaultdict(list)
@@ -187,11 +188,14 @@ def collect_alerts(store,universe=None,now=None):
             items[-1]['episode_key']=str(int(cleared.get(sid,0)))
             items[-1]['system_name']=name
             items[-1]['overlay_reports']=[{'id':r['id'],'when':r['timestamp'],'pilots':[pilot['name'] for pilot in r['pilots']],'ships':[ship['name'] for ship in r.get('ships',[])]} for r in rows]
-    return {'items':items,'observed_domains':domains,'enabled':p['enabled'],'overlay':{'enabled':p['overlay_enabled'],'seconds':p['overlay_seconds']}}
+    return {'items':items,'observed_domains':domains,'enabled':p['enabled'],'notifications_enabled':notification_preferences(store)['categories']['intel'],'overlay':{'enabled':p['overlay_enabled'],'seconds':p['overlay_seconds']}}
 
+
+from .refresh_policy import RefreshPolicy,AUTO_SECONDS
 
 class IntelMonitor:
     def __init__(self,store,catalog,eve,universe=None):
+        self.refresh_policy=RefreshPolicy(store)
         self.store=store;self.catalog=catalog;self.eve=eve;self.universe=universe or intel_universe.load(store)
         if catalog and isinstance(getattr(catalog,'types',None),dict):
             self.universe.ship_types.update({t['name'].casefold():t['id'] for t in catalog.types.values() if t['name'].casefold() in self.universe.ship_names})
@@ -215,14 +219,16 @@ class IntelMonitor:
         else:self.stop(permanent=False)
         return p
     def request_locations(self):
-        self.refresh_event.set();self._start_locations(preferences(self.store))
-    def request_characters(self):
+        self.refresh_event.set();self._start_locations(preferences(self.store),manual=True)
+    def request_characters(self,manual=False):
         with self.lock:
             if self.names_thread and self.names_thread.is_alive() or self.closed or time.time()<self.status.get('names_retry_at',0):return
+            if not self.refresh_policy.claim(['intel-names'],manual):return
             self.status['resolving_characters']=True;self.status['names_done']=0;self.status['names_total']=0
             def work():
                 try:self.resolve_characters()
                 finally:
+                    self.refresh_policy.claim(['intel-names'],manual=True)
                     with self.lock:self.status['resolving_characters']=False
             self.names_thread=threading.Thread(target=work,daemon=True,name='EVE-intel-names');self.names_thread.start()
     def resolve_characters(self,now=None):
@@ -249,13 +255,15 @@ class IntelMonitor:
             except EsiError:
                 with self.lock:self.status.update(names_error='A pilótaazonosítók most nem ellenőrizhetők.',names_retry_at=now+60)
                 return
-    def _start_locations(self,p):
+    def _start_locations(self,p,manual=False):
         with self.lock:
             if self.location_thread and self.location_thread.is_alive():return
+            if not self.refresh_policy.claim(['intel-locations'],manual):return
             self.status['location_refreshing']=True
         def work():
             try:self.refresh_locations(p)
             finally:
+                self.refresh_policy.claim(['intel-locations'],manual=True)
                 with self.lock:self.status['location_refreshing']=False;self.status['location_character']=None
         self.location_thread=threading.Thread(target=work,daemon=True,name='EVE-intel-location');self.location_thread.start()
 
@@ -268,9 +276,9 @@ class IntelMonitor:
                 p=preferences(self.store)
                 if not p['enabled']:break
                 self.scan(p)
-                if time.time()-self.last_names>=30 or self.status['new_messages']:
+                if time.time()-self.last_names>=AUTO_SECONDS or self.status['new_messages']:
                     self.last_names=time.time();self.request_characters()
-                if time.time()-self.last_locations>=15 or self.refresh_event.is_set():
+                if time.time()-self.last_locations>=AUTO_SECONDS or self.refresh_event.is_set():
                     self.refresh_event.clear();self.last_locations=time.time();self._start_locations(p)
             except Exception as error:
                 with self.lock:self.status.update(error=str(error) if isinstance(error,(PlanningError,EsiError)) else 'Az intelolvasás nem sikerült. Ellenőrizd a mappa hozzáférését.',checked=time.time(),scanning=False)
@@ -403,5 +411,5 @@ class IntelMonitor:
         for report in reports:report['system_names']=[universe.systems[sid]['name'] for sid in report['systems']]
         manual_names={cid:universe.systems[sid]['name'] for cid,sid in p['manual_locations'].items() if sid in universe.systems}
         with self.lock:status=dict(self.status)
-        alerts=collect_alerts(self.store,universe,now)['items']
-        return {'preferences':p,'manual_system_names':manual_names,'status':status,'characters':pos,'reference':reference,'region_id':region,'region_name':regions.get(region),'center':center,'nodes':nodes,'edges':[[a,b] for a,b in universe.edges if a in ids and b in ids],'reports':reports[:500],'alerts':alerts,'clipped':clipped,'universe_build':universe.build,'regions':sorted(regions.items(),key=lambda r:r[1]),'calculated_at':now}
+        alert_data=collect_alerts(self.store,universe,now);alerts=alert_data['items']
+        return {'preferences':p,'notifications_enabled':alert_data['notifications_enabled'],'manual_system_names':manual_names,'status':status,'characters':pos,'reference':reference,'region_id':region,'region_name':regions.get(region),'center':center,'nodes':nodes,'edges':[[a,b] for a,b in universe.edges if a in ids and b in ids],'reports':reports[:500],'alerts':alerts,'clipped':clipped,'universe_build':universe.build,'regions':sorted(regions.items(),key=lambda r:r[1]),'calculated_at':now}

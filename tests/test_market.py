@@ -26,15 +26,34 @@ class MarketTests(unittest.TestCase):
         self.assertNotIn('token',self.http.request.call_args.kwargs)
     def test_304_refresh_reuses_page_quotes_and_etag(self):
         self.http.request.return_value=([order(11,True),order(12)],{'ETag':'abc'})
-        self.market.quote(35);self.now=1301;self.http.request.return_value=(None,{'ETag':'abc'})
-        q=self.market.quote(35);self.assertEqual(q['buy'],'11');self.assertEqual(q['checked'],1301)
+        self.market.quote(35);self.now=1901;self.http.request.return_value=(None,{'ETag':'abc'})
+        q=self.market.quote(35);self.assertEqual(q['buy'],'11');self.assertEqual(q['checked'],1901)
         self.assertEqual(self.http.request.call_args.kwargs['headers'],{'If-None-Match':'abc'})
     def test_partial_failure_does_not_replace_last_complete_snapshot(self):
         self.http.request.return_value=([order(11,True),order(12)],{})
-        old=self.market.quote(35);self.now=1301
+        old=self.market.quote(35);self.now=1901
         self.http.request.side_effect=[([order(15,True)],{'X-Pages':'2'}),EsiError('offline')]
         with self.assertRaises(EsiError):self.market.quote(35)
         self.assertEqual(self.store.market_quote(35),old);self.assertTrue(self.market.snapshot([35])['quotes']['35']['stale'])
+    def test_manual_quote_bypasses_only_application_interval_and_resets_automatic_timer(self):
+        self.http.request.return_value=([order(11,True),order(12)],{})
+        self.market.quote(35);self.now=1100
+        self.market.quote(35,manual=True);self.assertEqual(self.http.request.call_count,1)
+        self.now=1301;self.market.quote(35);self.assertEqual(self.http.request.call_count,1)
+        self.market.quote(35,manual=True);self.assertEqual(self.http.request.call_count,2)
+        self.now=2100
+        other=Market(self.store,self.http,lambda:self.now);other.quote(35)
+        self.assertEqual(self.http.request.call_count,2)
+        self.now=2201;other.quote(35);self.assertEqual(self.http.request.call_count,3)
+
+    def test_cached_reads_cannot_extend_the_next_automatic_quote_deadline(self):
+        self.http.request.return_value=([order(11,True),order(12)],{})
+        self.market.quote(35)
+        for now in [1301,1400,1500,1800]:
+            self.now=now;self.market.quote(35)
+        self.assertEqual(self.market.refresh_policy.next_at(['market:35']),1900)
+        self.now=1900;self.market.quote(35);self.assertEqual(self.http.request.call_count,2)
+
     def test_snapshot_missing_is_not_a_fake_zero_price(self):
         data=self.market.snapshot([35]);self.assertEqual(data['quotes'],{})
     def test_background_failures_retain_quotes_and_limit_retry(self):

@@ -21,7 +21,7 @@ async function refreshSkills(auto=false){
     if(view==='skills')render();
   }catch(e){if(view==='skills'){error(e.message);$('#view-content').innerHTML=empty('A skilladatok nem olvashatók','Próbáld újra a Skilladatok frissítése gombbal.');}}
   finally{skillRequest=null;}
-  if(shouldSync&&view==='skills')void startTask('/api/skills/sync');
+  if(shouldSync&&view==='skills')void startTask('/api/skills/sync',false);
 }
 function renderSkills(content){
   setHead('MINDEN KARAKTER','Skillek és tanulási sor','Minden hozzáadott karakter, a gyártási karakter- és helyszűréstől függetlenül. Figyelmeztetés: nem tanul, vagy 120 órán belül megszakad a tanulás.');
@@ -38,14 +38,14 @@ function renderSkills(content){
   if(chars.some(c=>c.needs_auth))content.innerHTML+=settingsShortcut('Az engedélyezést a Beállítások → Adathozzáférések oldalon végezheted el.');
   const rows=chars.map(c=>`<tr class="skill-character skill-state-${c.status}"><td data-filter-value="${esc(c.name)}"><button class="text-button skill-character-name" data-skill-character="${c.id}" aria-label="${esc(c.name)} – Skillek és tanulási sor">${esc(c.name)}</button><div class="batch-note">${c.id}</div></td><td>${label(c)}${c.account_name?`<div data-i18n-skip>${esc(c.account_name)}</div>`:''}${c.training_reason?`<div>${esc(c.training_reason)}</div>`:''}${c.error?`<div class="skill-error">${esc(c.error)}</div>`:''}</td><td>${c.current?`${itemName(c.current.name)} ${skillLevel(c.current.level)}<div class="batch-note">Befejezés: ${esc(skillDate(c.current.finish))}</div>`:'–'}</td><td data-sort-value="${c.stops_at??''}">${c.stops_at?`${esc(skillDate(c.stops_at))}<div class="batch-note">${esc(skillDuration(c.seconds_left))}${c.gap?' · megszakadás':''}</div>`:c.status==='idle'?'Most nem tanul':'–'}${c.status==='unknown'&&c.stops_at?'<div class="batch-note">Korábbi sor alapján</div>':''}</td><td class="num">${c.queue_as_of==null?'–':fmt(c.queue_count)}</td><td class="num">${c.total_sp==null?'–':fmt(c.total_sp)}<div class="batch-note">SP</div></td><td><button class="button compact" data-skill-character="${c.id}" aria-label="${esc(c.name)} – Részletek">Részletek</button><div class="batch-note">Adat: ${esc(skillDate(c.queue_as_of))}</div></td></tr>`);
   content.innerHTML+=panel('Karakterek tanulási állapota','Piros: nem tanul · Sárga: 5 napon belül leáll · Szürke: nem ellenőrizhető',table(['Karakter','Állapot','Aktuális tanulás','Folyamatos tanulás vége','Sorban','Skillpont','Művelet'],rows,'skill-overview'));
-  content.innerHTML+='<p class="footnote">A jelzés a jelenleg betöltött sorból számolt első megszakadásra vonatkozik, nem csak a legutolsó sorvégre. Lejárt vagy hibás adatból nem állítjuk, hogy a karakter biztosan nem tanul. Az 5 percnél régebben ellenőrzött adatok elavultnak számítanak. Nyitott, előtérben lévő nézetnél percenként frissítjük az engedélyezett karakterek adatait; bezárt alkalmazás mellett nincs figyelés.</p><div id="skill-detail"></div>';
+  content.innerHTML+='<p class="footnote">A jelzés a jelenleg betöltött sorból számolt első megszakadásra vonatkozik, nem csak a legutolsó sorvégre. Hibás vagy 20 percnél régebbi adatból nem állítjuk, hogy a karakter biztosan nem tanul. A helyi állapot percenként újraszámolódik, automatikus ESI-lekérés legfeljebb 15 percenként indul; bezárt alkalmazás mellett nincs figyelés.</p><div id="skill-detail"></div>';
   $$('[data-skill-character]').forEach(el=>el.onclick=()=>{skillSelectedId=Number(el.dataset.skillCharacter);skillFilter='';renderSkillDetail();$('#skill-detail').scrollIntoView({block:'start',behavior:'smooth'});});
 
   renderSkillDetail();
   clearTimeout(skillTimer);
   skillTimer=setTimeout(()=>{
     if(view!=='skills')return;
-    if(!document.hidden&&!state.task.running&&skillData.characters.some(c=>!c.needs_auth))void startTask('/api/skills/sync');
+    if(!document.hidden&&!state.task.running&&skillData.characters.some(c=>!c.needs_auth))void startTask('/api/skills/sync',false);
     else void refreshSkills();
   },60000);
 }

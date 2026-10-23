@@ -40,7 +40,7 @@ async function refreshPI(auto=false){
     if(view==='pi')render();
   }catch(e){if(view==='pi'&&generation===piGeneration){error(e.message);$('#view-content').innerHTML=empty('A PI-adatok most nem olvashatók','Indíts PI-frissítést a fenti gombbal.');}}
   finally{if(generation===piGeneration){piRequest=null;piRequestHours=null;}}
-  if(shouldSync&&view==='pi')void startTask('/api/pi/sync');
+  if(shouldSync&&view==='pi')void startTask('/api/pi/sync',false);
 }
 function renderPI(content){
   setHead('PLANETARY INDUSTRY','Bolygók és PI','Karakterenkénti bolygónyilvántartás, kitermelőprogramok és a gyárak útvonalon elérhető alapanyag-ellátása.');
@@ -69,7 +69,7 @@ function renderPI(content){
   piTimer=setTimeout(()=>{
     if(view!=='pi')return;
     const due=piData.characters.some(c=>!c.needs_auth&&(!c.expires||c.expires<=Date.now()/1000));
-    if(!document.hidden&&!state.task.running&&due)void startTask('/api/pi/sync');else void refreshPI();
+    if(!document.hidden&&!state.task.running&&due)void startTask('/api/pi/sync',false);else void refreshPI();
   },60000);
 }
 function renderPIDetail(){

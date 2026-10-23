@@ -143,11 +143,11 @@ macOS may request Keychain access when encrypted authorization is saved. You can
 - **Red:** the character is not training, or the queue is empty or paused, when it has an available training place.
 - **Amber:** continuous training will stop within five days. A gap inside the queue counts even if its last entry ends much later.
 - **Green:** training is active and the loaded queue continues for more than five days.
-- **Grey:** permission or data is missing, refresh failed, or the last verification is older than five minutes. Unknown data is not treated as proof of idle training.
+- **Grey:** permission or data is missing, refresh failed, or the last verification is older than 20 minutes. Unknown data is not treated as proof of idle training.
 
 Enable **esi-skills.read_skills.v1** and **esi-skills.read_skillqueue.v1** in your Developer application, then authorize skills for each character under **Settings → Data access**. Keep the same Client ID and callback. Selecting a different character during a permission expansion does not overwrite the existing character's authorization.
 
-**Refresh skills** refreshes just skills; **Refresh EVE data** also checks them after industry data. A failed skill request does not invalidate industry inventory. An open, foreground skill view checks authorized data every minute while respecting EVE cache expiry. There is no monitoring or external notification while the app is stopped.
+**Refresh skills** refreshes just skills; **Refresh EVE data** also checks them after industry data. A failed skill request does not invalidate industry inventory. The foreground skill view recalculates local status every minute, but automatic ESI requests are at least 15 minutes apart. Manual refresh bypasses this application interval while respecting EVE cache expiry. There is no monitoring or external notification while the app is stopped.
 
 EVE can retain already completed queue entries until the character logs into the game. Known completed levels are included in trained levels and known SP. Active levels are displayed separately from EVE skill data because subscription restrictions or Expert Systems can make them differ. Enable **Show completed entries** to inspect retained completions.
 
@@ -443,7 +443,7 @@ The **Personal** tab contains personal jobs, character training and PI colonies.
 
 Jobs reported ready by EVE are distinguished from jobs expected to have finished based on their end time. Snapshot-based PI stop forecasts are marked as estimates. An alert does not deliver jobs, start production or change inventory.
 
-Under **Settings → Notifications**, choose **Authorize system notifications**, then approve the macOS permission prompt. Use **Test notification** to check display. Configure personal/corporation and category switches, change the moon look-ahead from 1 to 30 days, and enable automatic EVE checks every four minutes. EVE cache expiry is respected. **Check EVE data** also starts a manual refresh.
+Under **Settings → Notifications**, choose **Authorize system notifications**, then approve the macOS permission prompt. Use **Test notification** to check display. Configure personal/corporation and category switches, change the moon look-ahead from 1 to 30 days, and enable automatic EVE checks every 15 minutes. EVE cache expiry is respected. **Check EVE data** also starts a manual refresh.
 
 Moon ownership is inferred from ESI corporation timers. Unknown ownership stays in Personal with a label. In **Moon notification ownership**, choose automatic, personal or a specific corporation. This changes alert classification only.
 
@@ -501,7 +501,7 @@ Open **Intel map** in the sidebar; no production plan is required. The app check
 5. Alternatively, select a **Manual reference system** from the type-ahead search. This pins a reference; it does not follow movement. Clear it to resume automatic positioning.
 6. Save. For OS alerts, enable **Personal alerts**, **Nearby intel** and system notifications in **Settings → Notifications** and grant macOS permission. Intel notifications have an optional sound.
 
-Reliable ESI positioning requires both a fresh location and an online character. Failed, expired or offline ESI data cannot establish current proximity. Your character's Local system-change log supplies a last known location. **Also alert using a fresh Local log location** explicitly enables this less certain fallback; data must be no older than five minutes and does not prove online status. The location source and its time are shown.
+Reliable ESI positioning requires both a fresh location and an online character. Failed, expired or offline ESI data cannot establish current proximity. Your character's Local system-change log supplies a last known location. **Also alert using a fresh Local log location** explicitly enables this less certain fallback; data must be no older than 20 minutes and does not prove online status. The location source and its time are shown.
 
 ## Intel message interpretation and clear
 
@@ -554,3 +554,11 @@ The default display duration is **60 seconds**, editable as whole seconds from 1
 When empty the panel is hidden completely. In normal use it has no title bar, does not take keyboard focus and allows mouse clicks through to the underlying app. It floats above ordinary and full-screen applications; macOS system/security interfaces can take precedence.
 
 Select a **Monitor**, **X**, **Y** and **Width**, then **Save overlay**. Coordinates are measured from that monitor’s top-left corner in screen points. Each monitor remembers its own placement. **Move overlay** displays a draggable placeholder, even without reports. Drag it onto the desired monitor and click its **Done** button. **Finish positioning · reload position** locks the panel and reads its current position back into Settings. When a saved monitor is unavailable, the panel uses an available monitor and stays within its bounds. Placement is saved locally on that Mac. Closing the app stops the overlay.
+
+## Corporation monitoring and refresh interval
+
+Use **Corporations → Monitoring** to enable or disable each corporation. Disabled corporations are not queried for inventory, blueprints, jobs or corporation moon timers, even during manual refresh. Local snapshots and plans are retained. Old job alerts from a disabled corporation are suppressed. Members’ personal inventory, PI, training, calendars and notifications remain separate.
+
+Automatic ESI requests are at least **15 minutes** apart per data source. The interval persists across windows and app restarts, including failed attempts. Local tables, countdowns and chat logs can update more frequently without ESI requests. Refresh buttons start manual checks; CCP caching still applies.
+
+**Intel map → Intel notifications: on/off** changes only the intel system notification category. Other notification preferences, the map and chat monitoring remain unchanged. Both the app’s master OS notification setting and OS permission are still required. Intel ESI locations also observe the 15-minute interval; old ESI positions do not establish live proximity. Local chat logs can continue updating continuously.

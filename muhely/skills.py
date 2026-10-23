@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import time
 
 from .esi import EsiError
+from .refresh_policy import AUTO_SECONDS
 
 FIVE_DAYS=5*24*60*60
 
@@ -112,8 +113,8 @@ def character_view(character,skills,queue,status,name,now):
     else:
         label='Nem tanul · üres sor'
     # Cache lifetime decides when to revalidate, not whether a just-checked
-    # no-cache response is already obsolete. Monitoring data ages after 5 min.
-    stale=now-min(skills['fetched'],queue['fetched'])>=5*60
+    # no-cache response is already obsolete. Allow the 15-minute polling interval plus a five-minute refresh grace period.
+    stale=now-min(skills['fetched'],queue['fetched'])>=AUTO_SECONDS+5*60
     display_status=training_status
     if base['needs_auth']:display_status='unknown';label='Engedélyezés szükséges'
     elif base['error']:display_status='unknown';label='Frissítési hiba · korábbi adatok'

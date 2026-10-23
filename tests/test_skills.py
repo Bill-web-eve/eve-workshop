@@ -49,7 +49,7 @@ class SkillViewTests(unittest.TestCase):
 
     def test_old_failed_or_unauthorized_data_never_claims_character_is_idle(self):
         for status,checked in [({'needs_auth':1},NOW),({'needs_auth':0,'error':'Offline'},NOW),
-                               ({'needs_auth':0},NOW-300)]:
+                               ({'needs_auth':0},NOW-1200)]:
             r=self.view([],status=status,checked=checked)
             self.assertEqual(r['status'],'unknown');self.assertEqual(r['training_status'],'idle')
         fresh=self.view([]);self.assertEqual(fresh['status'],'idle')

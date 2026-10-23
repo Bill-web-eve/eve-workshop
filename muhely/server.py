@@ -34,6 +34,8 @@ from .planner import Planner, PlanningError, AssetSnapshotPending, integer, deci
 from .reservations import allocate_plans, except_owner
 from .store import Store, default_data_dir, DEFAULT_SETTINGS
 
+from .refresh_policy import RefreshPolicy
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -50,7 +52,7 @@ class App:
         self.cookie = secrets.token_urlsafe(32)
         self.csrf = secrets.token_urlsafe(32)
         self.instance = secrets.token_urlsafe(24)
-        self.notification_sync_at = 0
+        self.refresh_policy = RefreshPolicy(self.store)
         self.desktop_auth = {}
         self.desktop_auth_lock = threading.RLock()
         self.task_lock = threading.RLock()
@@ -76,77 +78,95 @@ class App:
                     return True
         return False
 
-    def start_task(self, kind):
+    def refresh_domains(self,kind):
+        if kind in ['sync','notifications']:
+            domains=['industry','skills','pi']
+            if any(c['monitoring_enabled'] for c in self.store.corporations()):domains.append('corporations')
+            if any(self.store.snapshot(c['id'],k) for c in self.store.characters() for k in ['moon_calendar','moon_timers','moon_notifications']):domains.append('extractions')
+            if any('esi-industry.read_character_mining.v1' in scopes for scopes in self.eve.granted_scopes().values()):domains.append('mining')
+            return domains
+        return ['industry' if kind=='sync' else 'moon-universe' if kind=='moons' else kind]
+
+    def start_task(self, kind, manual=True):
         with self.task_lock:
             if self.task['running']:
                 raise PlanningError('Egy frissítés már folyamatban van.')
+            domains=self.refresh_domains(kind)
+            allowed=self.refresh_policy.claim(domains,manual=manual)
+            if not allowed:return False
             self.task = {'id':uuid.uuid4().hex,'running':True,'kind':kind,'message':'Frissítés folyamatban…','results':[],'finished':None,'started':time.time(),'updated':time.time(),'outcome':'running','progress':{}}
         def work():
             outcomes=[]
             phases=1
             phase_index=0
-            def phase(label,operation):
+            def phase(label,operation,domain=None):
                 nonlocal phase_index
+                if domain and domain not in allowed:return []
                 self.task_progress({'stage':label,'stage_index':phase_index,'stages':phases,'subject':'','completed':0,'total':None,'resource':'Előkészítés','mode':'checking','page':None,'pages':None})
-                with progress.listen(self.task_progress):value=operation()
+                try:
+                    with progress.listen(self.task_progress):value=operation()
+                finally:
+                    # Space batches from their last request, including slow or failed refreshes.
+                    if domain:self.refresh_policy.claim([domain],manual=True)
                 if isinstance(value,list):outcomes.extend(value)
                 phase_index+=1
                 return value
             try:
-                include_corps=any(c['synced_at'] for c in self.store.corporations())
-                include_moons=any(self.store.snapshot(c['id'],k) for c in self.store.characters() for k in ['moon_calendar','moon_timers','moon_notifications'])
-                include_mining=any('esi-industry.read_character_mining.v1' in scopes for scopes in self.eve.granted_scopes().values())
-                phases=3+int(include_corps)+int(include_moons)+int(include_mining) if kind in ['sync','notifications'] else 1
+                include_corps='corporations' in allowed
+                include_moons='extractions' in allowed
+                include_mining='mining' in allowed
+                phases=sum(d in allowed for d in ['industry','skills','pi'])+int(include_corps)+int(include_moons)+int(include_mining) if kind in ['sync','notifications'] else 1
                 if kind in ['sync','notifications']:
                     if not self.store.characters():
                         raise PlanningError('Előbb adj hozzá egy karaktert az EVE-kapcsolat oldalon.')
-                    result = phase('Személyes ipari adatok',self.eve.sync)
+                    result = phase('Személyes ipari adatok',self.eve.sync,'industry')
                     ok = all(r['ok'] for r in result)
                     message = 'Az EVE-adatok frissítve.' if ok else 'Néhány karakter frissítése sikertelen. A részletek az EVE-kapcsolat oldalon láthatók.'
                     if kind=='sync' and ok and result and self.store.enable_eve_after_sync():
                         message += ' A terv most a személyes EVE-készlettel és jobkimenetekkel számol.'
-                    skill_results=phase('Skillek és tanulási sorok',self.eve.sync_skills)
+                    skill_results=phase('Skillek és tanulási sorok',self.eve.sync_skills,'skills')
                     missing=sum(not r['ok'] for r in skill_results)
                     if missing:
                         message+=f' {missing} karakter skilladata engedélyezést vagy frissítést igényel; részletek a Skillek és tanulás menüben.'
-                    pi_results=phase('Bolygók és PI',self.eve.sync_pi)
+                    pi_results=phase('Bolygók és PI',self.eve.sync_pi,'pi')
                     pi_missing=sum(not r['ok'] for r in pi_results)
                     if pi_missing:message+=f' {pi_missing} karakter PI-adata engedélyezést vagy frissítést igényel; részletek a Bolygók és PI menüben.'
                     if include_corps:
-                        corp_results=phase('Corporationok',self.eve.sync_corporations)
+                        corp_results=phase('Corporationok',self.eve.sync_corporations,'corporations')
                         message+=f" Corp-adatok: {sum(r['ok'] for r in corp_results)} sikeres lekérés; részletek a Corporationok oldalon."
                     if include_moons:
-                        moon_results=phase('Holdak és naptár',lambda:extractions.sync(self.eve))
+                        moon_results=phase('Holdak és naptár',lambda:extractions.sync(self.eve),'extractions')
                         message+=' '+extractions.refresh_summary(moon_results,self.store.characters())
                     if include_mining:
-                        mining_results=phase('Bányászati naplók',lambda:mining.sync(self.eve))
+                        mining_results=phase('Bányászati naplók',lambda:mining.sync(self.eve),'mining')
                         message+=f" Bányászati naplók frissítve: {sum(r['ok'] for r in mining_results)}/{len(mining_results)} karakter."
                 elif kind == 'mining':
-                    result=phase('Bányászati naplók',lambda:mining.sync(self.eve))
+                    result=phase('Bányászati naplók',lambda:mining.sync(self.eve),'mining')
                     message=f"Bányászati naplók frissítve: {sum(r['ok'] for r in result)}/{len(result)} karakter."
                 elif kind == 'skills':
                     if not self.store.characters():
                         raise PlanningError('Előbb adj hozzá karaktert az EVE-kapcsolat oldalon.')
-                    result=phase('Skillek és tanulási sorok',self.eve.sync_skills)
+                    result=phase('Skillek és tanulási sorok',self.eve.sync_skills,'skills')
                     ok_count=sum(r['ok'] for r in result)
                     message=f'Skilladatok ellenőrizve: {ok_count}/{len(result)} karakter. A részleteket a Skillek és tanulás oldalon találod.'
                 elif kind == 'pi':
                     if not self.store.characters():raise PlanningError('Előbb adj hozzá karaktert az EVE-kapcsolat oldalon.')
-                    result=phase('Bolygók és PI',self.eve.sync_pi);ok_count=sum(r['ok'] for r in result)
+                    result=phase('Bolygók és PI',self.eve.sync_pi,'pi');ok_count=sum(r['ok'] for r in result)
                     message=f'PI-adatok ellenőrizve: {ok_count}/{len(result)} karakter. Részletek a Bolygók és PI menüben.'
                 elif kind == 'moons':
                     result=phase('Holdak rendszeradatai',lambda:moons.refresh_universe(self.store,self.catalog,self.eve.http))
                     message='A holdak rendszeradatai frissítve.' if all(r['ok'] for r in result) else 'Néhány rendszer ESI-adata nem frissült. A korábbi adatok megmaradtak.'
                 elif kind == 'extractions':
-                    result=phase('Holdak és naptár',lambda:extractions.sync(self.eve))
+                    result=phase('Holdak és naptár',lambda:extractions.sync(self.eve),'extractions')
                     message=extractions.refresh_summary(result,self.store.characters())
                 elif kind == 'corporations':
                     if not self.store.characters():raise PlanningError('Előbb adj hozzá egy corp-hozzáférésre jogosult karaktert.')
-                    result=phase('Corporationok',self.eve.sync_corporations);ok_count=sum(r['ok'] for r in result)
+                    result=phase('Corporationok',self.eve.sync_corporations,'corporations');ok_count=sum(r['ok'] for r in result)
                     message=f'Corp-adatok ellenőrizve: {ok_count} sikeres lekérés. A részleteket a Corporationok oldalon találod.'
                 else:
                     phase('Receptadatbázis',self.update_catalog)
                     result, message = [], 'Az EVE-receptadatbázis naprakész.'
+                if set(domains)-allowed:message+=' Egyes forrásoknál a 15 perces automatikus frissítési időköz még nem telt le; a mentett adatok láthatók.'
                 with self.task_lock:
                     self.task.update(running=False,message=message,results=result,finished=time.time(),updated=time.time(),outcome='warning' if any(not row.get('ok',True) and row.get('warning',True) for row in outcomes) else 'success')
             except Exception as error:
@@ -154,6 +174,7 @@ class App:
                 with self.task_lock:
                     self.task.update(running=False,message=message,finished=time.time(),updated=time.time(),outcome='error',results=[{'ok':False,'error':message}])
         threading.Thread(target=work, daemon=True).start()
+        return True
 
     def task_progress(self,values):
         allowed={'stage','stage_index','stages','subject','completed','total','resource','mode','page','pages','bytes_done','bytes_total'}
@@ -174,7 +195,7 @@ class App:
     def notification_data(self):
         with self.catalog.lock:
             data=notifications.collect(self.store,self.catalog)
-        data.update(task=self.task_snapshot(),next_sync_at=self.notification_sync_at+240)
+        data.update(task=self.task_snapshot(),next_sync_at=self.refresh_policy.next_at(self.refresh_domains('notifications')))
         return data
 
     def update_catalog(self):
@@ -748,17 +769,17 @@ class Handler(BaseHTTPRequestHandler):
             corporation_id=self.app.scope_id(query.get('corporation_id',[None])[0])
             if path == '/api/intel/preferences':return self.send(200,self.app.intel.configure(data))
             elif path == '/api/intel/characters':
-                self.app.intel.request_characters();return self.send(200,{'intel':dict(self.app.intel.status)})
+                self.app.intel.request_characters(manual=True);return self.send(200,{'intel':dict(self.app.intel.status)})
             elif path == '/api/intel/locations':
                 self.app.intel.request_locations();return self.send(200,{'intel':dict(self.app.intel.status)})
             elif path == '/api/intel/claim':return self.send(200,{'items':notifications.claim(self.app.store,intel.collect_alerts(self.app.store,self.app.intel.universe))})
             elif path == '/api/industry/refresh':
-                self.app.industry.start();return self.send(200,self.app.industry.status())
+                self.app.industry.start(manual=data.get('manual') is True);return self.send(200,self.app.industry.status())
             elif path == '/api/industry/estimate':
                 with self.app.catalog.lock:return self.send(200,self.app.industry.estimate(data.get('rows'),self.app.store.settings(),self.app.catalog))
             elif path == '/api/prices/refresh':
                 ids=market_ids(data.get('ids'),self.app.catalog)
-                self.app.market.start(ids)
+                self.app.market.start(ids,manual=data.get('manual') is True)
                 return self.send(200,self.app.market.snapshot(ids))
             elif path == '/api/schedule':
                 return self.send(200,self.app.schedule(data))
@@ -779,11 +800,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(data.get('id'),str):raise PlanningError('Ismeretlen hold.')
                 self.app.store.remove_moon(data['id'])
             elif path == '/api/moons/extractions/sync':
-                self.app.start_task('extractions')
+                self.app.start_task('extractions',manual=data.get('manual') is True)
             elif path == '/api/moons/settings':
                 self.app.store.save_moon_preferences(moons.validate_preferences(data))
             elif path == '/api/moons/sync':
-                self.app.start_task('moons')
+                self.app.start_task('moons',manual=data.get('manual') is True)
             elif path == '/api/settings':
                 if corporation_id is not None:
                     if set(data)-{'location_ids','source'} or data.get('source','eve')!='eve':
@@ -847,23 +868,19 @@ class Handler(BaseHTTPRequestHandler):
             elif path == '/api/notifications/sent':
                 notifications.acknowledge(self.app.store,data.get('receipts'))
                 return self.send(200,{'ok':True})
+            elif path == '/api/corporations/monitoring':
+                with self.app.task_lock:
+                    if self.app.task['running']:raise PlanningError('Várd meg a folyamatban lévő frissítést a figyelés módosítása előtt.')
+                    with self.app.eve.sync_lock:
+                        self.app.store.set_corporation_monitoring(data.get('id'),data.get('enabled'))
+                return self.send(200,corporation_dashboard(self.app.store))
             elif path == '/api/notifications/sync':
                 with self.app.task_lock:
-                    now=time.time()
-                    if not self.app.task['running'] and (data.get('manual') is True or now>=self.app.notification_sync_at+240):
-                        self.app.notification_sync_at=now
-                        self.app.start_task('notifications')
-                return self.send(200,{'ok':True,'next_sync_at':self.app.notification_sync_at+240})
-            elif path == '/api/sync':
-                self.app.start_task('sync')
-            elif path == '/api/skills/sync':
-                self.app.start_task('skills')
-            elif path == '/api/mining/sync':
-                self.app.start_task('mining')
-            elif path == '/api/pi/sync':
-                self.app.start_task('pi')
-            elif path == '/api/corporations/sync':
-                self.app.start_task('corporations')
+                    started=False if self.app.task['running'] else self.app.start_task('notifications',manual=data.get('manual') is True)
+                return self.send(200,{'ok':True,'started':started,'next_sync_at':self.app.refresh_policy.next_at(self.app.refresh_domains('notifications'))})
+            elif path in ['/api/sync','/api/skills/sync','/api/mining/sync','/api/pi/sync','/api/corporations/sync']:
+                kind={'/api/sync':'sync','/api/skills/sync':'skills','/api/mining/sync':'mining','/api/pi/sync':'pi','/api/corporations/sync':'corporations'}[path]
+                self.app.start_task(kind,manual=data.get('manual') is True)
             elif path == '/api/sde/update':
                 self.app.start_task('sde')
             elif path == '/api/plans/save':

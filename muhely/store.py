@@ -88,6 +88,8 @@ class Store:
                 db.execute('ALTER TABLE plans ADD COLUMN corporation_id INTEGER')
             if 'manufacturer_id' not in columns:
                 db.execute('ALTER TABLE plans ADD COLUMN manufacturer_id INTEGER')
+            if 'monitoring_enabled' not in {r['name'] for r in db.execute('PRAGMA table_info(corporations)')}:
+                db.execute('ALTER TABLE corporations ADD COLUMN monitoring_enabled INTEGER NOT NULL DEFAULT 1')
             if 'corporation_id' not in {r['name'] for r in db.execute('PRAGMA table_info(characters)')}:
                 db.execute('ALTER TABLE characters ADD COLUMN corporation_id INTEGER')
         self.path.chmod(0o600)
@@ -262,6 +264,17 @@ class Store:
     def corporations(self):
         with self.db() as db:
             return [dict(r) for r in db.execute('SELECT * FROM corporations ORDER BY name,id')]
+
+    def corporation_monitored(self,corporation_id):
+        corp=self.corporation(corporation_id) if corporation_id else None
+        return corp is None or bool(corp['monitoring_enabled'])
+
+    def set_corporation_monitoring(self,corporation_id,enabled):
+        from .planner import PlanningError
+        if type(corporation_id) is not int or type(enabled) is not bool:raise PlanningError('Hibás corporationfigyelési beállítás.')
+        with self.db() as db:
+            if not db.execute('SELECT 1 FROM corporations WHERE id=?',(corporation_id,)).fetchone():raise PlanningError('Ismeretlen corporation.')
+            db.execute('UPDATE corporations SET monitoring_enabled=? WHERE id=?',(int(enabled),corporation_id))
 
     def character_corporation(self, char_id, corporation_id, name):
         with self.db() as db:

@@ -40,6 +40,21 @@ class NotificationTests(unittest.TestCase):
         rows=[a for a in self.data()['items'] if a['category']=='jobs']
         self.assertEqual({(a['job_id'],a['corporation_id']) for a in rows},{(1,None),(2,99)})
         self.enable(corporations=False);self.assertEqual([a['job_id'] for a in n.claim(self.s,self.data(),NOW)],[1])
+    def test_disabling_corporation_hides_job_alerts_without_reclassifying_alias_as_personal(self):
+        self.s.save_snapshots(1,{'jobs':snap([job(2,'ready')])})
+        self.s.save_corporation_snapshots(99,1,{'jobs':snap([job(2,'ready')])})
+        self.s.set_corporation_monitoring(99,False)
+        self.assertEqual([a for a in self.data()['items'] if a['category']=='jobs'],[])
+        self.assertIsNotNone(self.s.corporation_snapshot(99,'jobs'))
+        self.s.set_corporation_monitoring(99,True)
+        self.assertEqual([a['corporation_id'] for a in self.data()['items'] if a['category']=='jobs'],[99])
+
+    def test_intel_notification_switch_preserves_other_categories(self):
+        self.enable();before=n.preferences(self.s)
+        after=n.save_preferences(self.s,{'categories':{'intel':False}})
+        self.assertTrue(after['os_enabled']);self.assertFalse(after['categories']['intel'])
+        for key in ['skills','jobs','pi','moons']:self.assertEqual(after['categories'][key],before['categories'][key])
+
     def test_stale_or_failed_job_data_are_visible_but_not_sent(self):
         self.s.save_snapshots(1,{'jobs':snap([job(1,'ready')],old=86400)})
         self.enable();data=self.data();self.assertFalse(next(a for a in data['items'] if a['category']=='jobs')['reliable']);self.assertEqual(n.claim(self.s,data,NOW),[])

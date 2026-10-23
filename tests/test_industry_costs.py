@@ -57,7 +57,7 @@ class IndustryCostTests(unittest.TestCase):
         self.service.refresh();old=self.service.cached('prices');self.now=5000
         self.http.request.side_effect=[(systems(),{}),([{'type_id':35,'adjusted_price':float('nan')}],{})]
         self.service.refresh();self.assertEqual(self.service.cached('prices'),old)
-        self.assertTrue(self.service.status()['resources']['prices']['stale']);self.assertEqual(self.service.status()['retry_after'],5060)
+        self.assertTrue(self.service.status()['resources']['prices']['stale']);self.assertEqual(self.service.status()['retry_after'],5900)
         self.assertIn('prices',self.service.status()['errors'])
         calls=self.http.request.call_count;self.service.start();self.assertEqual(self.http.request.call_count,calls)
     def test_empty_no_jobs_is_zero_without_requiring_facilities(self):
