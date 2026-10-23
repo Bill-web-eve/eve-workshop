@@ -1,6 +1,19 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Várható kimenet": "Expected output",
+  "Újrapróbálás": "Retry",
+  "Az összes karakter személyes ipari jobjai, a gyártási terv szűrőitől függetlenül.": "Personal industry jobs from all characters, independent of production plan filters.",
+  "Jobok gyártási köre": "Industry job scope",
+  "Jobok karaktere": "Industry job character",
+  "A jobok nem tölthetők be": "Could not load industry jobs",
+  "Ipari jobok betöltése…": "Loading industry jobs…",
+  "Még nincs betöltött jobadat: {0}.": "Job data has not been downloaded for: {0}.",
+  "Korábbi jobadatok láthatók: {0}.": "Showing earlier job data for: {0}.",
+  "Nincs ilyen folyamatban lévő job": "No matching in-progress jobs",
+  "A lista a kiválasztott gyártási kör és karakter letöltött jobadataiból készül.": "The list uses downloaded jobs for the selected scope and character.",
+  "A Minden karakter nézet az összes hozzáadott karakter személyes jobjait mutatja, corp jobok nélkül. A listát a gyártási terv karakter- és helyszűrése nem korlátozza. A karakterválasztás csak ezt a listát szűri.": "All characters shows personal jobs from every connected character, excluding corporation jobs. Production plan character and location filters do not limit this list. Character selection filters only this list.",
+
   "A jelzés a jelenleg betöltött sorból számolt első megszakadásra vonatkozik, nem csak a legutolsó sorvégre. Hibás vagy 20 percnél régebbi adatból nem állítjuk, hogy a karakter biztosan nem tanul. A helyi állapot percenként újraszámolódik, automatikus ESI-lekérés legfeljebb 15 percenként indul; bezárt alkalmazás mellett nincs figyelés.": "The indicator uses the first interruption in the loaded queue, rather than only its final end. Failed data or data older than 20 minutes cannot confirm idle training. Local status is recalculated every minute; automatic ESI requests are at least 15 minutes apart. There is no monitoring while the app is closed.",
   "Ennek a corporationnek a figyelése ki van kapcsolva.": "Monitoring is disabled for this corporation.",
   "Figyelés": "Monitoring",

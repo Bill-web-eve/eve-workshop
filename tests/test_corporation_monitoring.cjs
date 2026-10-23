@@ -12,6 +12,7 @@ async function fixture(){
   else if(url==='/api/intel/alerts')value={enabled:false,items:[]};
   else if(url==='/api/corporations')value={corporations:[corp],characters:state.characters};
   else if(url==='/api/corporations/monitoring'){corp.monitoring_enabled=body.enabled;value={corporations:[corp],characters:state.characters};}
+  else if(url.startsWith('/api/jobs'))value={rows:[],sources:[]};
   else if(url==='/api/pi/sync')value={};
   else throw Error('Unexpected request '+url);
   return {ok:true,json:async()=>value};

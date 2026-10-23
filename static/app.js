@@ -33,7 +33,7 @@ async function setProductionScope(id){
   error('');
   try{
     await reloadState();if(generation!==planGeneration)return;
-    if(productId&&view!=='saved')await calculate(false);
+    if(productId&&!['saved','jobs'].includes(view))await calculate(false);
     else{
       localStorage.setItem('eve-muhely-last-plan',JSON.stringify({id:productId,name:productName,quantity:targetQuantity(),saved_plan_id:null,corporation_id:corporationId,manufacturer_id:manufacturerId,activity:productActivity}));
       render();
@@ -111,6 +111,7 @@ async function reloadState() {
   if(requestedScope!==corporationId)return;
   state=nextState;corporationData=null;scheduleRevision++;
   assetData=null;assetError='';assetRevision++;
+  jobData=null;jobError='';jobRevision++;
   shoppingData=null;shoppingRevision++;
   deliveryWait=state.delivery_wait||null;scheduleDeliveryCheck();
   if(activePlanId && !state.plans.some(p=>p.id===activePlanId&&(p.corporation_id??null)===corporationId)) activePlanId=null;
@@ -207,7 +208,8 @@ function scheduleTaskPoll() {
         lastTaskFinished=state.task.finished;if(state.task.kind!=='notifications')toast(state.task.message);
         if(view==='settings'&&settingsTab==='access')void loadSettingsAccess();
         if(!['skills','pi','notifications','mining'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
-        if(state.task.kind==='notifications'){skillData=null;piData=null;moonData=null;settingsAccessData=null;void refreshNotifications();if(view==='mining')await refreshMining();else if(view==='skills')await refreshSkills();else if(view==='pi')await refreshPI();else if(view==='moons')await refreshMoons();}
+        if(view==='jobs'){render();}
+        else if(state.task.kind==='notifications'){skillData=null;piData=null;moonData=null;settingsAccessData=null;void refreshNotifications();if(view==='mining')await refreshMining();else if(view==='skills')await refreshSkills();else if(view==='pi')await refreshPI();else if(view==='moons')await refreshMoons();}
         else if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else if(view==='settings')render();else await calculate(false);}
         else if(state.task.kind==='skills') await refreshSkills();
         else if(state.task.kind==='mining')await refreshMining();
@@ -307,7 +309,7 @@ function render() {
   if(view==='connection') return renderConnection(content);
   if(view==='saved') return renderSaved(content);
   if(view==='schedule')return renderSchedule(content);
-  if(view==='jobs'){renderJobs(content);if(corporationId)content.insertAdjacentHTML('afterbegin',scopeBanner());return;}
+  if(view==='jobs')return renderJobs(content);
   if(view==='inventory'&&inventoryMode!=='plan')return renderAssetInventory(content);
   if(view==='inventory'&&!plan)return renderInventoryEmpty(content);
   if(view==='shopping'&&shoppingMode==='all')return renderAllShopping(content);
@@ -592,18 +594,8 @@ async function applyMapping(kind) {
   } catch(e) {error(e.message); button.disabled=false;}
 }
 function jobReady(j){return j.status==='ready'||j.status==='active'&&Number.isFinite(Date.parse(j.end_date))&&Date.parse(j.end_date)<=Date.now();}
-function updateReadyJobs(){const badge=$('#jobs-ready-count');if(!badge||!state)return;const count=state.jobs.filter(jobReady).length;badge.hidden=!count;badge.textContent=count?String(count):'';badge.title=EveI18n.t('Átvehető vagy várhatóan elkészült jobok');}
+function updateReadyJobs(){const badge=$('#jobs-ready-count');if(!badge||!state)return;const count=(jobData?.key===(corporationId||'personal')?jobData.rows:state.jobs).filter(jobReady).length;badge.hidden=!count;badge.textContent=count?String(count):'';badge.title=EveI18n.t('Átvehető vagy várhatóan elkészült jobok');}
 setInterval(()=>{updateReadyJobs();if(view==='jobs'&&state)render();},30000);
-function renderJobs(content) {
-  updateReadyJobs();
-  setHead('IPARI JOBOK','Ami már folyamatban van',corporationId?'A kiválasztott corporation saját ipari jobjai.':'Személyes gyártási, reakciós és egyéb aktív jobok a legutóbbi EVE-frissítésből.');
-  const labels={active:'Fut',paused:'Szünetel',ready:'Átvehető'};
-  const ready=state.jobs.filter(jobReady);
-  const readyBanner=ready.length?`<div class="banner warn" role="alert"><strong>Van kész vagy várhatóan elkészült job.</strong> <span>${fmt(ready.length)}</span> <span>job átvehető vagy lejárt a befejezési ideje. Vedd át az EVE-ben, majd frissítsd az adatokat.</span></div>`:'';
-  const rows=state.jobs.map(j=>`<tr class="${jobReady(j)?'ready-job':''}"><td>${item({name:j.name,id:j.product_type_id||0})}</td><td><span class="badge ${j.status==='ready'?'good':'reaction'}">${esc(j.status==='active'&&jobReady(j)?'Várhatóan elkészült · frissíts':labels[j.status]||j.status)}</span></td><td class="num">${fmt(j.runs)}</td><td class="num"><strong>${fmt(j.expected_output)}</strong></td>${characterCell(j.character_id)}<td class="num">${j.output_location_id||'–'}</td><td data-sort-value="${j.end_date?Date.parse(j.end_date):''}">${j.end_date?esc(EveI18n.date(new Date(j.end_date))):'–'}</td></tr>`);
-  content.innerHTML=readyBanner+panel('Aktív és át nem vett jobok',`${fmt(rows.length)} job`,rows.length?table(['Termék','Állapot','Run','Beszámítható kimenet','Karakter','Kimeneti Hely-ID','Befejezés'],rows):empty('Nincs betöltött aktív job','Adj hozzá karaktert az EVE-kapcsolat oldalon, majd indíts EVE-frissítést.'));
-  content.innerHTML+='<p class="footnote">A kimenet csak gyártási és reakciós jobnál, a kiválasztott helyszíneken számít. A delivered, cancelled és reverted jobokat nem adja a folyamatban készlethez. Kutatás, invention és másolás kimenete itt 0. Kézi készletmódban a terv a Készlet oldalon megadott kézi folyamatban mennyiségekkel számol.</p>';
-}
 function renderStructureSettings(content) {
   setHead('GYÁRTÁSI KÖRNYEZET','Struktúrák és bónuszok','A közös beállítások a terv minden megfelelő gyártási lépésére érvényesek.');
   const group=(key,title)=>{
@@ -682,12 +674,13 @@ async function startTask(path,manual=true) {
     if(Object.keys(dirty).length) throw new Error('A frissítés előtt alkalmazd a megadott módosításokat.');
     await api(path,{manual}); await reloadState();
     if(!manual&&!state.task.running)return;
-    if(['mining','skills','pi','corporations','moons','settings'].includes(view))render();
+    if(['jobs','mining','skills','pi','corporations','moons','settings'].includes(view))render();
     if(!state.task.running) {
       if(manual)toast(state.task.message);
       if(view==='settings'&&settingsTab==='access')void loadSettingsAccess();
       if(!['skills','pi','notifications','mining'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
-      if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else if(view==='settings')render();else await calculate(false);}
+      if(view==='jobs'){render();}
+      else if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else if(view==='settings')render();else await calculate(false);}
       else if(state.task.kind==='skills')await refreshSkills();
       else if(state.task.kind==='mining')await refreshMining();
         else if(state.task.kind==='pi')await refreshPI();
