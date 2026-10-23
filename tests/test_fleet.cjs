@@ -95,7 +95,7 @@ function fakeBattle(){
 test('battle sides show separate losses, group controls, combat evidence and clickable ship losses',async t=>{
  const {w,d,data}=await fixture();t.after(()=>w.close());data.sessions[0].battle=fakeBattle();
  d.querySelector('[data-fleet-session]').click();await tick();
- assert.equal(d.querySelectorAll('.battle-sides>.battle-side').length,2);assert.match(d.querySelector('[data-battle-side="0"]').textContent,/100,00 ISK/);assert.match(d.querySelector('[data-battle-side="1"]').textContent,/200,00 ISK/);
+ assert.equal(d.querySelectorAll('.battle-sides>.battle-side').length,2);assert.equal(d.querySelectorAll('#fleet-battle [style]').length,0);assert.equal(d.querySelector('.battle-sides').dataset.count,'2');assert.match(d.querySelector('[data-battle-side="0"]').textContent,/100,00 ISK/);assert.match(d.querySelector('[data-battle-side="1"]').textContent,/200,00 ISK/);
  assert.equal(d.querySelector('[data-battle-move="alliance:1001"]').value,'0');assert(d.querySelector('.battle-losses a[href="https://zkillboard.com/kill/123/"] img'));
  assert(!/[áéíóöőúüű]/i.test(d.querySelector('#fleet-battle').textContent),d.querySelector('#fleet-battle').textContent);
 });
