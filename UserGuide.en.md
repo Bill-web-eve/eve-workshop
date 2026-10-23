@@ -4,6 +4,14 @@ Extraction calendar events titled “Moon extraction for …” are matched usin
 
 Moon refreshes list successful calendar, notification and corporation timer readers separately. Sources that have never been authorized and corporation timers that have never been accessible because of a role-related 403 are informational. Network or login failures, and loss of access to a previously used source, remain warnings identifying the character and source.
 
+## Full personal and corporation inventory
+
+Inventory offers Plan inventory, All personal items and Full corporation inventory. The personal view includes downloaded assets from every linked character, independently of the plan’s character and location filters. The corporation view selects one corporation; inventory owners remain separate. Assembled ships, modules and blueprint instances are included. Browsing does not change production eligibility, reservations or manual inventory overrides.
+
+Search and sorting apply to all matching rows, across every page. Characters use dropdown filters; other columns use text filters. Column filters are collapsed by default. Each page shows 100 rows; CSV export includes all filtered matches. Clicking an item name copies the plain name. Locations display the ESI location ID and storage flag; items inside containers resolve to the outermost location.
+
+The view uses downloaded snapshots. Refresh EVE data fetches new assets; Reload downloaded inventory only rereads local data. Missing and older snapshots are indicated. No plan or production inventory source is required.
+
 ## Native Windows application (1.2.0)
 
 Extract the entire Windows ZIP and start **EVE_Muhely.exe**. Workshop opens in its own window. EVE authorization uses the system browser; return to Workshop after approval. Choose theme and language under **Settings → Appearance and language**. Clipboard, native file saving, printing and separate intel map/chat windows are supported.

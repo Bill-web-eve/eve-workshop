@@ -13,6 +13,23 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class ServerTests(unittest.TestCase):
+    def test_full_asset_browser_is_authenticated_and_independent_of_planning(self):
+        self.app.store.add_character(123,'Asset Pilot')
+        now=time.time();snapshot={'data':[dict(item_id=1,type_id=23757,quantity=1,location_id=6001,is_singleton=True,location_flag='Hangar')],'fetched':now,'expires':now+600,'etag':None}
+        self.app.store.save_snapshots(123,{'assets':snapshot})
+        self.assertEqual(self.request('/api/assets',Cookie='')[0],403)
+        with patch.object(self.app,'plan',side_effect=AssertionError('Must not calculate a plan')):
+            status,data,_=self.request('/api/assets')
+        self.assertEqual(status,200);self.assertEqual(data['quantity'],1)
+        self.assertEqual(data['rows'][0]['name'],'Archon')
+        self.assertEqual(self.request('/api/assets?corporation_id=999')[0],400)
+        self.app.store.character_corporation(123,99,'Corp A')
+        self.app.store.save_corporation_snapshots(99,123,{'assets':dict(snapshot,data=[dict(snapshot['data'][0],quantity=7)])})
+        status,data,_=self.request('/api/assets?corporation_id=99')
+        self.assertEqual(status,200);self.assertEqual(data['quantity'],7)
+        self.assertEqual(data['rows'][0]['owner_name'],'Corp A')
+        self.assertEqual(self.request('/assets.js')[0],200)
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.app=App(self.tmp.name,ROOT/'data/catalog.sqlite3',port=0)

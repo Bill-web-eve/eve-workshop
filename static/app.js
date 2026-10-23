@@ -110,6 +110,7 @@ async function reloadState() {
   const requestedScope=corporationId,nextState=await api(scoped('/api/state'));
   if(requestedScope!==corporationId)return;
   state=nextState;corporationData=null;scheduleRevision++;
+  assetData=null;assetError='';assetRevision++;
   shoppingData=null;shoppingRevision++;
   deliveryWait=state.delivery_wait||null;scheduleDeliveryCheck();
   if(activePlanId && !state.plans.some(p=>p.id===activePlanId&&(p.corporation_id??null)===corporationId)) activePlanId=null;
@@ -292,7 +293,7 @@ function render() {
   restorePlanSelector();
   const content=$('#view-content'); actions();
   document.body.classList.toggle('manual-view',view==='documentation');
-  $('.plan-selector').hidden=['mining','intel','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures');
+  $('.plan-selector').hidden=['mining','intel','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures')||(view==='inventory'&&inventoryMode!=='plan');
   $('#plan-status').hidden=!plan?.stale_characters.length;
   if(view==='mining'){ $('#plan-status').hidden=true;return renderMining(content); }
   if(view==='intel')return renderIntel(content);
@@ -307,6 +308,8 @@ function render() {
   if(view==='saved') return renderSaved(content);
   if(view==='schedule')return renderSchedule(content);
   if(view==='jobs'){renderJobs(content);if(corporationId)content.insertAdjacentHTML('afterbegin',scopeBanner());return;}
+  if(view==='inventory'&&inventoryMode!=='plan')return renderAssetInventory(content);
+  if(view==='inventory'&&!plan)return renderInventoryEmpty(content);
   if(view==='shopping'&&shoppingMode==='all')return renderAllShopping(content);
   if(!plan&&deliveryWait)return renderDeliveryWait(content);
   if(view==='shopping'&&!plan){
@@ -370,7 +373,8 @@ function renderQueue(content) {
   bindJita([...materialValues.map(r=>r.id),plan.product_id]);bindEconomics();
   $('#export-csv').onclick=()=>csv(plan.queue.map(r=>[r.stage,r.name,r.available,r.wip,r.missing,r.runs,r.manufactured,r.jobs,batchText(r),r.producer?.name||'Kézi becslés',r.seconds]),['Szint','Termék','Elérhető (db)','Folyamatban (db)','Hiány (db)','Run','Kimenet (db)','Jobok','Jobfelosztás','Gyártó karakter','Idő (másodperc)'],'gyartasi-lista');
   if($('#target-stock-settings'))$('#target-stock-settings').onclick=()=>{
-    if(!navigate('inventory'))return;
+    const previousMode=inventoryMode;inventoryMode='plan';
+    if(!navigate('inventory')){inventoryMode=previousMode;return;}
     $('#row-filter').value=plan.name;
     $('#row-filter').dispatchEvent(new Event('input'));
   };
@@ -522,6 +526,7 @@ function renderInventory(content) {
   content.innerHTML+='<p class="footnote">Az Elérhető és a Folyamatban oszlopból más aktív tervek foglalásait már levontuk; a saját mentett terv foglalása felhasználható. A foglalási oszlopok felső értéke a készlet, az alsó a folyamatban lévő kimenet. Az üres kézi mező az EVE-adatot használja, kézi módban 0. A kézi Másra foglalva ezen felüli, külön levonás. Frissítéskor a tervfoglalások újraszámolódnak, a kézi felülírások megmaradnak.</p>';
   content.innerHTML+='<p class="footnote">Az EVE-készletből csak a becsomagolt példányokat használjuk fel. A kibontott hajók és modulok nem fedezik a célt és nem használhatók fel alapanyagként. A BPO/BPC-példányokat külön kezeljük; a kézi készletfelülírás továbbra is érvényes.</p>';
   bindDirty(); bindFilter(); $('#apply-inventory').onclick=()=>applyMapping('inventory');
+  content.insertAdjacentHTML('afterbegin',inventoryTabs());bindInventoryTabs();
 }
 function renderBlueprints(content) {
   setHead('BLUEPRINTPARAMÉTEREK','ME, TE és runbeállítások','Automatikus választás: BPO elsőbbség, majd a legjobb azonos ME/TE-jű BPC-csoport.');

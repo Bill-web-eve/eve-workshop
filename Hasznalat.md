@@ -4,6 +4,14 @@ A kitermelési naptár a „Moon extraction for …” EVE-esemény leírásáb�
 
 A holdadat-frissítés külön összesíti a sikeres naptár-, értesítés- és corporationidőzítő-olvasókat. A még nem engedélyezett adatforrások és a korábban sem hozzáférhető corporationidőzítők 403-as szerepkörhiánya tájékoztatásként jelennek meg. A hálózati vagy belépési hiba, illetve egy korábban használt adatforrás hozzáférésének elvesztése továbbra is figyelmeztetés, a karakter és az adatforrás megnevezésével.
 
+## Teljes személyes és corporation készlet
+
+A Készlet menüben a terv készlete mellett az Összes személyes item és a Corporation teljes készlete nézet is elérhető. A személyes nézet minden hozzáadott karakter letöltött assetjeit mutatja, a terv karakter- és helyszűrőitől függetlenül. A corporation nézetben egy corporation választható; a készletek soha nem keverednek. A kibontott hajók, modulok és blueprintpéldányok is megjelennek. Ez böngészés: a gyártási szabályok, a foglalások és a kézi készletfelülírások nem változnak.
+
+A kereső minden találatra keres, nem csak az aktuális oldalra. Karakterre legördülő listából lehet szűrni, az oszlopok rendezhetők és a többi oszlop szabad szöveggel szűrhető. Az oszlopszűrők alapból csukva vannak. Egy oldal 100 sort mutat; a CSV az összes szűrt találatot tartalmazza. Az item nevére kattintva csak a név kerül a vágólapra. A helyet az ESI helyazonosítója és tárolási jelzése mutatja; konténerben levő tárgynál a legfelső helyazonosító látszik.
+
+A nézet a már letöltött adatokat használja; az EVE-frissítés tölti le az új asseteket. A hiányzó vagy régi karakteradatok külön jelzést kapnak. A Betöltött készlet újraolvasása csak a helyi adatokat olvassa újra. Tervezés vagy EVE-készletforrás bekapcsolása nem szükséges hozzá.
+
 ## Saját ablakos Windows-alkalmazás (1.2.0)
 
 Bontsd ki a teljes Windows ZIP-et, és indítsd az **EVE_Muhely.exe** fájlt. A felület saját ablakban nyílik meg. Az EVE engedélykérése a rendszerböngészőt használja; jóváhagyás után térj vissza a Műhelybe. A sötét/világos téma és a nyelv a **Settings → Appearance and language** oldalon állítható. A vágólap, a mentési párbeszédablak, a nyomtatás és a külön intel-térkép/chatablak támogatott.

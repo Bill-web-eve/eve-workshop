@@ -160,3 +160,6 @@ html[data-intel-window=map] .page-heading{display:none}html[data-intel-window=ma
 @media(min-width:761px){.content .metric strong.schedule-date{font-size:18px}}
 
 @media(min-width:761px){.schedule-setup .plan-selector>.scope-selector{align-items:stretch;text-align:left}}
+
+/* Full inventory browser: all characters or one corporation, independent of plans. */
+.asset-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}.asset-toolbar{display:flex;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:10px}.asset-toolbar label{display:flex;flex-direction:column;gap:6px;min-width:190px}.asset-toolbar input,.asset-toolbar select{min-height:38px}.asset-toolbar .asset-search{flex:1;min-width:250px}.asset-pagination{display:flex;align-items:center;justify-content:center;gap:12px;padding:12px}.all-assets-table .item-name{min-width:210px}
