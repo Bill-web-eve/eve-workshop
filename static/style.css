@@ -189,3 +189,18 @@ html[data-intel-window=map] .page-heading{display:none}html[data-intel-window=ma
 .fleet-killmail-link{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:6px;vertical-align:middle}
 .fleet-killmail-link img{display:block;border-radius:4px}
 .fleet-killmail-link:hover{background:var(--bg);outline:1px solid var(--blue)}
+
+.battle-report{--battle-side-0:#6bb6db;--battle-side-1:#dfa65b;--battle-side-2:#77ba92;--battle-side-3:#b99bea;--battle-side--1:#899aa5;margin:22px 0;padding-top:18px;border-top:1px solid var(--line)}
+.battle-heading,.battle-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between}
+.battle-heading h2{margin:0}.battle-controls label{display:flex;align-items:center;gap:8px;font-size:12px}
+.battle-sides{display:grid;grid-template-columns:repeat(var(--battle-count),minmax(0,1fr));gap:12px;margin:14px 0}
+.battle-side{border:1px solid var(--line);border-top:3px solid var(--side-color);border-radius:8px;padding:14px;min-width:0;background:var(--paper)}
+.battle-side h3{color:var(--side-color);font-size:17px;margin:0 0 6px}.battle-side-value{font-size:clamp(17px,1.6vw,25px);font-weight:750;overflow-wrap:anywhere}
+.battle-side .footnote{margin:5px 0}.battle-counts{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0;font-size:12px;font-weight:650}
+.battle-groups{max-height:340px;overflow-y:auto;scrollbar-gutter:stable}.battle-group{border-top:1px solid var(--line);padding:10px 0;cursor:grab}
+.battle-group-title{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.battle-group-title img{border-radius:3px;object-fit:contain}.battle-group-title strong{overflow-wrap:anywhere}
+.battle-group-detail{font-size:11px;color:var(--muted);margin:4px 0}.battle-group label{font-size:11px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}.battle-group select{max-width:150px}.battle-group small{color:var(--muted)}
+.battle-conflict{font-size:11px;color:var(--red);margin-bottom:8px}.battle-losses,.battle-evidence,.battle-unassigned{margin:12px 0 0}.battle-losses .table-wrap{max-height:340px;overflow:auto}.battle-evidence>p{font-size:12px;color:var(--muted)}
+.battle-unassigned>.battle-side{margin-top:10px}.battle-unassigned .battle-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+@media(max-width:1200px){.battle-sides{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.battle-sides{grid-template-columns:1fr}.battle-controls{justify-content:start}}

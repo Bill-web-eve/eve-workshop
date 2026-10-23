@@ -129,3 +129,20 @@ class FleetValueTests(unittest.TestCase):
         a=kill(1);a['zkb']={'totalValue':0.1,'destroyedValue':0};b=kill(2);b['zkb']={'totalValue':0.2,'destroyedValue':0}
         v=fleet.session_value([a,b],11);self.assertEqual(v['total']['cents'],'30');self.assertEqual(v['total']['destroyed_missing'],0)
         self.assertEqual(v['participation_percent'],'100.00');self.assertEqual(v['losses']['count'],0)
+
+class FleetSideApiTests(unittest.TestCase):
+    setUp=server_tests.ServerTests.setUp;close=server_tests.ServerTests.close;request=server_tests.ServerTests.request
+    def test_side_annotations_are_local_session_bound_and_survive_reload(self):
+        self.app.store.add_character(11,'Pilot')
+        k=kill(1,at=0);k['killmail_time']=datetime.now(timezone.utc).isoformat();k['solar_system_id']=30000142
+        k['attackers'][0]['alliance_id']=1001;k['victim']['alliance_id']=1002
+        fleet.save_kills(self.app.store,[k])
+        self.assertEqual(self.request('/api/fleet/sides',{'session_id':'11:1','side_count':4},Origin='https://other.invalid')[0],403)
+        self.assertEqual(self.request('/api/fleet/sides',{'session_id':'11:999','side_count':4})[0],400)
+        self.assertEqual(self.request('/api/fleet/sides',{'session_id':'11:1','side_count':5})[0],400)
+        self.assertEqual(self.request('/api/fleet/sides',{'session_id':'11:1','side_count':4,'group':'alliance:1001','side':3})[0],200)
+        data=self.request('/api/fleet')[1];b=data['sessions'][0]['battle'];self.assertEqual(b['side_count'],4)
+        self.assertEqual(b['sides'][3]['groups'][0]['key'],'alliance:1001');self.assertTrue(b['sides'][3]['groups'][0]['manual'])
+        self.assertEqual(self.request('/battle.js')[0],200)
+        self.assertEqual(self.request('/api/fleet/sides',{'session_id':'11:1','reset':True})[0],200)
+        self.assertEqual(self.request('/api/fleet')[1]['sessions'][0]['battle']['side_count'],2)

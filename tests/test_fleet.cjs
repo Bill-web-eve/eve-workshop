@@ -12,6 +12,7 @@ async function fixture(){
  w.fetch=async(url,opts)=>{calls.push([url,opts?.body?JSON.parse(opts.body):null]);let value;
   if(url.startsWith('/api/state'))value=state;
   else if(url.startsWith('/api/fleet?')||url==='/api/fleet')value=data;
+  else if(url==='/api/fleet/sides')value={ok:true};
   else if(url==='/api/fleet/preferences'){data.preferences={...data.preferences,...JSON.parse(opts.body)};value=data.preferences;}
   else if(url==='/api/fleet/refresh')value={started:true};
   else if(url==='/api/notifications')value={items:[],counts:{data:0},task:{running:false},corporations:[],moons:[],preferences:{os_enabled:false,categories:{intel:false}}};
@@ -84,4 +85,26 @@ test('killmail links are ship icons in session and combined kill lists',async t=
  assert.equal(a.textContent,'');assert.equal(a.querySelector('img').getAttribute('src'),'https://images.evetech.net/types/590/icon?size=64');assert.match(a.getAttribute('aria-label'),/Open killmail on zKillboard/);
  d.querySelector('[data-fleet-tab=kills]').click();await tick();
  a=d.querySelector('a[href="https://zkillboard.com/kill/123/"]');assert(a.querySelector('img'));assert.equal(a.getAttribute('target'),'_blank');
+});
+
+function fakeBattle(){
+ const value=(n,count=1)=>({count,cents:String(n),missing:0,destroyed_cents:String(n/2),destroyed_missing:0});
+ const group=(id,name,side)=>({key:'alliance:'+id,kind:'alliance',id,name,side,manual:false,own:id===1001,pilot_count:2,kill_count:1,loss_value:value(id===1001?10000:20000),conflicts:0});
+ return {side_count:2,configured_count:null,sides:[{id:0,name:null,groups:[group(1001,'Friends',0)],pilot_count:2,loss_value:value(10000),loss_ids:[123],kill_count:1,friendly_fire:0},{id:1,name:null,groups:[group(1002,'Opponents',1)],pilot_count:2,loss_value:value(20000),loss_ids:[],kill_count:1,friendly_fire:0}],unassigned:{id:-1,groups:[],pilot_count:0,loss_value:value(0,0),loss_ids:[],kill_count:0,friendly_fire:0},relationships:[{attacker:0,victim:1,killmails:1}],manual_groups:0,group_count:2};
+}
+test('battle sides show separate losses, group controls, combat evidence and clickable ship losses',async t=>{
+ const {w,d,data}=await fixture();t.after(()=>w.close());data.sessions[0].battle=fakeBattle();
+ d.querySelector('[data-fleet-session]').click();await tick();
+ assert.equal(d.querySelectorAll('.battle-sides>.battle-side').length,2);assert.match(d.querySelector('[data-battle-side="0"]').textContent,/100,00 ISK/);assert.match(d.querySelector('[data-battle-side="1"]').textContent,/200,00 ISK/);
+ assert.equal(d.querySelector('[data-battle-move="alliance:1001"]').value,'0');assert(d.querySelector('.battle-losses a[href="https://zkillboard.com/kill/123/"] img'));
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('#fleet-battle').textContent),d.querySelector('#fleet-battle').textContent);
+});
+test('battle group movement, side count and reset target the open session',async t=>{
+ const {w,d,data,calls}=await fixture();t.after(()=>w.close());data.sessions[0].battle=fakeBattle();
+ d.querySelector('[data-fleet-session]').click();await tick();
+ let select=d.querySelector('[data-battle-move="alliance:1001"]');select.value='1';select.dispatchEvent(new w.Event('change'));await tick();await tick();
+ assert.deepEqual(calls.find(c=>c[0]==='/api/fleet/sides')[1],{session_id:'11:123',group:'alliance:1001',side:1});
+ select=d.querySelector('#battle-side-count');select.value='4';select.dispatchEvent(new w.Event('change'));await tick();await tick();
+ assert.deepEqual(calls.filter(c=>c[0]==='/api/fleet/sides').at(-1)[1],{session_id:'11:123',side_count:4});
+ d.querySelector('#battle-reset').click();await tick();await tick();assert.deepEqual(calls.filter(c=>c[0]==='/api/fleet/sides').at(-1)[1],{session_id:'11:123',reset:true});
 });

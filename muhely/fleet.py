@@ -10,7 +10,7 @@ from collections import defaultdict
 from decimal import Decimal,ROUND_HALF_UP
 from email.utils import parsedate_to_datetime
 import copy,gzip,json,math,re,threading,time,urllib.error,urllib.request
-from . import intel_universe,progress
+from . import intel_universe,progress,battle
 from .esi import ESI,EsiError,AuthenticationError,NoRedirect
 from .planner import PlanningError,integer
 
@@ -223,7 +223,7 @@ class ZKill:
 
 class Fleet:
     def __init__(self,store,catalog,eve):
-        self.store=store;self.catalog=catalog;self.eve=eve;schema(store)
+        self.store=store;self.catalog=catalog;self.eve=eve;schema(store);battle.schema(store)
         self.universe=intel_universe.load(store);self.zkill=ZKill(store)
         self.lock=threading.RLock();self.location_lock=threading.Lock();self.stop_event=threading.Event();self.thread=None
         self.state={'running':False,'kind':None,'completed':0,'total':0,'subject':'','resource':'','error':None,'finished':None,'results':[],'revision':0}
@@ -341,9 +341,38 @@ class Fleet:
                 save_kills(self.store,list({k['killmail_id']:k for k in rows}.values()))
             except EsiError as e:error=str(e)
             results.append({'system_id':sid,'year':year,'month':month,'ok':not error,'partial':not full,'error':error})
+        self.resolve_battle_names([json.loads(r[0]) for r in self._battle_kill_rows(s['windows'])])
         progress.report(completed=len(queries),total=len(queries))
         remember(self.store,'report:'+s['id'],{'results':results,'windows':s['windows']},time.time(),time.time()+3600)
         return results
+    def _battle_kill_rows(self,windows):
+        found={}
+        with self.store.db() as db:
+            for w in windows:
+                for r in db.execute('SELECT data,id FROM fleet_kills WHERE system_id=? AND ts>=? AND ts<=?',(w['system_id'],w['start'],w['end'])):found[r['id']]=r
+        return list(found.values())
+    def resolve_battle_names(self,kills):
+        old=cache(self.store,'battle-names');names=(old or {}).get('data',{}).copy();now=time.time()
+        ids=battle.name_ids(kills)
+        missing=[i for i in ids if str(i) not in names or (old or {}).get('expires',0)<=now]
+        blocked=cache(self.store,'battle-name-errors')
+        if not missing or blocked and blocked['expires']>now:return
+        try:
+            for start in range(0,len(missing),1000):
+                batch=missing[start:start+1000];progress.resource('Harci résztvevők nevei');progress.report(mode='request')
+                rows,_=self.eve.http.request(ESI+'/universe/names/',json_body=batch)
+                if not isinstance(rows,list) or any(not isinstance(r,dict) or r.get('id') not in batch or not isinstance(r.get('name'),str) or r.get('category') not in ['alliance','corporation','character'] for r in rows):raise EsiError('Hiányos résztvevőnév-adat.')
+                names.update({str(r['id']):{'name':r['name'],'category':r['category']} for r in rows})
+            remember(self.store,'battle-names',names,time.time(),time.time()+30*86400)
+        except EsiError:
+            remember(self.store,'battle-name-errors',{},time.time(),time.time()+900,'A résztvevőnevek egy része nem frissült; az azonosítók láthatók.')
+    def configure_sides(self,data):
+        sid=data.get('session_id')
+        if not isinstance(sid,str) or not re.fullmatch(r'\d+:\d+',sid):raise PlanningError('Ismeretlen flottamenet.')
+        session=next((s for s in self.dashboard()['sessions'] if s['id']==sid),None)
+        if not session:raise PlanningError('Ismeretlen flottamenet.')
+        known={g['key'] for side in [*session['battle']['sides'],session['battle']['unassigned']] for g in side['groups']}
+        battle.save(self.store,sid,data,known,battle.configuration(self.store,sid,session['kill_ids']));return {'ok':True}
     def dashboard(self):
         p=preferences(self.store);chars=self.store.characters();names={c['id']:c['name'] for c in chars};now=time.time();granted=self.eve.granted_scopes()
         with self.store.db() as db:
@@ -351,6 +380,7 @@ class Fleet:
         by_system=defaultdict(list)
         for k in kills:by_system[k['solar_system_id']].append(k)
         system_times={sid:[timestamp(k['killmail_time']) for k in rows] for sid,rows in by_system.items()}
+        names_cache=(cache(self.store,'battle-names') or {}).get('data',{})
         activity=[];access=[]
         for c in chars:
             # Read only kill-seeded intervals, not months of minute-by-minute
@@ -368,7 +398,9 @@ class Fleet:
                     for k in rows[bisect_left(ts,w['start']):bisect_right(ts,w['end'])]:context[k['killmail_id']]=k
                 context=list(context.values())
                 s['rows']=[self.row(k,c['id']) for k in sorted(context,key=lambda r:timestamp(r['killmail_time']))]
-                s['context_count']=len(context);s['value_summary']=session_value(context,c['id']);activity.append(s)
+                s['context_count']=len(context);s['value_summary']=session_value(context,c['id'])
+                s['battle']=battle.build(context,c['id'],battle.configuration(self.store,s['id'],s['kill_ids']),names_cache,session_value)
+                activity.append(s)
             source=cache(self.store,'character:'+str(c['id']));loc=cache(self.store,'location:'+str(c['id']));sid=(loc or {}).get('data',{}).get('location',{}).get('solar_system_id')
             access.append({'id':c['id'],'name':c['name'],'checked':(source or {}).get('checked'),'next_check':(source or {}).get('expires'),'error':(source or {}).get('error'),'complete':(source or {}).get('data',{}).get('complete',False),
                            'location_access':LOCATION_SCOPE in granted.get(c['id'],[]),'location_checked':(loc or {}).get('data',{}).get('observed'),'location_error':(loc or {}).get('error'),'system':self.universe.systems.get(sid,{}).get('name'),'selected':p['character_ids'] is None or c['id'] in p['character_ids']})
