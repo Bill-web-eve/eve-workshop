@@ -7,7 +7,7 @@ const piBadge=(status,text)=>`<span class="badge pi-${status}">${esc(text||piSta
 function piForecastOverview(c){
   if(c.monitor_mode==='extraction'){
     const e=c.extraction,at=e.next_end??e.last_end;
-    return `<strong>${at?esc(skillDate(at)):'Nincs ellenőrizhető programvég'}</strong><div class="batch-note">${e.next_end?esc(skillDuration(e.seconds_left))+' · <span>hátralévő programidő</span>':e.expired_count?'<span>A program lejárt</span>':''}</div><div class="batch-note">ESI programvége · helyi idő</div>`;
+    return `<strong>${at?esc(skillDate(at)):'Nincs ellenőrizhető programvég'}</strong><div class="batch-note">${e.next_end?'<span>'+esc(skillDuration(e.seconds_left))+'</span> · <span>hátralévő programidő</span>':e.expired_count?'<span>A program lejárt</span>':''}</div><div class="batch-note">ESI programvége · helyi idő</div>`;
   }
   const p=c.projection;
   if(!c.factories.length)return '–';

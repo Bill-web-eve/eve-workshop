@@ -5,7 +5,7 @@ async function fixture(){
  const dom=new JSDOM('<html><body><span id="plan-status"></span><div id="actions"></div><div id="view-content"></div></body></html>',{url:'http://127.0.0.1:8765',runScripts:'outside-only'}),w=dom.window,d=w.document,run=s=>vm.runInContext(s,dom.getInternalVMContext());
  w.$=s=>d.querySelector(s);w.$$=s=>[...d.querySelectorAll(s)];w.state={task:{running:false}};w.view='pi';
  w.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- w.fmt=n=>String(n);w.skillDate=n=>n==null?'–':new Date(n*1000).toISOString();w.skillDuration=n=>n==null?'–':`${n}s`;
+ w.fmt=n=>String(n);w.skillDate=n=>n==null?'–':new Date(n*1000).toISOString();w.skillDuration=n=>n==null?'–':n===86400*7?'7 nap 0 óra':`${n}s`;
  w.itemName=n=>`<span data-i18n-skip>${w.esc(n)}</span>`;
  w.panel=(name,note,body)=>`<section class="panel"><h2>${w.esc(name?.name||name)}</h2>${body}</section>`;
  w.table=(heads,rows)=>`<table><thead><tr>${heads.map(h=>`<th>${w.esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
@@ -29,7 +29,7 @@ test('extraction view shows exact program dates without factory predictions and 
  w.EveI18n.setLanguage('en');await tick();
  assert.match(d.querySelector('#view-content').textContent,/Extraction planet/);
  assert.match(d.querySelector('#view-content').textContent,/ESI program end · local time/);
- assert.match(detail.textContent,/Program start/);assert.match(detail.textContent,/Program active/);
+ assert.match(d.querySelector('#view-content').textContent,/7 days 0 hours/);assert.match(detail.textContent,/Program start/);assert.match(detail.textContent,/Program active/);
  assert(!/[áéőű]/i.test(d.querySelector('#view-content').textContent),d.querySelector('#view-content').textContent);
 });
 test('factory coverage remains finite, local and independent of extraction view',async t=>{
