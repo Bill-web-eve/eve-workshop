@@ -30,6 +30,7 @@ test('full personal inventory works without a plan, searches all pages and copie
  assert(d.querySelector('[data-inventory-mode=personal]'));
  d.querySelector('[data-inventory-mode=personal]').click();await tick();await tick();
  assert.equal(d.querySelector('.plan-selector').hidden,true);
+ assert.equal(d.querySelector('#page-eyebrow').textContent,'INVENTORY');
  assert.equal(d.querySelectorAll('.all-assets-table tbody tr').length,100);
  const input=d.querySelector('#asset-query');input.value='Needle';input.dispatchEvent(new w.Event('input'));await tick();
  assert.equal(d.querySelectorAll('.all-assets-table tbody tr').length,1);

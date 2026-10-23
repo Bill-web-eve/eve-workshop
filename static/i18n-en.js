@@ -1,6 +1,7 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "KÉSZLET": "INVENTORY",
   "Teljes EVE-készlet betöltése": "Loading full EVE inventory",
   "Készletnézet": "Inventory view",
   "Összes személyes item": "All personal items",
