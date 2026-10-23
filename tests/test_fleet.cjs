@@ -11,7 +11,7 @@ async function fixture(){
  w.localStorage.setItem('eve-muhely-language','en');w.confirm=()=>true;
  w.fetch=async(url,opts)=>{calls.push([url,opts?.body?JSON.parse(opts.body):null]);let value;
   if(url.startsWith('/api/state'))value=state;
-  else if(url==='/api/fleet')value=data;
+  else if(url.startsWith('/api/fleet?')||url==='/api/fleet')value=data;
   else if(url==='/api/fleet/preferences'){data.preferences={...data.preferences,...JSON.parse(opts.body)};value=data.preferences;}
   else if(url==='/api/fleet/refresh')value={started:true};
   else if(url==='/api/notifications')value={items:[],counts:{data:0},task:{running:false},corporations:[],moons:[],preferences:{os_enabled:false,categories:{intel:false}}};
@@ -54,4 +54,14 @@ test('visible progress includes current system and page; incomplete reports rema
  data.status={running:true,kind:'report',total:3,completed:1,subject:'Alpha',page:2,results:[]};run('render()');
  assert(d.querySelector('progress'));assert(d.querySelector('#fleet-refresh').disabled);assert.match(d.querySelector('#view-content [role=status]').textContent,/Alpha/);
  data.status.running=false;data.status.results=[{ok:true,partial:true}];run('render()');await tick();assert.match(d.querySelector('#view-content .banner.warn').textContent,/partial/);
+});
+
+test('successful related report labels are English and periodic local reads stay quiet',async t=>{
+ const {w,d,run,data}=await fixture();t.after(()=>w.close());
+ data.sessions[0].report={checked:Date.now()/1000,data:{results:[],windows:data.sessions[0].windows}};
+ d.querySelector('[data-fleet-session]').click();await tick();
+ assert.match(d.querySelector('#fleet-session').textContent,/Related report checked:/);
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('#fleet-session').textContent));
+ d.querySelector('details').open=true;await run('loadFleet(true)');
+ assert(d.querySelector('details').open);
 });

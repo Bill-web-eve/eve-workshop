@@ -125,7 +125,7 @@ globalThis.EveActivity=(()=>{
   }
   async function run(path,operation){
     const key='request:'+(++serial),route=base(path);
-    const quiet=route==='/api/intel/alerts'||route==='/api/intel/claim'||(route==='/api/intel'&&String(path).includes('background=1'))||route==='/api/activity'||(route==='/api/state'&&monitoring())||(route==='/api/prices'&&active.has('market'));
+    const quiet=(route==='/api/fleet'&&String(path).includes('background=1'))||route==='/api/intel/alerts'||route==='/api/intel/claim'||(route==='/api/intel'&&String(path).includes('background=1'))||route==='/api/activity'||(route==='/api/state'&&monitoring())||(route==='/api/prices'&&active.has('market'));
     if(!quiet)start(key,label(path));
     try{const result=await operation();observe(path,result);if(!quiet)finish(key);return result;}
     catch(error){if(!quiet)finish(key,'error',error.message||'A kérés nem sikerült.');throw error;}

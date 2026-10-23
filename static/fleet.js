@@ -2,16 +2,16 @@
 let fleetData=null,fleetRequest=null,fleetTimer=null,fleetError='',fleetCharacter='',fleetDays=30,fleetTab='sessions',fleetSession='',fleetPage=0;
 const fleetAt=at=>at?esc(EveI18n.date(new Date(at*1000))):'–';
 const fleetUTC=at=>new Date(at*1000).toISOString().replace('T',' ').slice(0,19)+' UTC';
-function scheduleFleet(){clearTimeout(fleetTimer);if(view==='fleet')fleetTimer=setTimeout(()=>void loadFleet(),fleetData?.status.running?1500:10000);}
-async function loadFleet(){
+function scheduleFleet(){clearTimeout(fleetTimer);if(view==='fleet')fleetTimer=setTimeout(()=>void loadFleet(true),fleetData?.status.running?1500:10000);}
+async function loadFleet(background=false){
   if(fleetRequest)return;
-  fleetRequest=api('/api/fleet');
-  try{fleetData=await fleetRequest;fleetError='';if(view==='fleet')render();}
+  fleetRequest=api('/api/fleet'+(background?'?background=1':''));
+  try{const next=await fleetRequest;const stamp=d=>d?JSON.stringify([d.preferences,d.characters,d.sessions,d.kills,d.status,d.location_status.running,d.location_status.character]):'';const changed=stamp(next)!==stamp(fleetData)||!!fleetError;fleetData=next;fleetError='';if(view==='fleet'&&changed)render();}
   catch(e){fleetError=e.message;if(view==='fleet')error(e.message);}
   finally{fleetRequest=null;scheduleFleet();}
 }
 async function refreshFleet(sessionId=null){
-  try{error('');await api('/api/fleet/refresh',sessionId?{session_id:sessionId}:{character_id:fleetCharacter?Number(fleetCharacter):null});await loadFleet();}
+  try{error('');await api('/api/fleet/refresh',sessionId?{session_id:sessionId}:{character_id:fleetCharacter?Number(fleetCharacter):null});if(fleetRequest)await fleetRequest.catch(()=>{});await loadFleet();}
   catch(e){error(e.message);}
 }
 function fleetLeaveEdits(){
@@ -27,6 +27,7 @@ function fleetTable(rows,id){
 function renderFleet(content){
   setHead('HARCOK ÉS ÚTVONAL','Flottatevékenység','A karakterek nyilvános killjei és veszteségei, ESI-pozíciókkal kiegészített flottamenetek.');
   actions('<button class="button compact" id="fleet-refresh">Killmailek frissítése</button>');$('#fleet-refresh').onclick=()=>void refreshFleet();
+  const opened=[...content.querySelectorAll('details')].map((el,i)=>el.open?i:-1).filter(i=>i>=0);
   const d=fleetData;if(!d){content.innerHTML=empty(fleetError||'Flottaadatok betöltése…');if(!fleetRequest)void loadFleet();return;}
   const p=d.preferences,busy=d.status.running;
   $('#fleet-refresh').disabled=busy;
@@ -59,11 +60,12 @@ function renderFleet(content){
   $('#fleet-settings').oninput=()=>{dirty.fleet_settings=true;};
   $('#fleet-settings').onchange=()=>{dirty.fleet_settings=true;};
   $('#fleet-settings').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);try{await api('/api/fleet/preferences',{tracking:f.has('tracking'),interval_seconds:Number(f.get('interval_seconds')),gap_minutes:Number(f.get('gap_minutes')),padding_minutes:Number(f.get('padding_minutes')),character_ids:f.getAll('character_ids').map(Number)});delete dirty.fleet_settings;fleetSession='';await loadFleet();toast('Flottakövetés beállításai mentve.');}catch(error_){error(error_.message);}};
+  opened.forEach(i=>{const el=content.querySelectorAll('details')[i];if(el)el.open=true;});
   scheduleFleet();
 }
 function renderFleetSession(s,busy){
   const p=fleetData.preferences,source=s.report,changed=source&&JSON.stringify(source.data.windows)!==JSON.stringify(s.windows);
   const partial=source?.data.results.some(r=>!r.ok||r.partial);
   const route=s.visits.map((v,i)=>`<li><span class="badge">${i+1}</span><strong data-i18n-skip>${esc(v.name)}</strong><span>${fleetAt(v.first)}${v.last!==v.first?' – '+fleetAt(v.last):''}</span><small>${v.kill_ids.length} kill · ${v.esi_samples} ESI</small></li>`).join('');
-  return `<section id="fleet-session" class="panel"><div class="panel-head"><h2><span data-i18n-skip>${esc(s.character_name)}</span> · <span>Flottamenet</span></h2><div><button class="button compact" id="fleet-context" ${busy?'disabled':''}>Kapcsolódó killmailek betöltése</button> <button class="button compact" id="fleet-windows">Időablakok CSV</button></div></div><div class="panel-body"><p><span>Riport időablaka:</span> ${fleetAt(s.start)} – ${fleetAt(s.end)}</p><ol class="fleet-route" aria-label="Megfigyelt rendszerlátogatások">${route}</ol><p class="footnote">A sorrend killmailekből és ESI-mintákból áll össze; a rendszerek közti tényleges út és a flottatagság nem bizonyított. Egy ESI-minta nem bizonyítja a teljes időablakban való jelenlétet.</p>${table(['Rendszer','Kezdés','Vége','Killmailek','ESI-minták'],s.windows.map(w=>`<tr><td data-i18n-skip>${esc(w.name)}</td><td title="${fleetUTC(w.start)}">${fleetAt(w.start)}</td><td title="${fleetUTC(w.end)}">${fleetAt(w.end)}</td><td class="num">${w.kill_ids.length}</td><td class="num">${w.esi_samples}</td></tr>`),'fleet-windows')}<p class="footnote"><span>A kill helyszínei legalább ennyi perc ráhagyást kapnak előtte és utána:</span> ${p.padding_minutes}. <span>A képernyőn helyi idő látszik, az export UTC.</span></p>${!source?'<div class="banner">A teljes környező harcanyag még nincs betöltve. Jelenleg a már ismert események látszanak.</div>':changed?'<div class="banner warn">Az időablak megváltozott; töltsd be újra a kapcsolódó killmaileket.</div>':partial?'<div class="banner warn">A kapcsolódó riport részleges; a lekérdezési keret vagy egy adatforrás korlátozta a letöltést.</div>':'<p class="footnote">Kapcsolódó riport ellenőrizve: '+fleetAt(source.checked)+'</p>'}${fleetTable(s.rows,'fleet-report-kills')}</div></section>`;
+  return `<section id="fleet-session" class="panel"><div class="panel-head"><h2><span data-i18n-skip>${esc(s.character_name)}</span> · <span>Flottamenet</span></h2><div><button class="button compact" id="fleet-context" ${busy?'disabled':''}>Kapcsolódó killmailek betöltése</button> <button class="button compact" id="fleet-windows">Időablakok CSV</button></div></div><div class="panel-body"><p><span>Riport időablaka:</span> ${fleetAt(s.start)} – ${fleetAt(s.end)}</p><ol class="fleet-route" aria-label="Megfigyelt rendszerlátogatások">${route}</ol><p class="footnote">A sorrend killmailekből és ESI-mintákból áll össze; a rendszerek közti tényleges út és a flottatagság nem bizonyított. Egy ESI-minta nem bizonyítja a teljes időablakban való jelenlétet.</p>${table(['Rendszer','Kezdés','Vége','Killmailek','ESI-minták'],s.windows.map(w=>`<tr><td data-i18n-skip>${esc(w.name)}</td><td title="${fleetUTC(w.start)}">${fleetAt(w.start)}</td><td title="${fleetUTC(w.end)}">${fleetAt(w.end)}</td><td class="num">${w.kill_ids.length}</td><td class="num">${w.esi_samples}</td></tr>`),'fleet-windows')}<p class="footnote"><span>A kill helyszínei legalább ennyi perc ráhagyást kapnak előtte és utána:</span> ${p.padding_minutes}. <span>A képernyőn helyi idő látszik, az export UTC.</span></p>${!source?'<div class="banner">A teljes környező harcanyag még nincs betöltve. Jelenleg a már ismert események látszanak.</div>':changed?'<div class="banner warn">Az időablak megváltozott; töltsd be újra a kapcsolódó killmaileket.</div>':partial?'<div class="banner warn">A kapcsolódó riport részleges; a lekérdezési keret vagy egy adatforrás korlátozta a letöltést.</div>':'<p class="footnote"><span>Kapcsolódó riport ellenőrizve:</span> '+fleetAt(source.checked)+'</p>'}${fleetTable(s.rows,'fleet-report-kills')}</div></section>`;
 }

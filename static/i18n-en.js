@@ -1,6 +1,8 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Elkészült": "Complete",
+
   "Bekapcsolva": "On",
   "Kikapcsolva": "Off",
   "nap": "days",
@@ -47,7 +49,7 @@ globalThis.EveEnglish={
   "Flottakövetés beállításai mentve.": "Fleet tracking settings saved.",
   "Flottamenet": "Activity session",
   "Kapcsolódó killmailek betöltése": "Load related killmails",
-  "Időablakok CSV": "Windows CSV",
+  "Időablakok CSV": "Export time windows",
   "Riport időablaka:": "Report window:",
   "Megfigyelt rendszerlátogatások": "Observed system visits",
   "A sorrend killmailekből és ESI-mintákból áll össze; a rendszerek közti tényleges út és a flottatagság nem bizonyított. Egy ESI-minta nem bizonyítja a teljes időablakban való jelenlétet.": "The sequence comes from killmails and ESI samples; actual travel between systems and fleet membership are unconfirmed. An ESI sample does not prove presence throughout the window.",
