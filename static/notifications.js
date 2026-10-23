@@ -80,7 +80,9 @@ function renderNotificationSettings(target){
     const form=e.target,body={};for(const key of ['os_enabled','auto_refresh','personal','corporations'])body[key]=form.elements[key].checked;
     body.moon_days=Number(form.elements.moon_days.value);body.categories=Object.fromEntries(Object.keys(p.categories).map(k=>[k,form.elements['category-'+k].checked]));
     if(body.os_enabled&&EveDesktop.active){const permission=await EveDesktop.notificationStatus();if(permission.status!=='authorized')throw Error('Előbb engedélyezd a rendszerértesítéseket a fenti gombbal.');}
-    await api('/api/notifications/preferences',body);delete dirty.notification_preferences;await refreshNotifications();toast('Beállítások mentve.');
+    const preferences=await api('/api/notifications/preferences',body);
+    if(typeof applyIntelNotificationPreferences==='function')await applyIntelNotificationPreferences(preferences);
+    delete dirty.notification_preferences;await refreshNotifications();toast('Beállítások mentve.');
   }catch(e){error(e.message);}finally{notificationSettingsBusy=false;}};
   $('#notification-preferences').oninput=()=>{dirty.notification_preferences=true;};
   const savePermission=async()=>{notificationSettingsBusy=true;try{const result=await EveDesktop.requestNotifications();notificationPermission=result.status;if(result.status==='authorized'){if(Object.keys(dirty).length){$('#notification-preferences').elements.os_enabled.checked=true;dirty.notification_preferences=true;}else await api('/api/notifications/preferences',{os_enabled:true});}await refreshNotifications();render();}catch(e){error(e.message);}finally{notificationSettingsBusy=false;}};

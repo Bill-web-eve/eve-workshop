@@ -8,7 +8,7 @@ const intelAge=at=>at==null?'–':EveI18n.t('{0} perce').replace('{0}',fmt(Math.
 const intelSource=p=>p.source==='manual'?'Kézi referencia':p.source==='esi'?p.online===false?'ESI · offline':p.alertable?'ESI · élő helyzet':'ESI · korábbi adat':p.source==='local'?'Local napló · utolsó ismert hely':'Nincs helyzetadat';
 const intelPilotUrl=p=>Number.isSafeInteger(p.id)&&p.id>0?'https://zkillboard.com/character/'+p.id+'/':null;
 const intelCardLifetime=180000;
-let intelCardTimer=null;
+let intelCardTimer=null,intelNotificationRevision=0;
 function intelPilotName(p){const url=intelPilotUrl(p);return url?`<a class="intel-pilot-link" data-intel-pilot href="${url}" target="_blank" rel="noopener noreferrer" data-i18n-skip>${esc(p.name)}</a>`:`<span class="intel-pilot-unresolved" data-i18n-skip>${esc(p.name)}</span><span class="intel-id-note"> · <span>Azonosító még nem ismert</span></span>`;}
 function intelShips(ships=[]){return ships.length?ships.map(s=>`<span class="intel-ship">${Number.isSafeInteger(s.type_id)&&s.type_id>0?`<img src="https://images.evetech.net/types/${s.type_id}/icon?size=32" alt="" data-intel-image loading="lazy" referrerpolicy="no-referrer">`:'<span class="intel-ship-placeholder" aria-hidden="true">◇</span>'}${verbatim(s.name)}</span>`).join(''):'<span class="muted">Nincs megadott hajó</span>';}
 async function refreshIntel(background=false){
@@ -30,7 +30,9 @@ async function pollIntelAlerts(){
   if(intelWindowMode){if(state&&!intelMapDragging)await refreshIntel(true);return;}
   if(!state||intelAlertBusy)return;intelAlertBusy=true;
   try{
-    const data=await api('/api/intel/alerts');intelEnabled=data.enabled;
+    const revision=intelNotificationRevision,data=await api('/api/intel/alerts');
+    if(revision!==intelNotificationRevision)return;
+    intelEnabled=data.enabled;
     if(EveDesktop.active)await syncIntelOverlay(data);
     const badge=$('#intel-count');if(badge){badge.textContent=fmt(data.items.length);badge.hidden=!data.items.length;}
     if(data.enabled&&data.notifications_enabled!==false&&EveDesktop.active&&notificationData?.preferences.os_enabled&&notificationData.preferences.categories.intel!==false){const status=await EveDesktop.notificationStatus();if(status.status==='authorized')await deliverNotifications('/api/intel/claim');}
@@ -39,9 +41,17 @@ async function pollIntelAlerts(){
 }
 async function syncIntelOverlay(data){
   if(EveDesktop.platform==='windows')return;
-  const prefs=data.overlay||{},items=[];
-  if(data.enabled&&prefs.enabled)for(const alert of data.items||[])for(const report of alert.overlay_reports||[]){items.push({key:alert.system_id+':'+report.id,system:alert.system_name,pilots:((report.pilots||[]).join(', ')||EveI18n.t('Nem megnevezett pilóta')).slice(0,1900),ships:(report.ships||[]).join(', ').slice(0,1900),character:alert.character_name,jumps:alert.jumps,when:report.when});}
-  await EveDesktop.syncIntelOverlay({enabled:!!(data.enabled&&prefs.enabled),seconds:prefs.seconds||60,items:items.slice(0,3000)});
+  const prefs=data.overlay||{},items=[],enabled=!!(data.enabled&&prefs.enabled&&data.notifications_enabled!==false&&notificationData?.preferences?.categories?.intel!==false);
+  if(enabled)for(const alert of data.items||[])for(const report of alert.overlay_reports||[]){items.push({key:alert.system_id+':'+report.id,system:alert.system_name,pilots:((report.pilots||[]).join(', ')||EveI18n.t('Nem megnevezett pilóta')).slice(0,1900),ships:(report.ships||[]).join(', ').slice(0,1900),character:alert.character_name,jumps:alert.jumps,when:report.when});}
+  await EveDesktop.syncIntelOverlay({enabled,seconds:prefs.seconds||60,items:items.slice(0,3000)});
+}
+async function applyIntelNotificationPreferences(preferences){
+  // Invalidate an alert fetch begun before this explicit preference change.
+  intelNotificationRevision++;
+  if(notificationData)notificationData.preferences=preferences;
+  const enabled=preferences.categories.intel!==false;
+  if(intelData)intelData.notifications_enabled=enabled;
+  if(!enabled&&EveDesktop.active)await syncIntelOverlay({enabled:false,notifications_enabled:false,items:[]});
 }
 function startIntelMonitor(){clearInterval(intelTick);intelTick=setInterval(()=>{if(!document.hidden)void pollIntelAlerts();},2000);void pollIntelAlerts();}
 function resetIntelMap(){intelZoom=1;intelPan={x:0,y:0};}
@@ -58,7 +68,7 @@ function renderIntel(content){
   if(intelWindowMode==='chat')return renderIntelChat(content);
   setHead('HELYI INTEL','Inteltérkép','Teljes régiótérkép, jelölt jumptávolság és jelentett pilóták hajóadatokkal.');$('#plan-status').hidden=true;
   actions(intelWindowMode==='map'?'':`<button class="button compact" id="intel-refresh">Állapot frissítése</button><button class="button compact" data-intel-window="map">Térkép külön ablakban</button><button class="button compact" data-intel-window="chat">Intelchat külön ablakban</button><button class="button compact" data-open-settings="intel">Intelbeállítások</button><button class="button compact" id="intel-notifications" aria-pressed="${intelData?.notifications_enabled!==false}">${intelData?.notifications_enabled===false?'Intelértesítések: kikapcsolva':'Intelértesítések: bekapcsolva'}</button>`);
-  if($('#intel-notifications'))$('#intel-notifications').onclick=async()=>{const button=$('#intel-notifications');button.disabled=true;try{await api('/api/notifications/preferences',{categories:{intel:intelData?.notifications_enabled===false}});await refreshNotifications(false);await refreshIntel();toast('Intelértesítések beállítása mentve.');}catch(e){error(e.message);button.disabled=false;}};
+  if($('#intel-notifications'))$('#intel-notifications').onclick=async()=>{const button=$('#intel-notifications');button.disabled=true;try{const preferences=await api('/api/notifications/preferences',{categories:{intel:intelData?.notifications_enabled===false}});await applyIntelNotificationPreferences(preferences);await refreshNotifications(false);await refreshIntel();toast('Intelértesítések beállítása mentve.');}catch(e){error(e.message);button.disabled=false;}};
   if($('#intel-refresh'))$('#intel-refresh').onclick=()=>void refreshIntel();bindIntelLinks();
   if(!intelData){content.innerHTML=empty('Inteladatok betöltése');void refreshIntel();return;}
   const d=intelData,p=d.preferences,current=d.reference||d.characters.find(c=>c.id===intelCharacter);

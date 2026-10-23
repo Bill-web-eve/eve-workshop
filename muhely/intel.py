@@ -168,9 +168,10 @@ def active_state(reports,now,ttl,owned=()):
 def collect_alerts(store,universe=None,now=None):
     from .notifications import preferences as notification_preferences
     now=time.time() if now is None else now;p=preferences(store);universe=universe or intel_universe.load(store)
+    notifications_enabled=notification_preferences(store)['categories']['intel']
     with store.db() as db:row=db.execute('SELECT data FROM intel_status WHERE id=1').fetchone()
     status=json.loads(row['data']) if row else {}
-    if not p['enabled'] or status.get('error') or now-(status.get('checked') or 0)>10:return {'items':[],'observed_domains':[],'enabled':p['enabled'],'notifications_enabled':notification_preferences(store)['categories']['intel'],'overlay':{'enabled':p['overlay_enabled'],'seconds':p['overlay_seconds']}}
+    if not p['enabled'] or status.get('error') or now-(status.get('checked') or 0)>10:return {'items':[],'observed_domains':[],'enabled':p['enabled'],'notifications_enabled':notifications_enabled,'overlay':{'enabled':p['overlay_enabled'] and notifications_enabled,'seconds':p['overlay_seconds']}}
     pos=positions(store,universe,p,now);reports=read_reports(store,p,now);owned={c['name'].casefold() for c in store.characters()}
     active,cleared=active_state(reports,now,p['ttl_minutes']*60,owned);items=[];domains=[]
     by_system=defaultdict(list)
@@ -188,7 +189,7 @@ def collect_alerts(store,universe=None,now=None):
             items[-1]['episode_key']=str(int(cleared.get(sid,0)))
             items[-1]['system_name']=name
             items[-1]['overlay_reports']=[{'id':r['id'],'when':r['timestamp'],'pilots':[pilot['name'] for pilot in r['pilots']],'ships':[ship['name'] for ship in r.get('ships',[])]} for r in rows]
-    return {'items':items,'observed_domains':domains,'enabled':p['enabled'],'notifications_enabled':notification_preferences(store)['categories']['intel'],'overlay':{'enabled':p['overlay_enabled'],'seconds':p['overlay_seconds']}}
+    return {'items':items,'observed_domains':domains,'enabled':p['enabled'],'notifications_enabled':notifications_enabled,'overlay':{'enabled':p['overlay_enabled'] and notifications_enabled,'seconds':p['overlay_seconds']}}
 
 
 from .refresh_policy import RefreshPolicy,AUTO_SECONDS

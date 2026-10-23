@@ -125,3 +125,33 @@ test('intel notification toggle changes only intel and keeps the map and chat en
  d.querySelector('#intel-notifications').click();await tick();await tick();await tick();
  assert.equal(notifications.preferences.categories.intel,true);
 });
+
+test('intel notification switch clears a visible overlay and blocks stale enabled payloads',async t=>{
+ const {w,d,run,intel}=await fixture();t.after(()=>w.close());const sent=[];
+ w.EveDesktop.active=true;w.EveDesktop.platform='mac';w.EveDesktop.syncIntelOverlay=async data=>sent.push(data);
+ intel.alerts=[{system_id:300001,system_name:'J5A-IX',character_name:'Own Pilot',jumps:2,overlay_reports:[{id:'visible',when:1800000000,pilots:['Reported Pilot'],ships:['Buzzard']}]}];
+ w.overlayPayload={enabled:true,notifications_enabled:true,overlay:{enabled:true,seconds:75},items:intel.alerts};
+ await run('syncIntelOverlay(overlayPayload)');assert.equal(sent.at(-1).enabled,true);assert.equal(sent.at(-1).items.length,1);
+ d.querySelector('#intel-notifications').click();await tick();await tick();await tick();
+ assert.equal(d.querySelector('#intel-notifications').getAttribute('aria-pressed'),'false');
+ assert.equal(sent.at(-1).enabled,false);assert.equal(sent.at(-1).items.length,0);
+ await run('syncIntelOverlay(overlayPayload)');assert.equal(sent.at(-1).enabled,false);assert.equal(sent.at(-1).items.length,0);
+ assert.equal(intel.preferences.enabled,true);assert(d.querySelector('#intel-map'));
+});
+test('late intel polling cannot reopen the overlay after notification disable',async t=>{
+ const {w,run,intel,notifications}=await fixture();t.after(()=>w.close());const sent=[];
+ w.EveDesktop.active=true;w.EveDesktop.syncIntelOverlay=async data=>sent.push(data);
+ let release;const gate=new Promise(resolve=>{release=resolve;}),original=w.fetch;
+ w.fetch=async(url,options)=>{if(url==='/api/intel/alerts'){await gate;return {ok:true,json:async()=>({enabled:true,notifications_enabled:true,overlay:{enabled:true,seconds:60},items:[]})};}return original(url,options);};
+ const pending=run('pollIntelAlerts()');await tick();
+ await run('applyIntelNotificationPreferences({...notificationData.preferences,categories:{...notificationData.preferences.categories,intel:false}})');
+ assert.equal(sent.at(-1).enabled,false);const cleared=sent.length;
+ release();await pending;assert.equal(sent.length,cleared);assert.equal(notifications.preferences.categories.intel,false);
+ assert.equal(intel.preferences.enabled,true);
+});
+test('server notification disable blocks overlays even before preferences reload',async t=>{
+ const {w,run}=await fixture();t.after(()=>w.close());const sent=[];
+ w.EveDesktop.syncIntelOverlay=async data=>sent.push(data);
+ await run('syncIntelOverlay({enabled:true,notifications_enabled:false,overlay:{enabled:true,seconds:60},items:[]})');
+ assert.equal(sent.at(-1).enabled,false);assert.equal(sent.at(-1).items.length,0);
+});

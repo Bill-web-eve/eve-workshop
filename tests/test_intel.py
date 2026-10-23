@@ -62,6 +62,18 @@ class IntelStoreTests(unittest.TestCase):
             if not p.is_symlink():os.utime(p,(NOW,NOW))
         self.monitor.scan(self.p,NOW)
     def alerts(self):return i.collect_alerts(self.store,self.u,NOW)
+    def test_intel_notification_disable_also_disables_overlay_without_hiding_map_reports(self):
+        self.enable(overlay_enabled=True,jumps=1)
+        self.write_log(line('L-A5XP Pilot One Buzzard')+'\n');self.scan()
+        self.assertTrue(self.alerts()['overlay']['enabled'])
+        n.save_preferences(self.store,{'categories':{'intel':False}})
+        disabled=self.alerts()
+        self.assertFalse(disabled['notifications_enabled']);self.assertFalse(disabled['overlay']['enabled'])
+        self.assertEqual(len(disabled['items']),1);self.assertEqual(len(self.monitor.dashboard(now=NOW)['reports']),1)
+        self.assertTrue(i.preferences(self.store)['enabled']);self.assertTrue(i.preferences(self.store)['overlay_enabled'])
+        n.save_preferences(self.store,{'categories':{'intel':True}})
+        self.assertTrue(self.alerts()['overlay']['enabled'])
+
     def test_overlay_preferences_validate_exact_seconds_and_alert_payload_keeps_report_detail(self):
         self.enable(overlay_enabled=True,overlay_seconds=75,jumps=1)
         self.write_log(line('L-A5XP Pilot One Buzzard')+'\n'+line('Jita Far Pilot')+'\n');self.scan()

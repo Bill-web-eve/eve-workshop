@@ -293,8 +293,8 @@ function render() {
   restorePlanSelector();
   const content=$('#view-content'); actions();
   document.body.classList.toggle('manual-view',view==='documentation');
-  $('.plan-selector').hidden=['mining','intel','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures')||(view==='inventory'&&inventoryMode!=='plan');
-  $('#plan-status').hidden=!plan?.stale_characters.length;
+  $('.plan-selector').hidden=['jobs','mining','intel','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures')||(view==='inventory'&&inventoryMode!=='plan');
+  $('#plan-status').hidden=view==='jobs'||!plan?.stale_characters.length;
   if(view==='mining'){ $('#plan-status').hidden=true;return renderMining(content); }
   if(view==='intel')return renderIntel(content);
   if(view==='notifications')return renderNotifications(content);

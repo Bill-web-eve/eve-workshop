@@ -35,3 +35,14 @@ test('manual refresh buttons pass the exception while automatic refreshes do not
  const requests=calls.filter(c=>c.url==='/api/pi/sync');
  assert.deepEqual(requests.map(c=>c.body),[{manual:false},{manual:true}]);
 });
+
+test('In progress hides the whole plan selector in personal and corporation scopes and restores it elsewhere',async t=>{
+ const {w,d,run}=await fixture();t.after(()=>w.close());
+ run('productId=92822;productName="Salvation";$("#product-search").value="Salvation";EveNumbers.set($("#target-quantity"),3);plan={stale_characters:["Old snapshot"],activity:"manufacturing",rows:[]};');
+ const selector=d.querySelector('.plan-selector'),target=d.querySelector('#target-quantity');
+ run('navigate("jobs")');await tick();assert.equal(selector.hidden,true);assert.equal(d.querySelector('#plan-status').hidden,true);
+ assert.equal(d.querySelector('#page-title').textContent,'What is already in progress');
+ run('corporationId=99;state.scope_label="Corp A";render()');await tick();assert.equal(selector.hidden,true);assert(d.querySelector('#view-content').textContent.includes('Corp A'));
+ run('navigate("saved")');await tick();assert.equal(selector.hidden,false);assert.equal(d.querySelector('.plan-selector'),selector);
+ assert.equal(target.value,'3');assert.equal(d.querySelector('#product-search').value,'Salvation');
+});

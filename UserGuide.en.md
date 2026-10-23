@@ -561,4 +561,6 @@ Use **Corporations → Monitoring** to enable or disable each corporation. Disab
 
 Automatic ESI requests are at least **15 minutes** apart per data source. The interval persists across windows and app restarts, including failed attempts. Local tables, countdowns and chat logs can update more frequently without ESI requests. Refresh buttons start manual checks; CCP caching still applies.
 
-**Intel map → Intel notifications: on/off** changes only the intel system notification category. Other notification preferences, the map and chat monitoring remain unchanged. Both the app’s master OS notification setting and OS permission are still required. Intel ESI locations also observe the 15-minute interval; old ESI positions do not establish live proximity. Local chat logs can continue updating continuously.
+**Intel map → Intel notifications: on/off** controls both intel system notifications and the transparent on-screen intel overlay. Turning it off also clears any alert already displayed. Other notification preferences, the map and chat monitoring remain unchanged. Both the app’s master OS notification setting and OS permission are still required. Intel ESI locations also observe the 15-minute interval; old ESI positions do not establish live proximity. Local chat logs can continue updating continuously.
+
+**In progress** shows industry jobs for the selected personal or corporation production scope. This page has no product, target quantity or saved-plan selector. Select the production scope in another production view.
