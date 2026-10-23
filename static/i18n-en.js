@@ -1,6 +1,23 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Helyi gyár termelésétől függ": "Depends on local factory production",
+  "Kitermelő bolygó": "Extraction planet",
+  "Gyártó bolygó": "Factory planet",
+  "Nincs ellenőrizhető programvég": "No verifiable program end",
+  "hátralévő programidő": "program time remaining",
+  "ESI programvége · helyi idő": "ESI program end · local time",
+  "ESI-programok": "ESI programs",
+  "Program vége / gyári fedezet": "Program end / factory coverage",
+  "Program kezdete": "Program start",
+  "{0} kitermelőprogram lejárt.": "{0} extractor programs have expired.",
+  "{0} kitermelőprogram időadata hiányos.": "Timing data is incomplete for {0} extractor programs.",
+  "A kitermelő bolygóknál kizárólag az ESI-program végét figyeljük. A gyártó bolygók fedezetét a saját, letöltött készletükből számoljuk; más bolygóról érkező utánpótlást nem feltételezünk. Az időpontok helyi időben látszanak.": "Extraction planets are monitored only by their ESI program end. Factory coverage uses each planet’s own downloaded stock; no supplies from other planets are assumed. Times are shown in your local time zone.",
+  "Az újraindított kitermelőprogram új lejárata akkor jelenik meg, amikor az ESI már visszaadja. A gyártó bolygó becslése nem kap jóváírást a kitermelő bolygó várható hozamából.": "A restarted extraction program’s new expiry appears when ESI returns it. Factory forecasts do not credit expected output from extraction planets.",
+  "A program vége közvetlen ESI-időpont; nem gyártási készletbecslés. Az újraindítást az új programkezdés és programvég azonosítja. A visszaszámlálás a frissítések között is halad.": "The program end is an ESI timestamp, independent of factory stock forecasts. Restarts are identified by the new program start and end. The countdown continues between refreshes.",
+  "A becslés kizárólag a bolygó letöltött készletéből, gyári puffereiből és a helyi gyárak termékeiből számol. Kitermelésből vagy más bolygóról érkező utánpótlást nem adunk hozzá. A már futó ciklus bemenetét nem vonjuk le újra.": "This forecast uses only the planet’s downloaded stock, factory buffers and products made by its local factories. No extraction or supplies from other planets are added. Inputs for a cycle already in progress are not deducted again.",
+  "Helyi gyár: {0}": "Local factory: {0}",
+
   "KÉSZLET": "INVENTORY",
   "Teljes EVE-készlet betöltése": "Loading full EVE inventory",
   "Készletnézet": "Inventory view",

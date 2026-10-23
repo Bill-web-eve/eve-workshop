@@ -240,18 +240,39 @@ def colony_view(record,catalog,now,hours):
             full=bool(known and capacity and used>=capacity-1e-6)
             storages.append({**base,'capacity':capacity,'used':used if known else None,'full':full,
                 'contents':[{'id':r['type_id'],'name':catalog.name(r['type_id']),'amount':r['amount']} for r in pin.get('contents',[])]})
+    # Extraction planets are monitored by their ESI program deadlines only.
+    # Local factories, modeled yields and other planets do not change this timer.
+    if extractors:
+        active_programs=[e for e in extractors if e['program_active']]
+        expired=[e for e in extractors if e['program_end'] is not None and e['program_end']<=now]
+        uncertain=[e for e in extractors if e not in active_programs and e not in expired]
+        next_end=min((e['program_end'] for e in active_programs),default=None)
+        status='alert' if expired and not active_programs else 'warning' if expired or uncertain else 'ok'
+        if not active_programs and not expired:status='unknown'
+        if next_end is not None and next_end-now<=hours*3600:status='warning'
+        messages=[]
+        if expired:messages.append(f'{len(expired)} kitermelőprogram lejárt.')
+        if uncertain:messages.append(f'{len(uncertain)} kitermelőprogram időadata hiányos.')
+        if next_end is not None and next_end-now<=hours*3600:messages.append(f'Kitermelőprogram jár le a következő {hours} órában.')
+        return {'id':pid,'name':metadata.get('name',f'Bolygó {pid}'),'system':catalog.pi_systems.get(planet['solar_system_id'],str(planet['solar_system_id'])),
+                'system_id':planet['solar_system_id'],'type':planet['planet_type'],'upgrade_level':planet['upgrade_level'],'pin_count':len(pins),
+                'last_update':updated,'layout_checked_at':record.get('layout_checked_at'),'state_old':False,'status':status,'alerts':messages,
+                'monitor_mode':'extraction','extractors':extractors,'factories':[],'unassigned':[],'unknown_recipes':[],'storages':storages,
+                'extraction':{'active_count':len(active_programs),'expired_count':len(expired),'unknown_count':len(uncertain),
+                              'next_end':next_end,'seconds_left':max(0,next_end-now) if next_end is not None else None,
+                              'last_end':max((e['program_end'] for e in expired),default=None),'source':'esi_expiry_time'},
+                'active_signals':len(active_programs),'next_enough':None,'next_materials':[],'horizon_hours':hours,
+                'period_enough':None,'period_materials':[],'stock_coverage_seconds':None,'bad_routes':len(bad_routes),'projection':None}
     supply=Supply(pins,factories,routes,catalog);next_cycle=supply.check(1);period=supply.check(hours*3600)
     coverage=supply.coverage()
     valid=not unknown_recipes and planet['num_pins']==len(pins) and not bad_routes
     stored_projection=forecast(pins,factories,routes,catalog,updated,now,hours,valid=valid)
-    projection=forecast(pins,factories,routes,catalog,updated,now,hours,valid=valid,extractors=extractors) if extractors else stored_projection
+    projection=stored_projection
     projection['stock_only_first_stop']=stored_projection['first_stop']
     projection['stock_only_seconds_left']=stored_projection['seconds_left']
     for f in projection['factories']:
         f['stock_stop']=next((r['expected_stop'] for r in stored_projection['factories'] if r['id']==f['id']),None)
     factory_by_id={f['id']:f for f in factories};factory_outputs={f['id']:set(f['recipe']['outputs']) for f in factories}
-    factory_inputs={f['id']:set(f['recipe']['inputs']) for f in factories}
-    extractor_by_id={e['id']:e for e in extractors}
     def providers(tid,target):
         result=[];seen={target};pending=[target]
         while pending:
@@ -261,9 +282,7 @@ def colony_view(record,catalog,now,hours):
                 source=route['source_pin_id']
                 if source in seen:continue
                 seen.add(source)
-                if source in extractor_by_id:
-                    if extractor_by_id[source]['active'] and extractor_by_id[source]['product_id']==tid:result.append(source)
-                elif source in factory_by_id:
+                if source in factory_by_id:
                     if tid in factory_outputs[source]:result.append(source)
                 elif source in supply.storage:pending.append(source)
         return result
@@ -271,25 +290,13 @@ def colony_view(record,catalog,now,hours):
         missing=next_cycle['affected'].get(factory['id'],[])
         replenishment=bool(missing and all(providers(tid,factory['id']) for tid in missing))
         factory['supply_status']='incoming' if replenishment else 'shortage' if missing else 'ready'
-        factory['supply_label']='Termeléstől / kitermeléstől függ' if replenishment else 'Készlethiány vagy útvonalhiány' if missing else 'Következő ciklus fedezett'
+        factory['supply_label']='Helyi gyár termelésétől függ' if replenishment else 'Készlethiány vagy útvonalhiány' if missing else 'Következő ciklus fedezett'
         factory['missing_materials']=[{'id':tid,'name':catalog.name(tid)} for tid in missing]
         factory['inputs']=[{'id':tid,'name':catalog.name(tid),'per_cycle':quantity,
                            'buffer':supply.contents[factory['id']].get(tid,0),
                            'suppliers':providers(tid,factory['id'])} for tid,quantity in factory['recipe']['inputs'].items()]
         factory['outputs']=[{'id':tid,'name':catalog.name(tid),'per_cycle':quantity} for tid,quantity in factory['recipe']['outputs'].items()]
-        # Trace extractor dependencies through storage and intermediate factories.
-        seen=set();pending=[(factory['id'],tid) for tid in factory_inputs[factory['id']]];extractor_sources=set()
-        while pending:
-            dest,tid=pending.pop()
-            if (dest,tid) in seen:continue
-            seen.add((dest,tid))
-            for r in routes:
-                if r['destination_pin_id']!=dest or r['content_type_id']!=tid:continue
-                source=r['source_pin_id']
-                if source in extractor_by_id and extractor_by_id[source]['product_id']==tid:extractor_sources.add(source)
-                elif source in supply.storage:pending.append((source,tid))
-                elif source in factory_by_id and tid in factory_outputs[source]:pending.extend((source,material) for material in factory_inputs[source])
-        factory['extractor_sources']=sorted(extractor_sources)
+        factory['extractor_sources']=[]
         factory['projection']=next((f for f in projection['factories'] if f['id']==factory['id']),None)
         factory.pop('recipe')
     active=sum(e['active'] for e in extractors)+sum(f['running_evidence'] and f['output_routed'] for f in factories)
@@ -316,7 +323,7 @@ def colony_view(record,catalog,now,hours):
     return {'id':pid,'name':metadata.get('name',f'Bolygó {pid}'),'system':catalog.pi_systems.get(planet['solar_system_id'],str(planet['solar_system_id'])),
             'system_id':planet['solar_system_id'],'type':planet['planet_type'],'upgrade_level':planet['upgrade_level'],'pin_count':len(pins),
             'last_update':updated,'layout_checked_at':record.get('layout_checked_at'),
-            'state_old':state_old,'status':status,'alerts':messages,'extractors':extractors,'factories':factories,
+            'state_old':state_old,'status':status,'alerts':messages,'monitor_mode':'factory','extractors':extractors,'factories':factories,
             'unassigned':unassigned,'unknown_recipes':unknown_recipes,'storages':storages,
             'active_signals':active,'next_enough':next_cycle['enough'] if not unknown_recipes else None,
             'next_materials':next_cycle['materials'],'horizon_hours':hours,'period_enough':period['enough'] if not unknown_recipes else None,

@@ -72,16 +72,66 @@ class PlanetTests(unittest.TestCase):
     def test_flow_reassigns_shared_sources_instead_of_greedy_false_shortage(self):
         self.assertEqual(maxflow({1:40,2:40},{3:40,4:40},{(1,3):40,(1,4):40,(2,3):40}),(80,set()))
 
-    def test_active_extraction_is_not_treated_as_future_inventory(self):
+    def extraction_record(self):
         r=record(0);r['layout']['pins'].append(pin(3,102,install_time=iso(NOW-100),expiry_time=iso(NOW+90000),
             extractor_details=dict(heads=[{'head_id':1}],cycle_time=900,product_type_id=1,qty_per_cycle=100)))
         r['layout']['links'].append(link(1,3));r['layout']['routes'].append(route(4,3,1,1,100));r['planet']['num_pins']=3
-        # Supply the second input, leaving water dependent on extraction.
-        r['layout']['pins'][0]['contents']=[content(2,1000)]
-        p=view(r);self.assertTrue(p['extractors'][0]['active']);self.assertFalse(p['next_enough'])
-        self.assertEqual(p['factories'][0]['supply_status'],'incoming')
-        r['layout']['pins'][2]['expiry_time']=iso(NOW-1)
-        self.assertFalse(view(r)['extractors'][0]['active']);self.assertEqual(view(r)['factories'][0]['supply_status'],'shortage')
+        return r
+
+    def test_extraction_timer_is_independent_of_local_factory_shortages(self):
+        r=self.extraction_record();p=view(r)
+        self.assertEqual(p['monitor_mode'],'extraction');self.assertEqual(p['status'],'ok')
+        self.assertEqual(p['extraction']['next_end'],NOW+90000)
+        self.assertEqual(p['extraction']['seconds_left'],90000)
+        self.assertIsNone(p['projection']);self.assertEqual(p['factories'],[])
+        self.assertEqual(p['period_materials'],[])
+        # A missing output route cannot alter the program deadline.
+        r['layout']['routes']=[];p=view(r)
+        self.assertFalse(p['extractors'][0]['active']);self.assertTrue(p['extractors'][0]['program_active'])
+        self.assertEqual(p['status'],'ok');self.assertEqual(p['extraction']['next_end'],NOW+90000)
+
+    def test_restart_replaces_expired_timer_without_reusing_old_factory_date(self):
+        r=self.extraction_record();e=r['layout']['pins'][-1]
+        e['install_time']=iso(NOW-86400);e['expiry_time']=iso(NOW-1)
+        self.assertEqual(view(r)['status'],'alert')
+        # The planet's last_update can be older than the ECU restart.
+        r['planet']['last_update']=iso(NOW-86400)
+        e['install_time']=iso(NOW);e['expiry_time']=iso(NOW+7*86400)
+        before=deepcopy(r);p=view(r)
+        self.assertEqual(p['status'],'ok');self.assertFalse(p['state_old'])
+        self.assertEqual(p['extractors'][0]['program_start'],NOW)
+        self.assertEqual(p['extraction']['next_end'],NOW+7*86400)
+        r['layout_checked_at']=NOW+3600
+        later=colony_view(r,catalog(),NOW+3600,24)
+        self.assertEqual(later['extraction']['next_end'],p['extraction']['next_end'])
+        self.assertEqual(later['extraction']['seconds_left'],p['extraction']['seconds_left']-3600)
+        self.assertEqual(r['layout'],before['layout'])
+
+    def test_multiple_extractors_and_exact_expiry_boundary(self):
+        r=self.extraction_record();other=deepcopy(r['layout']['pins'][-1]);other['pin_id']=4
+        other['expiry_time']=iso(NOW+100);r['layout']['pins'].append(other);r['planet']['num_pins']=4
+        p=view(r);self.assertEqual(p['status'],'warning');self.assertEqual(p['extraction']['next_end'],NOW+100)
+        p=colony_view(r,catalog(),NOW+100,24)
+        self.assertEqual(p['extraction']['expired_count'],1);self.assertEqual(p['extraction']['active_count'],1)
+        self.assertEqual(p['extraction']['next_end'],NOW+90000)
+        p=colony_view(r,catalog(),NOW+90000,24)
+        self.assertEqual(p['status'],'alert');self.assertIsNone(p['extraction']['next_end'])
+
+    def test_factory_planets_use_only_their_own_stock(self):
+        poor=record(40);rich=record(10000)
+        before=view(poor)
+        self.assertEqual(before['monitor_mode'],'factory');self.assertEqual(before['projection']['first_stop'],NOW+7190)
+        with tempfile.TemporaryDirectory() as folder:
+            store=Store(folder);store.add_character(123,'Pilot')
+            # Large supplies on a separate planet must not extend the poor planet.
+            rich['planet']['planet_id']=2
+            store.save_snapshots(123,{'pi':snap({'colonies':[poor,rich,self.extraction_record()]})},domain='pi')
+            rows=dashboard(store,catalog(),now=NOW)['colonies']
+            poor_row=next(r for r in rows if r['id']==1 and r['monitor_mode']=='factory')
+            rich_row=next(r for r in rows if r['id']==2)
+            self.assertEqual(poor_row['projection'],before['projection'])
+            self.assertGreater(rich_row['projection']['first_stop'],poor_row['projection']['first_stop'])
+            self.assertIsNone(next(r for r in rows if r['monitor_mode']=='extraction')['projection'])
 
     def test_expired_extractors_alert_and_fresh_http_does_not_make_old_factory_current(self):
         r=record(0);r['layout']['pins'][1].pop('last_cycle_start')

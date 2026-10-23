@@ -85,8 +85,9 @@ class ForecastTests(unittest.TestCase):
         self.assertEqual(a['extractors'][0]['cycles_remaining'],8)
         self.assertEqual(b['extractors'][0]['cycles_remaining'],0)
         self.assertFalse(b['extractors'][0]['program_active'])
-        self.assertEqual(a['factories'][0]['extractor_sources'],[3])
-        self.assertEqual(a['projection']['materials_now'],[])
+        self.assertEqual(a['factories'],[])
+        self.assertIsNone(a['projection']);self.assertIsNone(b['projection'])
+        self.assertEqual(b['status'],'alert')
 
     def test_capacity_prevents_phantom_intermediate_inventory(self):
         c=catalog();c.pi_types[100]['capacity']=0
@@ -115,12 +116,14 @@ class ForecastTests(unittest.TestCase):
         self.assertTrue(all(f['running_now'] for f in p['factories']))
         self.assertEqual(sum(m['quantity'] for f in p['factories'] for m in f['products_next_period']),10)
 
-    def test_extractor_dependency_follows_material_types_not_just_shared_storage(self):
-        r=record(80);r['layout']['pins'].append(pin(3,102,install_time=iso(NOW-100),expiry_time=iso(NOW+800),extractor_details=dict(heads=[{}],cycle_time=100,product_type_id=3,qty_per_cycle=100)))
-        r['layout']['links'].append(link(1,3));r['layout']['routes'].append(route(4,3,1,3,100));r['planet']['num_pins']=3
-        self.assertEqual(colony_view(r,catalog(),NOW,24)['factories'][0]['extractor_sources'],[])
-        r['layout']['routes'][-1]['content_type_id']=1;r['layout']['pins'][-1]['extractor_details']['product_type_id']=1
-        self.assertEqual(colony_view(r,catalog(),NOW,24)['factories'][0]['extractor_sources'],[3])
+    def test_extraction_routes_never_enable_factory_projection_in_extraction_mode(self):
+        r=self.mining_record()
+        for product in [1,3]:
+            r['layout']['pins'][-1]['extractor_details']['product_type_id']=product
+            r['layout']['routes'][-1]['content_type_id']=product
+            p=colony_view(r,catalog(),NOW,24)
+            self.assertEqual(p['monitor_mode'],'extraction');self.assertIsNone(p['projection'])
+            self.assertEqual(p['extraction']['next_end'],NOW+3*3600)
 
     def mining_record(self,cycles=3):
         r=record(0);r['layout']['pins'][0]['contents']=[content(2,200)]
@@ -135,35 +138,15 @@ class ForecastTests(unittest.TestCase):
         self.assertEqual(extraction_yield(0,900,0),0)
         self.assertGreater(extraction_yield(100,3600,0),40)
 
-    def test_modeled_extraction_feeds_factories_until_program_end(self):
-        p=self.projection(self.mining_record())
-        self.assertIn('modeled_yield',p['warnings'])
-        self.assertEqual(p['stock_only_first_stop'],NOW)
-        self.assertEqual(p['first_stop'],NOW+4*3600)
-        self.assertEqual(p['factories'][0]['products_next_period'][0]['quantity'],15)
-        self.assertFalse(p['factories'][0]['running_now'])
-        self.assertEqual(p['extraction_since_snapshot'],[])
-        self.assertGreater(p['extraction_next_period'][0]['quantity'],120)
-
-    def test_expired_program_still_reconstructs_past_production_without_new_extraction(self):
-        r=self.mining_record(2);p=self.projection(r,now=NOW+8000,hours=1)
-        self.assertEqual(p['first_stop'],NOW+10800)
-        self.assertEqual(p['factories'][0]['completed_cycles'],1)
-        self.assertEqual(p['factories'][0]['products_next_period'][0]['quantity'],5)
-        self.assertEqual(p['extraction_next_period'],[])
-        self.assertTrue(p['factories'][0]['running_now'])
-        later=self.projection(r,now=NOW+20000)
-        self.assertEqual(later['first_stop'],p['first_stop'])
-        self.assertFalse(later['factories'][0]['running_now'])
-        self.assertEqual(later['factories'][0]['products_next_period'],[])
-
-    def test_cached_state_does_not_recredit_extraction_before_baseline(self):
-        r=self.mining_record();r['planet']['last_update']=iso(NOW+4000)
-        p=self.projection(r,now=NOW+4000)
-        self.assertEqual(p['extraction_since_snapshot'],[])
-        # Only the two remaining extractor cycles can fund new factory output.
-        self.assertEqual(p['factories'][0]['products_next_period'][0]['quantity'],10)
-        self.assertEqual(p['first_stop'],NOW+14400)
+    def test_extraction_does_not_replay_modeled_past_or_future_factory_output(self):
+        r=self.mining_record(2)
+        for now in [NOW,NOW+8000,NOW+20000]:
+            p=colony_view(r,catalog(),now,24)
+            self.assertIsNone(p['projection']);self.assertEqual(p['factories'],[])
+            self.assertEqual(p['extractors'][0]['program_end'],NOW+7200)
+        r['planet']['last_update']=iso(NOW+4000)
+        p=colony_view(r,catalog(),NOW+4000,24)
+        self.assertIsNone(p['projection']);self.assertEqual(p['extraction']['seconds_left'],3200)
 
     def test_shortened_age_limit_never_promises_unexamined_thirty_day_coverage(self):
         with patch('muhely.pi_forecast.MAX_SECONDS',3600):p=self.projection(record(10000))

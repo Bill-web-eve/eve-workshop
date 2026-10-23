@@ -102,13 +102,14 @@ def collect(store,catalog,now=None):
         if c['status']=='unknown':unknown('pi:'+str(c['id']),'pi:'+str(c['id']),c['name'],checked=c['checked_at'],source_category='pi',character_id=c['id'],character_name=c['name'])
     for c in pd['colonies']:
         domain=f"pi:{c['character_id']}:{c['id']}";projection=c.get('projection') or {}
-        computed=projection.get('available') and not c['cached']
+        extracting=c.get('monitor_mode')=='extraction'
+        computed=projection.get('available') and not c['cached'] and not extracting
         known=not c['cached'] and (c['status']!='unknown' or computed)
         if known:observed.add(domain)
         else:unknown(domain,domain,c['name'],checked=c['checked_at'],source_category='pi',character_id=c['character_id'],character_name=c['character_name'],planet_id=c['id'])
         stopped=[f for f in projection.get('factories',[]) if not f['running_now'] and not f['products_next_period']] if computed else []
         expired=[e for e in c['extractors'] if e.get('program_end') is not None and e['program_end']<=now]
-        kind='pi_estimated' if stopped else 'pi_extractor' if expired and not c['cached'] else 'pi_idle' if c['status']=='alert' and not c['cached'] else None
+        kind='pi_extractor' if expired and not c['cached'] else 'pi_estimated' if stopped else 'pi_idle' if c['status']=='alert' and not c['cached'] and not extracting else None
         if kind:
             add(domain+':stop',domain,'pi',kind,c['name'],when=projection.get('first_stop') if stopped else min(e['program_end'] for e in expired) if expired else c['last_update'],
                 checked=c['checked_at'],reliable=known or (kind=='pi_extractor' and not c['cached']),character_id=c['character_id'],character_name=c['character_name'],planet_id=c['id'],factories=len(stopped),estimated=bool(stopped))

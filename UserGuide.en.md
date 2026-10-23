@@ -239,6 +239,17 @@ Missing BPC capacity is shown in runs. With five required runs and a two-run cop
 
 Stock, ready components and active outputs are deducted before blueprint requirements. A component already covered does not require another BPC. Actual copy runs can be reserved by a saved plan, released or consumed only once. Personal and corporation copies remain separate. The missing-run unit must not be interpreted as raw-material units; procurement CSV columns distinguish units and runs.
 
+## Planets and PI
+
+**Planets and PI** lists the colonies of all connected characters. Authorize **esi-planets.manage_planets.v1** under **Settings → Data access**, then refresh PI data. The app only reads these data.
+
+- **Extraction planets** show the ESI program start, program end and time remaining. Local factory shortages do not shorten the extraction program. A restart replaces the timer when ESI returns the new start and expiry. The countdown continues between refreshes; a fresh HTTP request never moves the deadline.
+- **Factory planets** use only their own downloaded material stock, individual factory buffers and intermediate products made locally from those materials. Expected extraction, stock on other planets and future imports are not credited. Shared stock is spent only once and configured routes constrain supply.
+
+Use **Details** to inspect a planet. Factory supply checks cover the next cycle and **1 / 6 / 24 / 72 hours**. **Time-based production forecast** consumes the dated stock as time passes and estimates shutdown and output. Inputs already paid for a running cycle are not deducted again. The original stock table remains a snapshot, separate from the forecast. Export supply shortages as CSV when required.
+
+Missing permissions, failed requests or stale API snapshots are marked for review. Old factory colony states remain dated estimates; refreshing the HTTP response does not make the original colony state current. Open the planet in EVE and refresh the app after the ESI cache expires to obtain updated data. The visible PI page checks every minute while the app is running. Closed apps do not monitor planets.
+
 ## Production dependency graph
 
 Open **Production graph** for the current target or saved plan. Arrows run from inputs to products. By default only remaining manufacturing and reactions appear, with the same quantities and runs as the table. Nodes show rounded output, deficit, free stock and active output after reservations.

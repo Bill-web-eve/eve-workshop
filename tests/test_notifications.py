@@ -50,6 +50,21 @@ class NotificationTests(unittest.TestCase):
         self.pd['colonies'][0]['cached']=True;self.assertEqual(n.claim(self.s,self.data(),NOW),[])
         self.pd['colonies']=[{**base,'id':11,'projection':{},'extractors':[{'program_end':NOW-100}]}]
         rows=n.claim(self.s,self.data(),NOW);self.assertEqual(rows[0]['kind'],'pi_extractor')
+    def test_extraction_alerts_ignore_factory_projection_and_restart_resolves_episode(self):
+        base={'id':10,'character_id':1,'character_name':'Pilot 1','name':'Planet','checked_at':NOW,'cached':False,
+              'last_update':NOW-5000,'status':'ok','monitor_mode':'extraction',
+              'projection':{'available':True,'first_stop':NOW-50,'factories':[{'running_now':False,'products_next_period':[]}]}}
+        self.pd['colonies']=[{**base,'extractors':[{'program_end':NOW+86400}]}]
+        self.enable();self.assertEqual(n.claim(self.s,self.data(),NOW),[])
+        colony=self.pd['colonies'][0];colony['extractors'][0]['program_end']=NOW-100;colony['status']='alert'
+        first=n.claim(self.s,self.data(),NOW);self.assertEqual(first[0]['kind'],'pi_extractor')
+        self.assertFalse(first[0]['estimated']);n.acknowledge(self.s,[first[0]['receipt']])
+        colony['extractors'][0]['program_end']=NOW+86400;colony['status']='ok'
+        self.assertEqual(n.claim(self.s,self.data(),NOW+1),[])
+        colony['extractors'][0]['program_end']=NOW-1;colony['status']='alert'
+        again=n.claim(self.s,self.data(),NOW+2)
+        self.assertNotEqual(again[0]['notification_id'],first[0]['notification_id'])
+
     def test_three_day_moon_window_corp_ownership_and_stale_guards(self):
         self.s.save_moon({'id':'moon1','moon_id':10,'system_id':100,'structure':'Athanor','enabled':True,'ores':[]})
         base={'moon_record_id':'moon1','moon_name':'Moon','structure_id':50,'date':iso(NOW+3*86400),'kind':'extraction','stale':False,'checked':NOW,'corporation_id':99,'volume':1000}
