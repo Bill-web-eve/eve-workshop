@@ -16,7 +16,7 @@ from .planner import PlanningError,integer
 
 LOCATION_SCOPE='esi-location.read_location.v1'
 PROJECT='EVEWorkshop/1.2 (https://github.com/Bill-web-eve/eve-workshop)'
-DEFAULTS={'tracking':True,'interval_seconds':60,'gap_minutes':45,'padding_minutes':15,'character_ids':None}
+DEFAULTS={'tracking':True,'live':True,'interval_seconds':60,'gap_minutes':45,'padding_minutes':15,'character_ids':None}
 
 
 def schema(store):
@@ -28,6 +28,9 @@ def schema(store):
         CREATE TABLE IF NOT EXISTS fleet_positions(character_id INTEGER NOT NULL,ts REAL NOT NULL,system_id INTEGER NOT NULL,PRIMARY KEY(character_id,ts));
         CREATE INDEX IF NOT EXISTS fleet_positions_time ON fleet_positions(ts);
         CREATE TABLE IF NOT EXISTS fleet_sources(key TEXT PRIMARY KEY,data TEXT NOT NULL,checked REAL NOT NULL,expires REAL NOT NULL,error TEXT);
+        CREATE TABLE IF NOT EXISTS fleet_live_buffer(id INTEGER PRIMARY KEY,ts REAL NOT NULL,system_id INTEGER NOT NULL,seen REAL NOT NULL,characters TEXT NOT NULL,data TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS fleet_live_buffer_window ON fleet_live_buffer(system_id,ts);
+        CREATE INDEX IF NOT EXISTS fleet_live_buffer_seen ON fleet_live_buffer(seen);
         ''')
 
 
@@ -40,7 +43,7 @@ def save_preferences(store,data):
     if not isinstance(data,dict) or set(data)-set(DEFAULTS):raise PlanningError('Hibás flottakövetési beállítás.')
     p=preferences(store)
     for key,value in data.items():
-        if key=='tracking':
+        if key in ['tracking','live']:
             if type(value) is not bool:raise PlanningError('Hibás flottakövetési beállítás.')
         elif key=='character_ids':
             ids={c['id'] for c in store.characters()}
@@ -228,14 +231,17 @@ class Fleet:
         self.lock=threading.RLock();self.location_lock=threading.Lock();self.stop_event=threading.Event();self.thread=None
         self.state={'running':False,'kind':None,'completed':0,'total':0,'subject':'','resource':'','error':None,'finished':None,'results':[],'revision':0}
         self.location_status={'running':False,'character':'','checked':None}
+        from .fleet_live import LiveFeed
+        self.live=LiveFeed(self)
     def actors(self):
         p=preferences(self.store);return [c for c in self.store.characters() if p['character_ids'] is None or c['id'] in p['character_ids']]
     def start(self):
         if self.thread and self.thread.is_alive():return
-        self.stop_event.clear();self.thread=threading.Thread(target=self._work,daemon=True,name='EVE-fleet-tracking');self.thread.start()
+        self.stop_event.clear();self.thread=threading.Thread(target=self._work,daemon=True,name='EVE-fleet-tracking');self.thread.start();self.live.start()
     def stop(self):
         self.stop_event.set()
         if self.thread:self.thread.join(timeout=3)
+        if self.live.thread:self.live.thread.join(timeout=3)
     def _work(self):
         while not self.stop_event.is_set():
             try:
@@ -247,6 +253,13 @@ class Fleet:
                     if due:
                         with self.lock:busy=self.state['running']
                         if not busy:self.start_refresh()
+                    name_check=cache(self.store,'live:names')
+                    if preferences(self.store)['live'] and (not name_check or name_check['expires']<=time.time()):
+                        with self.lock:busy=self.state['running']
+                        if not busy:
+                            remember(self.store,'live:names',{},time.time(),time.time()+900)
+                            with self.store.db() as db:recent=[json.loads(r[0]) for r in db.execute('SELECT data FROM fleet_kills WHERE ts>=?',(time.time()-6*3600,))]
+                            self.resolve_battle_names(recent)
             except Exception:
                 with self.lock:self.location_status.update(running=False,checked=time.time())
             self.stop_event.wait(5)
@@ -280,7 +293,43 @@ class Fleet:
             with self.lock:self.location_status.update(running=False,character='',checked=time.time())
         finally:self.location_lock.release()
     def status(self):
-        with self.lock:return {'task':copy.deepcopy(self.state),'location':dict(self.location_status)}
+        with self.lock:state={'task':copy.deepcopy(self.state),'location':dict(self.location_status)}
+        return {**state,'live':self.live.status()}
+    def ingest_live(self,rows):
+        """Keep own kills and matching session windows, not a global kill archive.
+
+        A bounded six-hour staging buffer lets a newly received own kill discover
+        surrounding losses that arrived earlier in the feed. Position samples
+        can expand windows on subsequent polls without needing another kill.
+        """
+        validate_kills(rows);now=time.time();p=preferences(self.store);actors=self.actors();ids={c['id'] for c in actors}
+        if not ids:return 0
+        with self.store.db() as db:
+            db.executemany('INSERT OR REPLACE INTO fleet_live_buffer VALUES(?,?,?,?,?,?)',[(k['killmail_id'],timestamp(k['killmail_time']),k['solar_system_id'],now,','+','.join(str(cid) for cid in participants(k)|{k['victim'].get('character_id')} if type(cid) is int)+',',json.dumps(k)) for k in rows])
+            db.execute('DELETE FROM fleet_live_buffer WHERE seen<?',(now-6*3600,))
+            db.execute('DELETE FROM fleet_live_buffer WHERE id IN (SELECT id FROM fleet_live_buffer ORDER BY seen DESC,id DESC LIMIT -1 OFFSET 10000)')
+            own={}
+            for r in db.execute('SELECT data FROM fleet_kills WHERE ts>=?',(now-90*86400,)):
+                k=json.loads(r[0])
+                if any(role(k,cid) for cid in ids):own[k['killmail_id']]=k
+            for r in db.execute('SELECT data FROM fleet_live_buffer WHERE '+' OR '.join('characters LIKE ?' for _ in ids),tuple('%,'+str(cid)+',%' for cid in ids)):
+                k=json.loads(r[0])
+                if any(role(k,cid) for cid in ids):own[k['killmail_id']]=k
+            selected=own.copy()
+            for cid in ids:
+                positions={}
+                for seed in sessions(list(own.values()),[],cid,p,self.universe):
+                    for r in db.execute('SELECT * FROM fleet_positions WHERE character_id=? AND ts>=? AND ts<=?',(cid,seed['start'],seed['end'])):positions[r['ts']]=dict(r)
+                for session in sessions(list(own.values()),list(positions.values()),cid,p,self.universe):
+                    for w in session['windows']:
+                        for r in db.execute('SELECT data FROM fleet_live_buffer WHERE system_id=? AND ts>=? AND ts<=?',(w['system_id'],w['start'],w['end'])):
+                            k=json.loads(r[0]);selected[k['killmail_id']]=k
+            changed=0
+            for k in selected.values():
+                body=json.dumps(k);old=db.execute('SELECT data FROM fleet_kills WHERE id=?',(k['killmail_id'],)).fetchone()
+                if old and old[0]==body:continue
+                db.execute('INSERT OR REPLACE INTO fleet_kills VALUES(?,?,?,?)',(k['killmail_id'],timestamp(k['killmail_time']),k['solar_system_id'],body));changed+=1
+        return changed
     def _progress(self,values):
         with self.lock:self.state.update({k:v for k,v in values.items() if k in ['completed','total','subject','resource','page','pages','mode']})
     def start_refresh(self,cid=None,session_id=None):
@@ -408,7 +457,7 @@ class Fleet:
         with self.lock:status=copy.deepcopy(self.state);location_status=copy.deepcopy(self.location_status)
         return {'preferences':p,'characters':access,'sessions':sorted(activity,key=lambda s:-s['last']),
                 'kills':[self.row(k,None,names) for k in sorted(own,key=lambda k:-timestamp(k['killmail_time']))],
-                'status':status,'location_status':location_status,'calculated_at':now}
+                'status':status,'location_status':location_status,'live_status':self.live.status(),'calculated_at':now}
     def row(self,k,cid=None,names=None):
         value=k.get('zkb',{}).get('totalValue');victim=k['victim'];at=timestamp(k['killmail_time']);sid=k['solar_system_id']
         return {'id':k['killmail_id'],'at':at,'system_id':sid,'system':self.universe.systems.get(sid,{}).get('name',str(sid)),

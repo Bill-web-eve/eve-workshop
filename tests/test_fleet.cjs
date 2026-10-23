@@ -7,7 +7,7 @@ async function fixture(){
  const state={csrf:'test',version:'1.2.0',characters,corporations:[],production_characters:[],plans:[],jobs:[],settings:{source:'manual',character_ids:[],location_ids:[]},task:{running:false,results:[]},sde:{buildNumber:1},recipe_count:1,scope_label:'Personal'};
  const at=Date.now()/1000-1000,windows=[{system_id:1,name:'Alpha',start:at-900,end:at+900,kill_ids:[123],esi_samples:1}];
  const row={id:123,at,system_id:1,system:'Alpha',ship_id:590,ship:'Ship',value:1000,attackers:3,role:'kill',characters:[{id:11,name:'Alice',role:'kill'}]};
- const data={preferences:{tracking:true,interval_seconds:60,gap_minutes:45,padding_minutes:15,character_ids:null},characters:characters.map(c=>({...c,selected:true,location_access:true,complete:true,checked:at,next_check:at+3600,location_checked:at,system:'Alpha'})),sessions:[{id:'11:123',character_id:11,character_name:'Alice',first:at,last:at,start:at-900,end:at+900,kills:1,losses:0,esi_samples:1,visits:[{...windows[0],first:at,last:at}],windows,rows:[row],report:null}],kills:[row],status:{running:false,results:[],revision:0},location_status:{running:false}};
+ const data={preferences:{tracking:true,live:true,interval_seconds:60,gap_minutes:45,padding_minutes:15,character_ids:null},characters:characters.map(c=>({...c,selected:true,location_access:true,complete:true,checked:at,next_check:at+3600,location_checked:at,system:'Alpha'})),sessions:[{id:'11:123',kill_ids:[123],character_id:11,character_name:'Alice',first:at,last:at,start:at-900,end:at+900,kills:1,losses:0,esi_samples:1,visits:[{...windows[0],first:at,last:at}],windows,rows:[row],report:null}],kills:[row],status:{running:false,results:[],revision:0},location_status:{running:false},live_status:{enabled:true,phase:'live',checked:at,received:20,saved:2,error:null}};
  w.localStorage.setItem('eve-muhely-language','en');w.confirm=()=>true;
  w.fetch=async(url,opts)=>{calls.push([url,opts?.body?JSON.parse(opts.body):null]);let value;
   if(url.startsWith('/api/state'))value=state;
@@ -53,7 +53,7 @@ test('tracking settings allow a one-minute interval and do not alter inventory o
 test('visible progress includes current system and page; incomplete reports remain explicit',async t=>{
  const {w,d,run,data}=await fixture();t.after(()=>w.close());
  data.status={running:true,kind:'report',total:3,completed:1,subject:'Alpha',page:2,results:[]};run('render()');
- assert(d.querySelector('progress'));assert(d.querySelector('#fleet-refresh').disabled);assert.match(d.querySelector('#view-content [role=status]').textContent,/Alpha/);
+ assert(d.querySelector('progress'));assert(d.querySelector('#fleet-refresh').disabled);assert.match(d.querySelector('#view-content progress').closest('[role=status]').textContent,/Alpha/);
  data.status.running=false;data.status.results=[{ok:true,partial:true}];run('render()');await tick();assert.match(d.querySelector('#view-content .banner.warn').textContent,/partial/);
 });
 
@@ -124,4 +124,19 @@ test('battle group movement, side count and reset target the open session',async
  select=d.querySelector('#battle-side-count');select.value='4';select.dispatchEvent(new w.Event('change'));await tick();await tick();
  assert.deepEqual(calls.filter(c=>c[0]==='/api/fleet/sides').at(-1)[1],{session_id:'11:123',side_count:4});
  d.querySelector('#battle-reset').click();await tick();await tick();assert.deepEqual(calls.filter(c=>c[0]==='/api/fleet/sides').at(-1)[1],{session_id:'11:123',reset:true});
+});
+test('live feed status is translated, retry time is visible, and live tracking can be toggled separately',async t=>{
+ const {w,d,run,data,calls}=await fixture();t.after(()=>w.close());
+ assert.match(d.querySelector('#fleet-live-status').textContent,/Live feed active/);assert.match(d.querySelector('#fleet-live-status').textContent,/Relevant updates: 2/);
+ data.live_status={...data.live_status,phase:'retrying',error:'Az élő zKillboard-adatfolyam átmenetileg nem érhető el.',retry_at:Date.now()/1000+60};run('render()');await tick();
+ assert.match(d.querySelector('#fleet-live-status').textContent,/Waiting to reconnect/);assert.match(d.querySelector('#fleet-live-status').textContent,/Retry at:/);
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('#fleet-live-status').textContent));
+ const form=d.querySelector('#fleet-settings');form.elements.live.checked=false;form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();await tick();
+ const body=calls.find(c=>c[0]==='/api/fleet/preferences')[1];assert.equal(body.live,false);assert.equal(body.tracking,true);
+});
+test('live updates preserve an open session when an earlier kill changes its ID',async t=>{
+ const {w,d,run,data}=await fixture();t.after(()=>w.close());
+ d.querySelector('[data-fleet-session]').click();await tick();
+ run('fleetData=JSON.parse(JSON.stringify(fleetData))');data.sessions=[{...data.sessions[0],id:'11:122',kill_ids:[122,123]}];
+ await run('loadFleet(true)');assert.equal(d.querySelector('[data-fleet-session="11:122"]').getAttribute('aria-pressed'),'true');assert(d.querySelector('#fleet-session'));
 });
