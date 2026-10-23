@@ -26,7 +26,7 @@ function fleetLink(k){
 }
 function fleetRole(r){return esc(EveI18n.t(r==='kill'?'Kill':r==='loss'?'Veszteség':'Környező esemény'));}
 function fleetTable(rows,id){
-  return table(['Időpont','Rendszer','Esemény','Megsemmisült hajó','Résztvevő támadók','Érték (ISK)','Killmail'],rows.map(k=>`<tr><td data-sort-value="${k.at}" title="${fleetUTC(k.at)}">${fleetAt(k.at)}</td><td data-i18n-skip>${esc(k.system)}</td><td>${k.characters?.length?k.characters.map(c=>`<span data-i18n-skip>${esc(c.name)}</span> · ${fleetRole(c.role)}`).join('<br>'):fleetRole(k.role)}</td><td>${itemName(k.ship)}</td><td class="num">${fmt(k.attackers)}</td><td class="num">${k.value==null?'–':fmt(Math.round(k.value))}</td><td data-sort-value="${k.id}" data-filter-value="${esc(k.ship)} #${k.id}">${fleetLink(k)}</td></tr>`),id);
+  return table(['Killmail','Időpont','Rendszer','Esemény','Megsemmisült hajó','Résztvevő támadók','Érték (ISK)'],rows.map(k=>`<tr><td data-sort-value="${k.id}" data-filter-value="${esc(k.ship)} #${k.id}">${fleetLink(k)}</td><td data-sort-value="${k.at}" title="${fleetUTC(k.at)}">${fleetAt(k.at)}</td><td data-i18n-skip>${esc(k.system)}</td><td>${k.characters?.length?k.characters.map(c=>`<span data-i18n-skip>${esc(c.name)}</span> · ${fleetRole(c.role)}`).join('<br>'):fleetRole(k.role)}</td><td>${itemName(k.ship)}</td><td class="num">${fmt(k.attackers)}</td><td class="num">${k.value==null?'–':fmt(Math.round(k.value))}</td></tr>`),id);
 }
 function renderFleet(content){
   setHead('HARCOK ÉS ÚTVONAL','Flottatevékenység','A karakterek nyilvános killjei és veszteségei, ESI-pozíciókkal kiegészített flottamenetek.');
