@@ -8,7 +8,7 @@ from .planner import PlanningError
 from .esi import ESI,EsiError,AuthenticationError,INTEL_SCOPES
 from . import intel_universe
 
-DEFAULTS={'enabled':False,'folder':'','channels':[],'character_ids':None,'manual_locations':{},'jumps':5,'ttl_minutes':20,'cooldown_seconds':20,'region_ids':[],'allow_local_alerts':False,'sound':False,'overlay_enabled':True,'overlay_seconds':60}
+DEFAULTS={'enabled':False,'killfeed_enabled':True,'kill_region_ids':[],'folder':'','channels':[],'character_ids':None,'manual_locations':{},'jumps':5,'ttl_minutes':20,'cooldown_seconds':20,'region_ids':[],'allow_local_alerts':False,'sound':False,'overlay_enabled':True,'overlay_seconds':60}
 FILE=re.compile(r'^(?P<channel>.+)_(?P<date>\d{8})_(?P<time>\d{6})_(?P<character>\d+)\.txt$',re.I)
 LINE=re.compile(r'^\ufeff*\[\s*(\d{4}\.\d\d\.\d\d \d\d:\d\d:\d\d)\s*\]\s*([^>]{1,100})>\s*(.*)$')
 LINK=re.compile(r'<url=["\']?showinfo:(137[3-9]|138[0-6])//(\d+)["\']?>(.*?)</url>',re.I)
@@ -25,6 +25,8 @@ def schema(store):
         CREATE TABLE IF NOT EXISTS intel_status(id INTEGER PRIMARY KEY,data TEXT);
         CREATE TABLE IF NOT EXISTS intel_characters(name TEXT PRIMARY KEY,id INTEGER,canonical TEXT,checked REAL,retry_at REAL);
     ''')
+    from . import intel_kills
+    intel_kills.schema(store)
 
 
 def preferences(store):
@@ -37,7 +39,7 @@ def save_preferences(store,data,universe):
     if not isinstance(data,dict) or set(data)-set(DEFAULTS):raise PlanningError('Hibás intelbeállítás.')
     p=preferences(store);known={c['id'] for c in store.characters()}
     for key,value in data.items():
-        if key in ['enabled','allow_local_alerts','sound','overlay_enabled']:
+        if key in ['enabled','killfeed_enabled','allow_local_alerts','sound','overlay_enabled']:
             if type(value) is not bool:raise PlanningError('Hibás intelkapcsoló.')
         elif key=='folder':
             if not isinstance(value,str) or len(value)>2000:raise PlanningError('Hibás chatlogmappa.')
@@ -51,7 +53,7 @@ def save_preferences(store,data,universe):
             if value is not None:value=list(dict.fromkeys(value))
         elif key=='manual_locations':
             if not isinstance(value,dict) or any(not isinstance(k,str) or not k.isdigit() or int(k) not in known or type(v) is not int or v not in universe.systems for k,v in value.items()):raise PlanningError('Hibás kézi intelhelyszín.')
-        elif key=='region_ids':
+        elif key in ['region_ids','kill_region_ids']:
             valid={r['region_id'] for r in universe.systems.values()}
             if not isinstance(value,list) or any(type(v) is not int or v not in valid for v in value):raise PlanningError('Ismeretlen intelrégió.')
         else:
@@ -171,14 +173,15 @@ def collect_alerts(store,universe=None,now=None):
     notifications_enabled=notification_preferences(store)['categories']['intel']
     with store.db() as db:row=db.execute('SELECT data FROM intel_status WHERE id=1').fetchone()
     status=json.loads(row['data']) if row else {}
-    if not p['enabled'] or status.get('error') or now-(status.get('checked') or 0)>10:return {'items':[],'observed_domains':[],'enabled':p['enabled'],'notifications_enabled':notifications_enabled,'overlay':{'enabled':p['overlay_enabled'] and notifications_enabled,'seconds':p['overlay_seconds']}}
+    from . import intel_kills
+    chat_ready=p['enabled'] and not status.get('error') and now-(status.get('checked') or 0)<=10
     pos=positions(store,universe,p,now);reports=read_reports(store,p,now);owned={c['name'].casefold() for c in store.characters()}
     active,cleared=active_state(reports,now,p['ttl_minutes']*60,owned);items=[];domains=[]
     by_system=defaultdict(list)
     for r in active:
-        if not r.get('historical') and not r['ambiguous']:by_system[r['system_id']].append(r)
+        if chat_ready and not r.get('historical') and not r['ambiguous']:by_system[r['system_id']].append(r)
     for char in pos:
-        if not char['alertable']:continue
+        if not chat_ready or not char['alertable']:continue
         domain='intel:'+str(char['id']);domains.append(domain);distances=universe.distances(char['system_id'])
         for sid,rows in by_system.items():
             distance=distances.get(sid)
@@ -189,7 +192,8 @@ def collect_alerts(store,universe=None,now=None):
             items[-1]['episode_key']=str(int(cleared.get(sid,0)))
             items[-1]['system_name']=name
             items[-1]['overlay_reports']=[{'id':r['id'],'when':r['timestamp'],'pilots':[pilot['name'] for pilot in r['pilots']],'ships':[ship['name'] for ship in r.get('ships',[])]} for r in rows]
-    return {'items':items,'observed_domains':domains,'enabled':p['enabled'],'notifications_enabled':notifications_enabled,'overlay':{'enabled':p['overlay_enabled'] and notifications_enabled,'seconds':p['overlay_seconds']}}
+    kills,kill_domains=intel_kills.alerts(store,universe,p,pos,now);items+=kills;domains+=kill_domains
+    return {'items':items,'observed_domains':domains,'enabled':p['enabled'] or p['killfeed_enabled'],'notifications_enabled':notifications_enabled,'overlay':{'enabled':p['overlay_enabled'] and notifications_enabled,'seconds':p['overlay_seconds']}}
 
 
 from .refresh_policy import RefreshPolicy,AUTO_SECONDS
@@ -398,6 +402,9 @@ class IntelMonitor:
         if region is not None and region not in regions:raise PlanningError('Ismeretlen intelrégió.')
         region=region or universe.systems.get(center,{}).get('region_id')
         distance=universe.distances(origin);ids={sid for sid,s in universe.systems.items() if s['region_id']==region};clipped=False
+        from . import intel_kills
+        kill_groups=intel_kills.groups(self.store,universe,p,now,{region} if region else set());kill_by_system=defaultdict(list)
+        for g in kill_groups:kill_by_system[g['system_id']].append(g)
         by_sid=defaultdict(list)
         for row in active:by_sid[row['system_id']].append(row)
         last={}
@@ -409,8 +416,10 @@ class IntelMonitor:
             pilots=sorted({p['name'] for row in rows for p in row['pilots']});state='contact' if rows else 'clear' if clear and now-clear<=min(600,p['ttl_minutes']*60) else 'old' if history and recent else 'quiet'
             contacts=rows or ([recent] if state=='old' and recent['state']=='contact' else [])
             nodes.append({**universe.systems[sid],'distance':distance.get(sid),'in_range':distance.get(sid) is not None and distance[sid]<=p['jumps'],'state':state,'pilots':pilots,'contacts':[{'id':r['id'],'timestamp':r['timestamp'],'pilots':r['pilots'],'ships':r.get('ships',[]),'count':r.get('count'),'ambiguous':r['ambiguous'],'historical':r.get('historical',False)} for r in contacts],'reported_at':max(r['timestamp'] for r in rows) if rows else clear if state=='clear' else recent['timestamp'] if recent and state=='old' else None,'characters':[c['name'] for c in pos if c['system_id']==sid],'reports':[r['id'] for r in rows]})
+            nodes[-1]['kill_groups']=kill_by_system[sid]
         for report in reports:report['system_names']=[universe.systems[sid]['name'] for sid in report['systems']]
         manual_names={cid:universe.systems[sid]['name'] for cid,sid in p['manual_locations'].items() if sid in universe.systems}
         with self.lock:status=dict(self.status)
         alert_data=collect_alerts(self.store,universe,now);alerts=alert_data['items']
-        return {'preferences':p,'notifications_enabled':alert_data['notifications_enabled'],'manual_system_names':manual_names,'status':status,'characters':pos,'reference':reference,'region_id':region,'region_name':regions.get(region),'center':center,'nodes':nodes,'edges':[[a,b] for a,b in universe.edges if a in ids and b in ids],'reports':reports[:500],'alerts':alerts,'clipped':clipped,'universe_build':universe.build,'regions':sorted(regions.items(),key=lambda r:r[1]),'calculated_at':now}
+        kill_regions=intel_kills.regions(p,pos,universe)
+        return {'preferences':p,'notifications_enabled':alert_data['notifications_enabled'],'manual_system_names':manual_names,'status':status,'characters':pos,'reference':reference,'region_id':region,'region_name':regions.get(region),'center':center,'nodes':nodes,'edges':[[a,b] for a,b in universe.edges if a in ids and b in ids],'reports':reports[:500],'alerts':alerts,'kill_groups':kill_groups,'kill_regions':sorted(kill_regions),'kill_feed':intel_kills.source(self.store),'clipped':clipped,'universe_build':universe.build,'regions':sorted(regions.items(),key=lambda r:r[1]),'calculated_at':now}

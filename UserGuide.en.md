@@ -610,3 +610,17 @@ The status strip shows connection, catch-up, active feed, or retry time after a 
 The next sequence number is saved and resumed after restart. A bounded temporary local buffer retains up to 10,000 received events for up to six hours so an own kill received later can recover preceding surrounding losses. Irrelevant events are not added to the permanent combat history. A long outage is marked as a live-coverage gap; use **Load related killmails** for previous battles. Live tracking is not proof of complete battle coverage.
 
 One serial feed connection makes at most five requests per second. An empty queue waits at least six seconds; failures back off and respect server retry instructions. ESI refresh rules remain unchanged. Known alliance/corporation names use the local cache; checks for new group names run at most every 15 minutes.
+
+### Regional kill intel from the live feed
+
+**Intel map** also displays new kills from the live R2Z2 feed. Systems in the viewed region receive a separate **☠ kill** marker and count. Each system has one combined callout summarizing recently received kills and lost ship types. The callout expires three minutes after receipt; the marker remains for the configured **Intel lifetime**. Displayed event times come from killmails, not download times.
+
+**Kills in the region** lists per-system arrival batches, ship icons, quantities and total values. Individual killmails open on zKillboard through ship icons. The detached map remains map-only, and public kill data does not get inserted into combined chat.
+
+Kills received within ten seconds in the same system share one notification batch when their event timestamps span no more than two minutes. Notifications wait for that batch to close. Different systems or distant event times remain separate. Reprocessed killmails may update metadata but do not increase counts or resend the same alert. System notifications and the transparent overlay show system, kill count and ship types, **without ISK values**.
+
+Under **Settings → Intel settings**, **zKillboard kills in intel** controls this source. **Kill alert region** defaults to tracked characters’ last known regions, or can be set to one explicit region. It is independent of the map’s browsing region and the region used to parse abbreviated chat system names. Kill alerts cover the whole monitored region; chat proximity alerts still use the jump limit. With no known character location, choose an explicit kill region or configure a location.
+
+The app and **Fleet activity → Live zKillboard tracking** must be running. Kill data requires neither chat-log monitoring nor an additional ESI scope. **Intel notifications: off** suppresses both OS alerts and the transparent overlay while leaving map markers visible. OS delivery also requires the app’s master notification permission. Additional map/chat windows do not duplicate notifications.
+
+A kill is an observed loss, not confirmation of current hostile presence. A chat **clear/clr** message does not erase a kill marker. Delayed publications use their actual event time; events older than the intel lifetime do not trigger fresh alerts. Up to 24 hours / 20,000 compact local kill-intel records are kept. Events not published on zKillboard remain unavailable.

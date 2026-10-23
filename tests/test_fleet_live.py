@@ -53,6 +53,8 @@ class LiveTests(unittest.TestCase):
         with self.s.db() as db:self.assertEqual(json.loads(db.execute('SELECT data FROM fleet_kills').fetchone()[0])['zkb']['totalValue'],123.45)
         self.assertEqual(self.f.live.cursor['sequence'],12)
     def test_disabled_live_or_empty_selection_makes_no_network_requests(self):
+        from muhely import intel
+        intel.save_preferences(self.s,{'killfeed_enabled':False},self.f.universe)
         for changes in [{'live':False},{'live':True,'character_ids':[]}]:
             fleet.save_preferences(self.s,changes)
             with patch.object(self.f.live,'_read') as read:self.assertEqual(self.f.live.step(),5);read.assert_not_called()
@@ -108,3 +110,10 @@ class LiveTests(unittest.TestCase):
             self.assertEqual(request.full_url,'https://r2z2.zkillboard.com/ephemeral/sequence.json');self.assertNotIn('Authorization',request.headers)
             self.assertIn('User-agent',request.headers);self.assertEqual(request.headers['Accept-encoding'],'gzip')
         with self.assertRaises(EsiError):self.f.live._read('../secret')
+    def test_regional_intel_keeps_feed_active_without_fleet_pilots_and_saves_public_kill(self):
+        from muhely import intel
+        fleet.save_preferences(self.s,{'character_ids':[]});self.cursor()
+        with patch('muhely.fleet_live.time.time',return_value=BASE),patch.object(self.f.live,'_read',side_effect=[package(10,kill(1,cid=77)),None]):self.f.live.step()
+        self.assertEqual(self.ids(),set())
+        with self.s.db() as db:self.assertEqual(db.execute('SELECT id FROM intel_kill_events').fetchone()[0],1)
+        self.assertTrue(intel.preferences(self.s)['killfeed_enabled']);self.assertEqual(self.f.live.cursor['sequence'],11)

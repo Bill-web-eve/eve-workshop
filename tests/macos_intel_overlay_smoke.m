@@ -15,6 +15,11 @@ int main(int argc,const char *argv[]){@autoreleasepool{
     now+=.11;[overlay refresh];require(!overlay.panel.visible,@"expiry without a sync");[overlay sync:payload(@[report],60)];require(!overlay.panel.visible,@"expired report reappeared");
     NSMutableDictionary *fresh=[report mutableCopy];fresh[@"when"]=@(now);[overlay sync:payload(@[report,fresh],1)];require(overlay.canvas.cards.count==1,@"duplicate report");now+=1;[overlay refresh];require(!overlay.panel.visible,@"one-second duration");
     [overlay sync:@{@"enabled":@NO,@"seconds":@60,@"items":@[fresh]}];require(!overlay.panel.visible,@"disabled panel visible");
+    NSMutableDictionary *regional=[fresh mutableCopy];regional[@"when"]=@(now);regional[@"jumps"]=NSNull.null;regional[@"pilots"]=@"3 kills";
+    require([overlay sync:payload(@[regional],60)],@"unknown regional distance rejected");[overlay.canvas display];
+    regional[@"jumps"]=@45;require([overlay sync:payload(@[regional],60)],@"regional distance above chat alert limit rejected");
+    regional[@"jumps"]=@(-1);require(![overlay sync:payload(@[regional],60)],@"negative regional distance accepted");
+    [overlay sync:@{@"enabled":@NO,@"seconds":@60,@"items":@[]}];
     NSDictionary *screen=[overlay settings][@"screens"][0];NSString *screenID=screen[@"id"];
     require(![overlay configure:@{@"screen_id":@"missing-screen"}],@"invalid screen accepted");require(![overlay configure:@{@"width":@900}],@"invalid width accepted");require(![overlay sync:payload(@[],0)],@"invalid duration accepted");
     require([overlay configure:@{@"screen_id":screenID,@"x":@40,@"y":@70,@"width":@340,@"editing":@YES}],@"position edit");

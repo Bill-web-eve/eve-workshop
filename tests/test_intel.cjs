@@ -4,7 +4,7 @@ const {JSDOM}=require('jsdom'),layout=require('../static/intel-map.js').layout;
 const root=path.join(__dirname,'../static'),tick=()=>new Promise(r=>setImmediate(r));
 async function fixture(mode=null){
  const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://127.0.0.1:8765'+(mode?'/?intel_window='+mode:''),runScripts:'outside-only'}),w=dom.window,d=w.document,run=s=>vm.runInContext(s,dom.getInternalVMContext()),calls=[];
- const prefs={enabled:true,folder:'/test/logs',channels:['Test Intel'],character_ids:null,manual_locations:{'1':300001},jumps:5,ttl_minutes:20,cooldown_seconds:20,region_ids:[],allow_local_alerts:false,sound:false};
+ const prefs={enabled:true,killfeed_enabled:true,kill_region_ids:[],folder:'/test/logs',channels:['Test Intel'],character_ids:null,manual_locations:{'1':300001},jumps:5,ttl_minutes:20,cooldown_seconds:20,region_ids:[],allow_local_alerts:false,sound:false};
  const position={id:1,name:'Own Pilot',system_id:300001,system_name:'J5A-IX',source:'manual',alertable:true};
  const intel={preferences:prefs,manual_system_names:{'1':'J5A-IX'},status:{checked:1800000000,files:1,done:1},characters:[position],center:300001,universe_build:1,regions:[[10,'Test Region']],nodes:[{id:300001,name:'J5A-IX',x:0,y:0,state:'contact',characters:['Own Pilot'],pilots:['Reported Pilot'],distance:0,in_range:true,contacts:[{timestamp:1800000000,pilots:[{id:359618261,name:'Reported Pilot'}],ships:[{name:'Buzzard',type_id:11192}]}]}],edges:[],alerts:[],reports:[{id:'report',timestamp:1800000000,channel:'Test Intel',systems:[300001],system_names:['J5A-IX'],pilots:[{name:'Reported Pilot',verified:false}],state:'contact',reporter:'Reporter',message:'J5A-IX Reported Pilot <script>fake</script>',historical:true}]};
  const state={csrf:'test',version:'1.0.0',characters:[{id:1,name:'Own Pilot'}],corporations:[],production_characters:[],plans:[],jobs:[],settings:{source:'manual'},task:{running:false},sde:{buildNumber:1},recipe_count:1};
@@ -154,4 +154,40 @@ test('server notification disable blocks overlays even before preferences reload
  w.EveDesktop.syncIntelOverlay=async data=>sent.push(data);
  await run('syncIntelOverlay({enabled:true,notifications_enabled:false,overlay:{enabled:true,seconds:60},items:[]})');
  assert.equal(sent.at(-1).enabled,false);assert.equal(sent.at(-1).items.length,0);
+});
+
+function killGroup(id='kill:300001:1'){
+ return {id,system_id:300001,system_name:'J5A-IX',region_id:10,region_name:'Test Region',received:1800000000,ready_at:1800000010,last_at:1799999990,count:2,cents:'300000',missing:0,
+  ships:[{type_id:590,name:'Rifter',count:2}],kills:[{id:1,at:1799999980,ship_id:590,ship:'Rifter',cents:'100000'},{id:2,at:1799999990,ship_id:590,ship:'Rifter',cents:'200000'}]};
+}
+test('regional kills have one grouped callout and an independent map marker on clear systems',async t=>{
+ const {w,d,run,intel}=await fixture();t.after(()=>w.close());const g=killGroup();
+ intel.nodes[0].state='clear';intel.nodes[0].contacts=[];intel.nodes[0].pilots=[];intel.nodes[0].kill_groups=[g];intel.kill_groups=[g];intel.kill_regions=[10];intel.kill_feed={enabled:true,checked:1800000000};
+ await run('refreshIntel(true)');await tick();
+ assert(d.querySelector('.intel-node.clear.kill-activity'));assert(d.querySelector('.intel-kill-ring'));assert.equal(d.querySelectorAll('.intel-kill-summary').length,1);
+ assert.match(d.querySelector('.intel-kill-summary').textContent,/2 kill/);assert(!d.querySelector('.intel-kill-summary').textContent.includes('ISK'));assert.match(d.querySelector('.intel-kill-summary').textContent,/2 × Rifter/);
+ assert.equal(d.querySelectorAll('.intel-kills tbody tr:not(.table-empty-row)').length,1);
+ assert(d.querySelector('.intel-kill-links a[href="https://zkillboard.com/kill/1/"] img'));assert(d.querySelector('.intel-kill-links a[href="https://zkillboard.com/kill/2/"] img'));
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('#view-content').textContent),d.querySelector('#view-content').textContent);
+ w.Date.now=()=>1800000180000;run('drawIntelMap()');assert.equal(d.querySelector('.intel-kill-summary'),null);assert(d.querySelector('.intel-node.kill-activity'));
+});
+test('detached kill map stays map-only and combines several bursts in the same system',async t=>{
+ const {w,d,run,intel}=await fixture('map');t.after(()=>w.close());const a=killGroup(),b=killGroup('kill:300001:3');b.kills=[{...a.kills[0],id:3}];b.count=1;b.cents='100000';
+ intel.nodes[0].contacts=[];intel.nodes[0].kill_groups=[a,b];await run('refreshIntel(true)');await tick();
+ assert.equal(d.querySelector('#view-content').children.length,1);assert.equal(d.querySelectorAll('.intel-kill-summary').length,1);assert.match(d.querySelector('.intel-kill-summary').textContent,/3 kill/);assert(!d.querySelector('.intel-kill-summary').textContent.includes('ISK'));
+ assert.equal(d.querySelector('.intel-kills'),null);
+});
+test('kill notifications are grouped, omit ISK and do not invent live pilots',async t=>{
+ const {w,run,intel,notifications:n}=await fixture();t.after(()=>w.close());const sent=[],overlays=[];
+ w.EveDesktop.active=true;w.EveDesktop.platform='mac';w.EveDesktop.syncIntelOverlay=async data=>overlays.push(data);w.EveDesktop.notificationStatus=async()=>({status:'authorized'});w.EveDesktop.notify=async data=>sent.push(data);n.preferences.os_enabled=true;
+ intel.alerts=[{id:'intel:kill:300001:1',category:'intel',kind:'intel_kill',subject:'J5A-IX',system_id:300001,system_name:'J5A-IX',character_name:'Test Region',region_name:'Test Region',jumps:null,corporation_id:null,kill_count:2,cents:'300000',missing:0,when:1800000000,receipt:'receipt',notification_id:'id',overlay_reports:[{id:'kill:300001:1',kind:'kill',when:1800000000,kill_count:2,cents:'300000',missing:0,pilots:[],ships:['2 × Rifter']}]}];
+ const old=w.fetch;w.fetch=async(url,opts)=>url==='/api/notifications/sent'?{ok:true,json:async()=>({ok:true})}:url==='/api/intel/alerts'?{ok:true,json:async()=>({enabled:true,notifications_enabled:true,overlay:{enabled:true,seconds:60},items:intel.alerts})}:old(url,opts);
+ await run('pollIntelAlerts()');assert.equal(sent.length,1);assert.match(sent[0].body,/Kill in the region: J5A-IX · 2 kill · Test Region/);assert(!sent[0].body.includes('null jump'));assert(!sent[0].body.includes('ISK'));
+ assert.equal(overlays.at(-1).items.length,1);assert.equal(overlays.at(-1).items[0].pilots,'2 kill');assert(!overlays.at(-1).items[0].pilots.includes('Unnamed'));assert.equal(overlays.at(-1).items[0].jumps,null);
+ await run('applyIntelNotificationPreferences({...notificationData.preferences,categories:{...notificationData.preferences.categories,intel:false}})');await run('pollIntelAlerts()');assert.equal(sent.length,1);assert.equal(overlays.at(-1).enabled,false);
+});
+test('kill region and source settings save independently from chat parsing region',async t=>{
+ const {w,d,run,intel}=await fixture();t.after(()=>w.close());run('openSettingsTab("intel")');await tick();
+ const form=d.querySelector('#intel-settings');form.elements.kill_region.value='10';form.elements.killfeed_enabled.checked=false;form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
+ assert.equal(intel.preferences.killfeed_enabled,false);assert.equal(intel.preferences.kill_region_ids[0],10);assert.equal(intel.preferences.region_ids.length,0);assert.equal(intel.preferences.enabled,true);
 });

@@ -169,6 +169,9 @@ def claim(store,data,now=None):
             # expected-to-confirmed transition for the same completed job.
             fingerprint=a.get('episode_key','') if a['category']=='intel' else str(int(a['when'])) if a['category']=='skills' and a['when'] is not None else ''
             old=db.execute('SELECT * FROM notification_events WHERE id=?',(a['id'],)).fetchone()
+            # A closed kill batch is a past event, never a rearmed proximity
+            # episode when switching regions or notification preferences.
+            if a['kind']=='intel_kill' and old and old['sent']:continue
             episode=old['episode'] if old else 1
             if old and (not old['active'] or old['fingerprint']!=fingerprint):episode+=1;old=None
             if old and (old['sent'] or old['lease_until']>now):continue

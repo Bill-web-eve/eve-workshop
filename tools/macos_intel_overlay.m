@@ -37,7 +37,7 @@
         BOOL ships=[card[@"ships"] length]>0;CGFloat height=ships?86:68;
         NSRect rect=NSMakeRect(1,y+1,width-2,height-2);NSBezierPath *box=[NSBezierPath bezierPathWithRoundedRect:rect xRadius:7 yRadius:7];[paper setFill];[box fill];[[NSColor colorWithSRGBRed:.9 green:.51 blue:.44 alpha:1] setStroke];[box stroke];
         [self label:card[@"system"] rect:NSMakeRect(11,y+7,width-66,18) size:13 color:ink bold:YES];
-        [self label:[NSString stringWithFormat:@"%@j",card[@"jumps"]] rect:NSMakeRect(width-42,y+8,34,16) size:11 color:muted bold:YES];
+        [self label:[card[@"jumps"] isKindOfClass:NSNumber.class]?[NSString stringWithFormat:@"%@j",card[@"jumps"]]:@"–" rect:NSMakeRect(width-42,y+8,34,16) size:11 color:muted bold:YES];
         [self label:card[@"pilots"] rect:NSMakeRect(11,y+28,width-22,18) size:12 color:accent bold:YES];
         if(ships)[self label:card[@"ships"] rect:NSMakeRect(11,y+47,width-22,16) size:11 color:ink bold:NO];
         [self label:card[@"character"] rect:NSMakeRect(11,y+height-19,width-22,14) size:10 color:muted bold:NO];
@@ -125,14 +125,15 @@
     for(id row in data[@"items"]){
         if(![row isKindOfClass:NSDictionary.class])return NO;
         for(NSString *key in @[@"key",@"system",@"pilots",@"ships",@"character"]){if(![row[key] isKindOfClass:NSString.class]||[row[key] length]>2000)return NO;}
-        if(![row[@"when"] isKindOfClass:NSNumber.class]||!isfinite([row[@"when"] doubleValue])||![row[@"jumps"] isKindOfClass:NSNumber.class]||[row[@"jumps"] doubleValue]<0||[row[@"jumps"] doubleValue]>30)return NO;
+        if(![row[@"when"] isKindOfClass:NSNumber.class]||!isfinite([row[@"when"] doubleValue]))return NO;
+        id jumps=row[@"jumps"];if(jumps!=NSNull.null&&(![jumps isKindOfClass:NSNumber.class]||!isfinite([jumps doubleValue])||[jumps doubleValue]<0||[jumps doubleValue]>10000||floor([jumps doubleValue])!=[jumps doubleValue]))return NO;
         [items addObject:row];
     }
     self.enabled=[data[@"enabled"] boolValue];self.seconds=(NSInteger)seconds;self.items=items;[self refresh];return YES;
 }
 - (void)refresh {
     NSTimeInterval now=self.clock();NSMutableDictionary *unique=[NSMutableDictionary new];
-    if(self.enabled)for(NSDictionary *row in self.items){NSTimeInterval at=[row[@"when"] doubleValue];if(at<=now&&now<at+self.seconds){NSDictionary *old=unique[row[@"key"]];if(!old||[row[@"jumps"] integerValue]<[old[@"jumps"] integerValue])unique[row[@"key"]]=row;}}
+    if(self.enabled)for(NSDictionary *row in self.items){NSTimeInterval at=[row[@"when"] doubleValue];if(at<=now&&now<at+self.seconds){NSDictionary *old=unique[row[@"key"]];NSInteger jumps=[row[@"jumps"] isKindOfClass:NSNumber.class]?[row[@"jumps"] integerValue]:NSIntegerMax,oldJumps=[old[@"jumps"] isKindOfClass:NSNumber.class]?[old[@"jumps"] integerValue]:NSIntegerMax;if(!old||jumps<oldJumps)unique[row[@"key"]]=row;}}
     NSArray *cards=[[unique allValues] sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *a,NSDictionary *b){NSComparisonResult order=[b[@"when"] compare:a[@"when"]];return order==NSOrderedSame?[a[@"key"] compare:b[@"key"]]:order;}];
     if(cards.count>5)cards=[cards subarrayWithRange:NSMakeRange(0,5)];
     if(!self.editing&&!cards.count){[self.panel orderOut:nil];return;}

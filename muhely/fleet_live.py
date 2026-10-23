@@ -8,6 +8,7 @@ import copy,gzip,io,json,math,re,threading,time,urllib.error,urllib.request
 from email.utils import parsedate_to_datetime
 from .esi import EsiError,NoRedirect
 from .fleet import PROJECT,cache,remember,preferences,validate_kills
+from . import intel_kills
 
 BASE='https://r2z2.zkillboard.com/ephemeral/'
 CURSOR='live:cursor'
@@ -67,7 +68,7 @@ class LiveFeed:
         now=time.time();self.next_check=now+delay
         remember(self.store,CURSOR,self.cursor,now,self.next_check,error)
     def step(self):
-        if not self.enabled() or not self.fleet.actors():
+        if not self.enabled() or not (self.fleet.actors() or intel_kills.wants_feed(self.store)):
             with self.lock:self.state.update(phase='paused',retry_at=None)
             return 5
         if self.next_check>time.time():return max(.2,min(6,self.next_check-time.time()))
@@ -88,6 +89,7 @@ class LiveFeed:
         if self.stop_event.is_set():return 0
         # Save first, checkpoint second. Replays after a crash are harmless.
         saved=self.fleet.ingest_live(list({k['killmail_id']:k for k in rows}.values()))
+        intel_kills.ingest(self.store,list({k['killmail_id']:k for k in rows}.values()),self.fleet.catalog)
         now=time.time()
         if sequence is not None:self.cursor['sequence']=sequence
         if rows or failure is None:self.cursor['polled_at']=now
