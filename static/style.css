@@ -210,5 +210,6 @@ html[data-intel-window=map] .page-heading{display:none}html[data-intel-window=ma
 .battle-group-detail{font-size:11px;color:var(--muted);margin:4px 0}.battle-group label{font-size:11px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}.battle-group select{max-width:150px}.battle-group small{color:var(--muted)}
 .battle-conflict{font-size:11px;color:var(--red);margin-bottom:8px}.battle-losses,.battle-evidence,.battle-unassigned{margin:12px 0 0}.battle-losses .table-wrap{max-height:340px;overflow:auto}.battle-evidence>p{font-size:12px;color:var(--muted)}
 .battle-unassigned>.battle-side{margin-top:10px}.battle-unassigned .battle-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.battle-loss-ship{display:inline-flex;align-items:center;gap:8px}.battle-loss-ship img{flex:none;border-radius:4px}
 @media(max-width:1200px){.battle-sides[data-count]{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.battle-sides[data-count]{grid-template-columns:1fr}.battle-controls{justify-content:start}}

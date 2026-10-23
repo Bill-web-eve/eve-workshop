@@ -108,6 +108,7 @@ globalThis.EveEnglish={
   "Környező esemény": "Surrounding event",
   "Veszteség": "Loss",
   "Megsemmisült hajó": "Destroyed ship",
+  "Darabszám": "Quantity",
   "Résztvevő támadók": "Attacking pilots",
   "Érték (ISK)": "Value (ISK)",
   "Hibás flottakövetési beállítás.": "Invalid fleet tracking setting.",

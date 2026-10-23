@@ -92,12 +92,29 @@ function fakeBattle(){
  const group=(id,name,side)=>({key:'alliance:'+id,kind:'alliance',id,name,side,manual:false,own:id===1001,pilot_count:2,kill_count:1,loss_value:value(id===1001?10000:20000),conflicts:0});
  return {side_count:2,configured_count:null,sides:[{id:0,name:null,groups:[group(1001,'Friends',0)],pilot_count:2,loss_value:value(10000),loss_ids:[123],kill_count:1,friendly_fire:0},{id:1,name:null,groups:[group(1002,'Opponents',1)],pilot_count:2,loss_value:value(20000),loss_ids:[],kill_count:1,friendly_fire:0}],unassigned:{id:-1,groups:[],pilot_count:0,loss_value:value(0,0),loss_ids:[],kill_count:0,friendly_fire:0},relationships:[{attacker:0,victim:1,killmails:1}],manual_groups:0,group_count:2};
 }
-test('battle sides show separate losses, group controls, combat evidence and clickable ship losses',async t=>{
+test('battle sides show separate losses, group controls, combat evidence and ship loss summaries',async t=>{
  const {w,d,data}=await fixture();t.after(()=>w.close());data.sessions[0].battle=fakeBattle();
  d.querySelector('[data-fleet-session]').click();await tick();
  assert.equal(d.querySelectorAll('.battle-sides>.battle-side').length,2);assert.equal(d.querySelectorAll('#fleet-battle [style]').length,0);assert.equal(d.querySelector('.battle-sides').dataset.count,'2');assert.match(d.querySelector('[data-battle-side="0"]').textContent,/100,00 ISK/);assert.match(d.querySelector('[data-battle-side="1"]').textContent,/200,00 ISK/);
- assert.equal(d.querySelector('[data-battle-move="alliance:1001"]').value,'0');assert(d.querySelector('.battle-losses a[href="https://zkillboard.com/kill/123/"] img'));
+ assert.equal(d.querySelector('[data-battle-move="alliance:1001"]').value,'0');assert(d.querySelector('.battle-losses img[src="https://images.evetech.net/types/590/icon?size=64"]'));assert.equal(d.querySelector('.battle-losses a'),null);
  assert(!/[áéíóöőúüű]/i.test(d.querySelector('#fleet-battle').textContent),d.querySelector('#fleet-battle').textContent);
+});
+test('side loss summaries group ship types, deduplicate killmails and retain missing price counts',async t=>{
+ const {w,d,data,run}=await fixture();t.after(()=>w.close());
+ const session=data.sessions[0],row=session.rows[0];session.battle=fakeBattle();
+ session.rows=[{...row,value:1000.125},{...row,value:1000.125},{...row,id:124,value:0.02},{...row,id:125,value:null},{...row,id:126,ship_id:591,ship:'Other ship',value:null},{...row,id:127,value:500}];
+ session.battle.sides[0].loss_ids=[123,124,125,126,123];session.battle.sides[1].loss_ids=[127];
+ d.querySelector('[data-fleet-session]').click();await tick();
+ const summary=d.querySelector('[data-battle-side="0"] .battle-losses'),rows=summary.querySelectorAll('tbody tr:not(.table-empty-row)');
+ assert.equal(rows.length,2);assert.match(summary.querySelector('summary').textContent,/\(4\)/);
+ assert.equal(rows[0].querySelectorAll('td')[1].textContent,'3');assert.equal(rows[0].querySelectorAll('td')[2].textContent,'≥ 1 000,15 ISK');
+ assert.equal(rows[1].querySelectorAll('td')[1].textContent,'1');assert.equal(rows[1].querySelectorAll('td')[2].textContent,'–');
+ assert.equal(rows[0].querySelector('td').querySelector('.battle-loss-ship').firstElementChild.tagName,'IMG');
+ assert.equal(summary.querySelectorAll('a').length,0);
+ assert.equal(d.querySelector('[data-battle-side="1"] .battle-losses tbody tr td:nth-child(2)').textContent,'1');
+ const grouped=run('battleShipLosses([{id:1,ship_id:null,ship:"Unknown",value:null},{id:2,ship_id:null,ship:"Unknown",value:null}],[1,2])');
+ assert.equal(grouped.length,1);assert.equal(grouped[0].count,2);assert.equal(grouped[0].missing,2);
+ assert(!/[áéíóöőúüű]/i.test(summary.textContent));
 });
 test('battle group movement, side count and reset target the open session',async t=>{
  const {w,d,data,calls}=await fixture();t.after(()=>w.close());data.sessions[0].battle=fakeBattle();

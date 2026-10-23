@@ -4,6 +4,20 @@ function battleSideName(side){return side.name?esc(side.name):esc(EveI18n.t('Old
 function battleMoney(value,field='cents',missing='missing'){
   return value[missing]===value.count&&value.count?'–':(value[missing]?'≥ ':'')+EveCosts.format(BigInt(value[field]));
 }
+function battleShipLosses(rows,lossIds){
+  const ids=new Set(lossIds),seen=new Set(),ships=new Map();
+  for(const k of rows){
+    if(!ids.has(k.id)||seen.has(k.id))continue;
+    seen.add(k.id);
+    const shipId=Number.isSafeInteger(k.ship_id)&&k.ship_id>0?k.ship_id:null;
+    const key=shipId===null?'name:'+k.ship:'type:'+shipId;
+    if(!ships.has(key))ships.set(key,{ship_id:shipId,ship:k.ship,count:0,cents:0n,missing:0});
+    const ship=ships.get(key),value=EveCosts.money(k.value);
+    ship.count++;
+    if(value===null)ship.missing++;else ship.cents+=value;
+  }
+  return [...ships.values()].sort((a,b)=>b.count-a.count||a.ship.localeCompare(b.ship));
+}
 function renderBattleReport(session,incomplete){
   const b=session.battle;if(!b)return '';
   const option=(id,label,chosen)=>`<option value="${id}" ${chosen?'selected':''}>${label}</option>`;
@@ -13,8 +27,8 @@ function renderBattleReport(session,incomplete){
     return `<div class="battle-group" draggable="true" data-battle-group="${esc(g.key)}"><div class="battle-group-title">${image}<strong data-i18n-skip>${esc(g.name)}</strong>${g.own?'<span class="badge good">Saját karakter</span>':''}</div><div class="battle-group-detail"><span>${EveI18n.t(kind)}</span> · ${fmt(g.pilot_count)} <span>pilóta</span> · ${fmt(g.loss_value.count)} <span>veszteség</span> · ${battleMoney(g.loss_value)}</div><label><span>Oldal</span><select data-battle-move="${esc(g.key)}" aria-label="${esc(EveI18n.t('Csoport áthelyezése')+': '+g.name)}">${option(-1,EveI18n.t('Besorolatlan'),g.side===-1)}${b.sides.map(s=>option(s.id,battleSideName(s),g.side===s.id)).join('')}</select><small>${EveI18n.t(g.manual?'Kézi besorolás':'Becsült besorolás')}${g.conflicts?' · '+EveI18n.t('Ellentmondó lövési kapcsolat'):''}</small></label></div>`;
   }
   function losses(side){
-    const ids=new Set(side.loss_ids),rows=session.rows.filter(k=>ids.has(k.id));
-    return rows.length?`<details class="battle-losses" data-fleet-detail="battle-losses-${side.id}"><summary>${EveI18n.t('Veszteségek')} (${rows.length})</summary>${table(['Killmail','Megsemmisült hajó','Érték (ISK)'],rows.map(k=>`<tr><td data-sort-value="${k.id}" data-filter-value="${esc(k.ship)} #${k.id}">${fleetLink(k)}</td><td>${itemName(k.ship)}</td><td class="num">${k.value==null?'–':fmt(Math.round(k.value))}</td></tr>`),'battle-losses-'+side.id)}</details>`:'';
+    const rows=battleShipLosses(session.rows,side.loss_ids),count=rows.reduce((sum,row)=>sum+row.count,0);
+    return rows.length?`<details class="battle-losses" data-fleet-detail="battle-losses-${side.id}"><summary>${EveI18n.t('Veszteségek')} (${count})</summary>${table(['Megsemmisült hajó','Darabszám','Érték (ISK)'],rows.map(k=>`<tr><td data-sort-value="${esc(k.ship)}" data-filter-value="${esc(k.ship)}"><span class="battle-loss-ship">${k.ship_id===null?'<span aria-hidden="true">◇</span>':`<img src="https://images.evetech.net/types/${k.ship_id}/icon?size=64" width="32" height="32" alt="" loading="lazy">`}${itemName(k.ship)}</span></td><td class="num">${fmt(k.count)}</td><td class="num" data-sort-value="${k.missing===k.count?'':k.cents}">${battleMoney(k)}</td></tr>`),'battle-losses-'+side.id)}</details>`:'';
   }
   function card(side,unassigned=false){
     return `<section class="battle-side" data-battle-side="${side.id}"><h3>${unassigned?EveI18n.t('Besorolatlan'):battleSideName(side)}</h3><div class="battle-side-value">${battleMoney(side.loss_value)}</div><div class="footnote"><span>Ténylegesen megsemmisült:</span> ${battleMoney(side.loss_value,'destroyed_cents','destroyed_missing')}</div><div class="battle-counts"><span>${fmt(side.pilot_count)} <span>pilóta</span></span><span>${fmt(side.loss_value.count)} <span>veszteség</span></span><span>${fmt(side.kill_count)} kill</span></div>${side.friendly_fire?'<div class="battle-conflict">'+EveI18n.t('Azonos oldalra sorolt csoportok egymásra is lőttek.')+' '+fmt(side.friendly_fire)+' killmail</div>':''}<div class="battle-groups">${side.groups.length?side.groups.map(group).join(''):'<p class="footnote">Nincs ide sorolt alliance vagy corporation.</p>'}</div>${losses(side)}</section>`;
