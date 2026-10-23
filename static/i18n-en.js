@@ -1,6 +1,16 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Killmail megnyitása a zKillboardon": "Open killmail on zKillboard",
+
+  "A session teljes veszteségértéke": "Total session loss value",
+  "A karakter részvételével elért killek": "Kills involving this character",
+  "A karakter saját vesztesége": "Character’s own losses",
+  "Ténylegesen megsemmisült:": "Actually destroyed:",
+  "A session értéke még részösszeg: a kapcsolódó riport hiányzik, részleges vagy frissítésre vár.": "The session value is still a subtotal: the related report is missing, partial or needs refreshing.",
+  "Néhány killmail értékadata hiányzik; az ismert értékek részösszege látszik. A hiányzó megsemmisült értéket nem helyettesítjük a loot-tal együtt számolt értékkel.": "Some killmail values are missing; known values are shown as a subtotal. Missing destroyed values are not replaced with values including dropped loot.",
+  "A fő összegek a zKillboard becsült teljes killmailértékei, a kihullott loot-tal együtt. A megsemmisült sor csak a destroyedValue értéket mutatja. Részvételnél minden olyan kill teljes értéke egyszer számít, amelyen a karakter támadóként szerepel; nem sebzésarányos részesedés.": "Main amounts are zKillboard estimated total killmail values, including dropped loot. The destroyed line shows destroyedValue only. Participation counts the full value of each kill with this character as an attacker once; it is not damage-proportional credit.",
+
   "Elkészült": "Complete",
 
   "Bekapcsolva": "On",

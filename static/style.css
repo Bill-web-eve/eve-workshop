@@ -179,3 +179,13 @@ html[data-intel-window=map] .page-heading{display:none}html[data-intel-window=ma
 #fleet-settings .skill-character-options{display:flex;flex-wrap:wrap;gap:12px;margin:14px 0}
 #fleet-session .panel-head{gap:12px;flex-wrap:wrap}
 #view-content:has(.fleet-controls) progress{display:block;width:100%;height:7px;margin-top:8px}
+
+.fleet-value-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:10px}
+.fleet-value-summary .metric strong{font-size:clamp(18px,1.65vw,27px);overflow-wrap:anywhere}
+.fleet-value-summary .metric small{display:block;margin-top:4px}
+.fleet-value-summary .footnote{margin:6px 0 0}
+@media(max-width:900px){.fleet-value-summary{grid-template-columns:1fr}}
+
+.fleet-killmail-link{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:6px;vertical-align:middle}
+.fleet-killmail-link img{display:block;border-radius:4px}
+.fleet-killmail-link:hover{background:var(--bg);outline:1px solid var(--blue)}

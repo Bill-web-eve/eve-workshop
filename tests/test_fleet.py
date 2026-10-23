@@ -110,3 +110,22 @@ class FleetApiTests(unittest.TestCase):
         self.assertEqual(self.request('/api/fleet/refresh',{'session_id':'unknown'})[0],400)
         self.assertEqual(self.request('/fleet.js')[0],200)
         self.assertIn('fleet',self.request('/api/activity')[1])
+
+class FleetValueTests(unittest.TestCase):
+    def test_totals_include_context_and_full_participation_not_damage_share(self):
+        a=kill(1);a['zkb']={'totalValue':100.25,'destroyedValue':70.10};a['attackers'].append({'character_id':77})
+        loss=kill(2,loss=True);loss['zkb']={'totalValue':50.25,'destroyedValue':40}
+        other=kill(3,cid=12);other['zkb']={'totalValue':49.50,'destroyedValue':39.90}
+        v=fleet.session_value([a,loss,other,a],11)
+        self.assertEqual(v['total'],{'count':3,'cents':'20000','missing':0,'destroyed_cents':'15000','destroyed_missing':0})
+        self.assertEqual(v['participation']['cents'],'10025');self.assertEqual(v['participation']['count'],1)
+        self.assertEqual(v['losses']['cents'],'5025');self.assertEqual(v['participation_percent'],'50.13')
+    def test_unknown_prices_are_partial_and_never_replace_destroyed_with_loot(self):
+        a=kill(1);a['zkb']={'totalValue':100.25};b=kill(2,cid=12);b['zkb']={}
+        v=fleet.session_value([a,b],11)
+        self.assertEqual(v['total']['missing'],1);self.assertIsNone(v['participation_percent'])
+        self.assertEqual(v['participation']['destroyed_missing'],1);self.assertEqual(v['participation']['destroyed_cents'],'0')
+    def test_isk_sums_use_cents_and_zero_is_a_known_value(self):
+        a=kill(1);a['zkb']={'totalValue':0.1,'destroyedValue':0};b=kill(2);b['zkb']={'totalValue':0.2,'destroyedValue':0}
+        v=fleet.session_value([a,b],11);self.assertEqual(v['total']['cents'],'30');self.assertEqual(v['total']['destroyed_missing'],0)
+        self.assertEqual(v['participation_percent'],'100.00');self.assertEqual(v['losses']['count'],0)

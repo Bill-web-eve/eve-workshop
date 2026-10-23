@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from bisect import bisect_left,bisect_right
 from collections import defaultdict
+from decimal import Decimal,ROUND_HALF_UP
 from email.utils import parsedate_to_datetime
 import copy,gzip,json,math,re,threading,time,urllib.error,urllib.request
 from . import intel_universe,progress
@@ -71,8 +72,9 @@ def validate_kills(rows):
         if row['killmail_id'] in seen:raise EsiError('Hibás zKillboard-adat.')
         seen.add(row['killmail_id']);timestamp(row.get('killmail_time'))
         if not isinstance(row.get('victim'),dict) or not isinstance(row.get('attackers'),list) or any(not isinstance(a,dict) for a in row['attackers']):raise EsiError('Hiányos zKillboard-adat; a korábbi adatok megmaradtak.')
-        value=row.get('zkb',{}).get('totalValue') if isinstance(row.get('zkb',{}),dict) else None
-        if value is not None and (type(value) not in [int,float] or not math.isfinite(value) or value<0):raise EsiError('Hibás zKillboard-adat.')
+        for field in ['totalValue','destroyedValue']:
+            value=row.get('zkb',{}).get(field) if isinstance(row.get('zkb',{}),dict) else None
+            if value is not None and (type(value) not in [int,float] or not math.isfinite(value) or value<0):raise EsiError('Hibás zKillboard-adat.')
 
 
 def cache(store,key):
@@ -156,6 +158,30 @@ def sessions(kills,positions,cid,p,universe):
                        'kill_ids':[k['killmail_id'] for k in group],'fleet_candidate':bool(allies),'other_attackers':len(allies),
                        'visits':visits,'windows':sorted(merged,key=lambda r:r['start']),'esi_samples':sum(v['esi_samples'] for v in visits)})
     return result
+
+
+def session_value(kills,cid):
+    """Whole killmail values, counted once. Participation is not damage credit.
+
+    Keep destroyedValue distinct from totalValue (which also includes loot).
+    Missing valuations remain explicit instead of silently becoming zero.
+    """
+    def bucket():return {'count':0,'cents':0,'missing':0,'destroyed_cents':0,'destroyed_missing':0}
+    totals={key:bucket() for key in ['total','participation','losses']}
+    unique={k['killmail_id']:k for k in kills}
+    for k in unique.values():
+        side=role(k,cid);keys=['total']+(['participation'] if side=='kill' else ['losses'] if side=='loss' else [])
+        for key in keys:
+            b=totals[key];b['count']+=1
+            for field,out,missing in [('totalValue','cents','missing'),('destroyedValue','destroyed_cents','destroyed_missing')]:
+                value=k.get('zkb',{}).get(field)
+                if type(value) not in [int,float] or not math.isfinite(value) or value<0:b[missing]+=1
+                else:b[out]+=int((Decimal(str(value))*100).quantize(Decimal('1'),rounding=ROUND_HALF_UP))
+    total=totals['total'];part=totals['participation']
+    percent=str((Decimal(part['cents'])*100/total['cents']).quantize(Decimal('.01'),rounding=ROUND_HALF_UP)) if total['cents'] and not total['missing'] else None
+    for b in totals.values():
+        b['cents']=str(b['cents']);b['destroyed_cents']=str(b['destroyed_cents'])
+    return {**totals,'participation_percent':percent}
 
 
 class ZKill:
@@ -342,7 +368,7 @@ class Fleet:
                     for k in rows[bisect_left(ts,w['start']):bisect_right(ts,w['end'])]:context[k['killmail_id']]=k
                 context=list(context.values())
                 s['rows']=[self.row(k,c['id']) for k in sorted(context,key=lambda r:timestamp(r['killmail_time']))]
-                s['context_count']=len(context);activity.append(s)
+                s['context_count']=len(context);s['value_summary']=session_value(context,c['id']);activity.append(s)
             source=cache(self.store,'character:'+str(c['id']));loc=cache(self.store,'location:'+str(c['id']));sid=(loc or {}).get('data',{}).get('location',{}).get('solar_system_id')
             access.append({'id':c['id'],'name':c['name'],'checked':(source or {}).get('checked'),'next_check':(source or {}).get('expires'),'error':(source or {}).get('error'),'complete':(source or {}).get('data',{}).get('complete',False),
                            'location_access':LOCATION_SCOPE in granted.get(c['id'],[]),'location_checked':(loc or {}).get('data',{}).get('observed'),'location_error':(loc or {}).get('error'),'system':self.universe.systems.get(sid,{}).get('name'),'selected':p['character_ids'] is None or c['id'] in p['character_ids']})

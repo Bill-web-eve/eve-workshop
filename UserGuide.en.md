@@ -580,3 +580,11 @@ Under **Tracking and grouping settings**, select tracked pilots, turn location t
 ESI does not provide historical routes: samples are recorded while the app is running. A position is a last known location, not proof that the pilot is online; travel between samples remains unknown. Location is the only ESI data queried more frequently than the existing 15-minute automatic limit. ESI cache lifetimes are still respected. Public kill history is checked hourly, and identical zKillboard queries are cached locally for one hour, including manual refreshes. Missing or delayed public killmails cannot be reliably reconstructed.
 
 **Sources and coverage** shows per-character kill and location timestamps, next killmail request availability and access errors. Progress indicators show the current pilot/system and page. History stays in the local profile and is excluded from clean installer packages.
+
+### Session ISK summary and killmail icons
+
+Opening an activity session shows three summary cards: **total session loss value**, **kills involving this character**, and **character’s own losses**. Participation counts the full value of each killmail containing the character as an attacker once, without splitting it by attackers or damage dealt. Cards include killmail counts; participation also shows its percentage of the fully valued session total.
+
+The main amount is zKillboard’s estimated `totalValue`, including dropped loot. The **Actually destroyed** line separately sums `destroyedValue`, excluding dropped loot. Missing values are not treated as zero. Missing prices, an unloaded or partial related report, or changed system windows are marked as subtotals. Use **Load related killmails** for fuller coverage. The session total includes all loaded events within the system windows, so it may include unrelated surrounding fights.
+
+The **Killmail** column displays a clickable icon of the destroyed ship instead of a text link, both in session details and the combined killmail list. Clicking the icon opens that exact killmail on zKillboard. Hover for its ship name and killmail ID. The separate ship name remains clickable for plain-text copying.

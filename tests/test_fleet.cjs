@@ -65,3 +65,23 @@ test('successful related report labels are English and periodic local reads stay
  d.querySelector('details').open=true;await run('loadFleet(true)');
  assert(d.querySelector('details').open);
 });
+
+test('session summary shows full ISK, own involvement, losses and partial coverage',async t=>{
+ const {w,d,run,data}=await fixture();t.after(()=>w.close());
+ data.sessions[0].value_summary={total:{count:3,cents:'20000',missing:0,destroyed_cents:'15000',destroyed_missing:0},participation:{count:1,cents:'10025',missing:0,destroyed_cents:'7010',destroyed_missing:0},losses:{count:1,cents:'5025',missing:0,destroyed_cents:'4000',destroyed_missing:0},participation_percent:'50.13'};
+ d.querySelector('[data-fleet-session]').click();await tick();
+ const total=d.querySelector('[data-fleet-value=total]'),part=d.querySelector('[data-fleet-value=participation]');
+ assert.match(total.textContent,/200,00 ISK/);assert.match(total.textContent,/150,00 ISK/);assert.match(part.textContent,/100,25 ISK/);assert.match(part.textContent,/50.13%/);
+ assert.match(d.querySelector('[data-fleet-value=losses]').textContent,/50,25 ISK/);assert.match(d.querySelector('#fleet-session').textContent,/still a subtotal/);
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('#fleet-session').textContent));
+ data.sessions[0].value_summary.total.missing=1;data.sessions[0].value_summary.participation.destroyed_missing=1;run('render()');await tick();
+ assert.match(d.querySelector('#fleet-session').textContent,/Some killmail values are missing/);
+});
+test('killmail links are ship icons in session and combined kill lists',async t=>{
+ const {w,d}=await fixture();t.after(()=>w.close());
+ d.querySelector('[data-fleet-session]').click();await tick();
+ let a=d.querySelector('a[href="https://zkillboard.com/kill/123/"]');
+ assert.equal(a.textContent,'');assert.equal(a.querySelector('img').getAttribute('src'),'https://images.evetech.net/types/590/icon?size=64');assert.match(a.getAttribute('aria-label'),/Open killmail on zKillboard/);
+ d.querySelector('[data-fleet-tab=kills]').click();await tick();
+ a=d.querySelector('a[href="https://zkillboard.com/kill/123/"]');assert(a.querySelector('img'));assert.equal(a.getAttribute('target'),'_blank');
+});
