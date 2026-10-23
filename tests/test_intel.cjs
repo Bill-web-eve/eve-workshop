@@ -191,3 +191,8 @@ test('kill region and source settings save independently from chat parsing regio
  const form=d.querySelector('#intel-settings');form.elements.kill_region.value='10';form.elements.killfeed_enabled.checked=false;form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
  assert.equal(intel.preferences.killfeed_enabled,false);assert.equal(intel.preferences.kill_region_ids[0],10);assert.equal(intel.preferences.region_ids.length,0);assert.equal(intel.preferences.enabled,true);
 });
+test('live kills do not dismiss an open region selector and paint after focus leaves it',async t=>{
+ const {w,d,run,intel}=await fixture();t.after(()=>w.close());const select=d.querySelector('#intel-region'),svg=d.querySelector('#intel-map svg');select.focus();
+ intel.nodes[0].kill_groups=[killGroup()];await run('refreshIntel(true)');assert.equal(d.querySelector('#intel-region'),select);assert.equal(d.querySelector('#intel-map svg'),svg);
+ select.blur();await run('refreshIntel(true)');assert.notEqual(d.querySelector('#intel-map svg'),svg);assert(d.querySelector('.intel-kill-summary'));
+});

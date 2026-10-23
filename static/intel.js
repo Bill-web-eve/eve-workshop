@@ -20,6 +20,8 @@ async function refreshIntel(background=false){
     if(intelWindowMode==='chat'){
       if(!$('#intel-chat-feed'))render();else updateIntelChat();
     }else if((view==='intel'&&!intelMapDragging)||(view==='settings'&&settingsTab==='intel')){
+      // A live update must not dismiss a native region/character dropdown.
+      if(background&&document.activeElement?.matches('.intel-toolbar select')){updateIntelStatus();return;}
       if(!background||fingerprint!==intelFingerprint){render();intelFingerprint=fingerprint;}
       else updateIntelStatus();
     }
