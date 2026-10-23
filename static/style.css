@@ -165,3 +165,17 @@ html[data-intel-window=map] .page-heading{display:none}html[data-intel-window=ma
 .asset-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}.asset-toolbar{display:flex;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:10px}.asset-toolbar label{display:flex;flex-direction:column;gap:6px;min-width:190px}.asset-toolbar input,.asset-toolbar select{min-height:38px}.asset-toolbar .asset-search{flex:1;min-width:250px}.asset-pagination{display:flex;align-items:center;justify-content:center;gap:12px;padding:12px}.all-assets-table .item-name{min-width:210px}
 
 .job-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:18px;padding:14px 18px}.job-controls label{display:flex;align-items:center;gap:12px;font-size:12px}.job-controls select{flex:1;min-width:0;font-size:12px}@media(max-width:760px){.job-controls{grid-template-columns:1fr}}
+
+/* Combat activity keeps controls compact; long routes wrap instead of widening the page. */
+.fleet-controls{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin-bottom:14px}
+.fleet-controls>label{flex:1 1 180px;max-width:320px;display:grid;gap:6px}
+.fleet-controls .footnote{flex:2 1 240px;margin:0 0 8px}
+.fleet-route{display:flex;gap:9px;flex-wrap:wrap;padding:0;list-style:none}
+.fleet-route li{display:grid;gap:4px;position:relative;padding:10px 14px;border:1px solid var(--line);border-radius:8px;min-width:170px}
+.fleet-route li .badge{position:absolute;top:7px;right:7px;font-size:10px}
+.fleet-route li strong{padding-right:24px}
+.fleet-route li span:not(.badge),.fleet-route li small{font-size:11px;color:var(--muted)}
+.fleet-pager{display:flex;align-items:center;gap:12px;margin:12px 0}
+#fleet-settings .skill-character-options{display:flex;flex-wrap:wrap;gap:12px;margin:14px 0}
+#fleet-session .panel-head{gap:12px;flex-wrap:wrap}
+#view-content:has(.fleet-controls) progress{display:block;width:100%;height:7px;margin-top:8px}

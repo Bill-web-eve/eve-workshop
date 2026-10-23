@@ -7,7 +7,7 @@ globalThis.EveActivity=(()=>{
   const detailText=value=>Array.isArray(value)?value.map(p=>p.raw?p.text:t(p.text,...(p.args||[]))).join(' · '):t(value);
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const labels={
-    '/api/assets':'Teljes EVE-készlet betöltése',
+    '/api/fleet':'Flottaadatok betöltése…','/api/fleet/refresh':'Killmailek frissítése','/api/assets':'Teljes EVE-készlet betöltése',
     '/api/mining':'Bányászati naplók összesítése','/api/mining/sync':'Bányászati naplók frissítése',
     '/api/intel/characters':'Pilótaazonosítók ellenőrzése…','/api/intel':'Inteladatok betöltése','/api/intel/channels':'Intelcsatornák keresése','/api/intel/locations':'ESI-helyzetek frissítése',
     '/api/state':'Műhelyadatok betöltése','/api/plan':'Gyártási terv számítása','/api/schedule':'Gyártás ütemezése','/api/search':'Termékkeresés',
@@ -75,6 +75,7 @@ globalThis.EveActivity=(()=>{
   }
   function observe(path,data){
     if(!data||typeof data!=='object')return;
+    if(base(path)==='/api/fleet')fleet(data.status,data.location_status);
     if(data.task)task(data.task);
     if(data.intel)intel(data.intel);
     const key=base(path);
@@ -99,14 +100,24 @@ globalThis.EveActivity=(()=>{
     background('intel-names','Pilótaazonosítók ellenőrzése…',!!data.resolving_characters,[part('Ellenőrizve: {0} / {1}',data.names_done||0,data.names_total||0)],data.names_total?{done:data.names_done||0,total:data.names_total}:null,data.names_error?'warning':'success');if(data.resolving_characters)pollSoon();
     background('intel','ESI-helyzetek frissítése',!!data.location_refreshing,data.location_character?[{text:data.location_character,raw:true}]:[part('Helyzetadatok ellenőrzése')]);if(data.location_refreshing)pollSoon();
   }
-  function monitoring(){return [...active.keys()].some(key=>key==='intel-names'||key==='intel'||key==='market'||key==='industry'||key==='pending:task'||key.startsWith('task:'));}
+  function fleet(data={},location={}){
+    const bits=[part('Ellenőrizve: {0} / {1}',data.completed||0,data.total||0)];
+    if(data.subject)bits.push({text:data.subject,raw:true});
+    if(data.page)bits.push(part('{0}. oldal',data.page));
+    if(data.resource)bits.push(part(data.resource));
+    const issue=data.error||data.results?.some(r=>!r.ok||r.partial);
+    background('fleet','Killmailek frissítése',!!data.running,data.error||bits,data.total?{done:data.completed||0,total:data.total}:null,issue?'warning':'success');
+    background('fleet-location','ESI-helyzetek frissítése',!!location.running,location.character?[{text:location.character,raw:true}]:[part('Helyzetadatok ellenőrzése')]);
+    if(data.running||location.running)pollSoon();
+  }
+  function monitoring(){return [...active.keys()].some(key=>key==='fleet'||key==='fleet-location'||key==='intel-names'||key==='intel'||key==='market'||key==='industry'||key==='pending:task'||key.startsWith('task:'));}
   function pollSoon(delay=700){if(!pollTimer&&!polling)pollTimer=setTimeout(()=>{pollTimer=null;void poll();},delay);}
   async function poll(){
     if(polling)return;polling=true;
     try{
       const response=await fetch('/api/activity');if(!response.ok)throw Error('status');const data=await response.json();monitorFailures=0;
       if(data.task?.kind)task(data.task);else if(active.has('pending:task'))finish('pending:task','success','Nincs folyamatban adatfrissítés.');
-      market(data.market||{});industry(data.industry||{});intel(data.intel||{});finish('monitor','success','Az állapotjelzés helyreállt.');
+      fleet(data.fleet?.task,data.fleet?.location);market(data.market||{});industry(data.industry||{});intel(data.intel||{});finish('monitor','success','Az állapotjelzés helyreállt.');
     }catch{
       monitorFailures++;
       const row=start('monitor','Az állapot most nem ellenőrizhető.','Újrapróbáljuk az állapot lekérését; a folyamat befejezése még nem igazolt.');row.state='warning';render();

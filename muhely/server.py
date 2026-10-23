@@ -21,7 +21,7 @@ import uuid
 import webbrowser
 
 from . import __version__
-from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe, mining, assets, jobs as job_browser
+from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe, mining, assets, jobs as job_browser, fleet
 from .market import Market,validate_ids as market_ids
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
@@ -59,6 +59,7 @@ class App:
         self.planning_lock = threading.RLock()
         self.task = {'running': False, 'kind': None, 'message': '', 'finished': None, 'results': []}
         self.intel=intel.IntelMonitor(self.store,self.catalog,self.eve)
+        self.fleet=fleet.Fleet(self.store,self.catalog,self.eve)
 
     def desktop_auth_start(self, url):
         """One-use browser handoff; OAuth codes and tokens never enter the UI."""
@@ -190,7 +191,7 @@ class App:
         with self.market.lock:
             market={'running':self.market.running,'done':self.market.done,'total':self.market.total,'errors':len(self.market.errors),'current':getattr(self.market,'current',None),'current_name':self.catalog.name(self.market.current) if getattr(self.market,'current',None) else None,'page':getattr(self.market,'page',None),'pages':getattr(self.market,'pages',None)}
         with self.intel.lock:intel_status=dict(self.intel.status)
-        return {'task':task,'market':market,'industry':self.industry.status(),'intel':intel_status}
+        return {'task':task,'market':market,'industry':self.industry.status(),'intel':intel_status,'fleet':self.fleet.status()}
 
     def notification_data(self):
         with self.catalog.lock:
@@ -534,7 +535,7 @@ class App:
                 'locations': locations, 'jobs': [j for j in jobs if j.get('status') in ['active', 'paused', 'ready']],
                 'blueprint_count': len(bps), 'stale_characters': stale, 'sde': self.catalog.meta,
                 'recipe_count': sum(self.catalog.types.get(i, {}).get('published', 0) for i in self.catalog.recipes),
-                'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,'mining_scopes':mining.MINING_SCOPES,
+                'fleet_running':self.fleet.status()['task']['running'],'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,'mining_scopes':mining.MINING_SCOPES,
                 'crypto_available': crypto_available()}
 
 
@@ -632,7 +633,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -652,6 +653,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(200, moon_calendar.export(self.app.store, self.app.catalog, query.get('lang', ['en'])[0]), 'text/calendar; charset=utf-8')
             if not self.authorized():
                 return self.send(403, {'error': 'Nyisd meg az alkalmazás kezdőlapját.'})
+            if path == '/api/fleet':return self.send(200,self.app.fleet.dashboard())
             if path == '/api/jobs':
                 cid=self.app.scope_id(query.get('corporation_id',[None])[0])
                 with self.app.catalog.lock:return self.send(200,job_browser.dashboard(self.app.store,self.app.catalog,cid))
@@ -770,7 +772,9 @@ class Handler(BaseHTTPRequestHandler):
             path = urllib.parse.urlsplit(self.path).path
             query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             corporation_id=self.app.scope_id(query.get('corporation_id',[None])[0])
-            if path == '/api/intel/preferences':return self.send(200,self.app.intel.configure(data))
+            if path == '/api/fleet/preferences':return self.send(200,fleet.save_preferences(self.app.store,data))
+            elif path == '/api/fleet/refresh':return self.send(200,self.app.fleet.start_refresh(data.get('character_id'),data.get('session_id')))
+            elif path == '/api/intel/preferences':return self.send(200,self.app.intel.configure(data))
             elif path == '/api/intel/characters':
                 self.app.intel.request_characters(manual=True);return self.send(200,{'intel':dict(self.app.intel.status)})
             elif path == '/api/intel/locations':
@@ -913,6 +917,7 @@ class Server(ThreadingHTTPServer):
     allow_reuse_address = True
 
     def server_close(self):
+        self.app.fleet.stop()
         self.app.intel.stop()
         super().server_close()
 
@@ -941,6 +946,7 @@ def main():
         server = Server(app)
     except OSError:
         raise SystemExit(f'A {args.port} port foglalt. Ha az alkalmazás már fut, nyisd meg: {app.origin}')
+    app.fleet.start()
     if not args.no_browser:
         threading.Timer(.4, lambda: webbrowser.open(app.origin)).start()
     print(f'EVE Műhely: {app.origin}\nAdatok: {args.data_dir}\nLeállítás: a felületen vagy Ctrl+C.', flush=True)

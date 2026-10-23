@@ -46,7 +46,7 @@ globalThis.EveDesktop=(()=>{
   }
   async function prepareQuit(){
     let running=false;
-    try{const response=await fetch('/api/state');if(response.ok)running=(await response.json()).task.running;}catch{}
+    try{const response=await fetch('/api/state');if(response.ok){const state=await response.json();running=state.task.running||state.fleet_running;}}catch{}
     await send('quitCheck',{dirty:typeof dirty!=='undefined'&&Object.keys(dirty).length>0,running});
   }
   async function shutdown(){
