@@ -113,50 +113,51 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
     dispatch_async(dispatch_get_main_queue(),^{[self showNotificationTarget:target];done();});
 }
 - (void)notificationAction:(NSDictionary *)body reply:(void (^)(id,NSString *))reply {
-    if(!self.notificationCenter){if([body[@"action"] isEqual:@"notify"])reply(nil,@"A macOS-értesítések nincsenek engedélyezve.");else reply(@{ @"status":@"unavailable" },nil);return;}
+    BOOL english=[self english];
+    if(!self.notificationCenter){if([body[@"action"] isEqual:@"notify"])reply(nil,(english?@"macOS notifications are not authorized.":@"A macOS-értesítések nincsenek engedélyezve."));else reply(@{ @"status":@"unavailable" },nil);return;}
     NSString *action=body[@"action"];
     if([action isEqual:@"requestNotifications"]){
         [self.notificationCenter requestAuthorizationWithOptions:(UNAuthorizationOptionAlert|UNAuthorizationOptionSound) completionHandler:^(BOOL allowed,NSError *error){
-            [self.notificationCenter getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings){dispatch_async(dispatch_get_main_queue(),^{reply(error?nil:@{ @"status":[self notificationStatusName:settings.authorizationStatus] },error?@"A macOS-értesítések engedélyezése nem sikerült.":nil);});}];
+            [self.notificationCenter getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings){dispatch_async(dispatch_get_main_queue(),^{reply(error?nil:@{ @"status":[self notificationStatusName:settings.authorizationStatus] },error?(english?@"Could not authorize macOS notifications.":@"A macOS-értesítések engedélyezése nem sikerült."):nil);});}];
         }];return;
     }
     [self.notificationCenter getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings){
         if([action isEqual:@"notificationStatus"]){dispatch_async(dispatch_get_main_queue(),^{reply(@{ @"status":[self notificationStatusName:settings.authorizationStatus] },nil);});return;}
-        if(![[self notificationStatusName:settings.authorizationStatus] isEqual:@"authorized"]){dispatch_async(dispatch_get_main_queue(),^{reply(nil,@"A macOS-értesítések nincsenek engedélyezve.");});return;}
+        if(![[self notificationStatusName:settings.authorizationStatus] isEqual:@"authorized"]){dispatch_async(dispatch_get_main_queue(),^{reply(nil,(english?@"macOS notifications are not authorized.":@"A macOS-értesítések nincsenek engedélyezve."));});return;}
         NSString *identifier=body[@"id"],*title=body[@"title"],*text=body[@"body"],*scope=body[@"scope"],*category=body[@"category"];
         BOOL valid=[identifier isKindOfClass:NSString.class]&&identifier.length<=128&&identifier.length>0&&
             [identifier rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._:-"].invertedSet].location==NSNotFound&&
             [title isKindOfClass:NSString.class]&&title.length<=200&&[text isKindOfClass:NSString.class]&&text.length<=1500&&
             [scope isKindOfClass:NSString.class]&&scope.length<=20&&([scope isEqual:@"personal"]||[scope rangeOfCharacterFromSet:NSCharacterSet.decimalDigitCharacterSet.invertedSet].location==NSNotFound)&&
             [@[@"skills",@"jobs",@"pi",@"moons",@"intel",@"implants",@"all"] containsObject:category];
-        if(!valid){dispatch_async(dispatch_get_main_queue(),^{reply(nil,@"Hibás rendszerértesítés.");});return;}
+        if(!valid){dispatch_async(dispatch_get_main_queue(),^{reply(nil,(english?@"Invalid system notification.":@"Hibás rendszerértesítés."));});return;}
         UNMutableNotificationContent *content=[UNMutableNotificationContent new];content.title=title;content.body=text;
         content.userInfo=@{ @"scope":scope,@"category":category };
         if([body[@"sound"] isEqual:@YES])content.sound=UNNotificationSound.defaultSound;
         UNNotificationRequest *request=[UNNotificationRequest requestWithIdentifier:identifier content:content trigger:nil];
-        [self.notificationCenter addNotificationRequest:request withCompletionHandler:^(NSError *error){dispatch_async(dispatch_get_main_queue(),^{reply(error?nil:@{ @"queued":@YES },error?@"A macOS nem tudta sorba állítani az értesítést.":nil);});}];
+        [self.notificationCenter addNotificationRequest:request withCompletionHandler:^(NSError *error){dispatch_async(dispatch_get_main_queue(),^{reply(error?nil:@{ @"queued":@YES },error?(english?@"macOS could not queue the notification.":@"A macOS nem tudta sorba állítani az értesítést."):nil);});}];
     }];
 }
 - (BOOL)english { return [self.language isEqualToString:@"en"]; }
 - (void)menu {
     NSMenu *menu = [NSMenu new], *app = [NSMenu new], *edit = [NSMenu new], *view = [NSMenu new];
     NSMenuItem *appRoot = [NSMenuItem new]; appRoot.submenu = app; [menu addItem:appRoot];
-    self.settingsItem = [app addItemWithTitle:@"Beállítások…" action:@selector(settings:) keyEquivalent:@","];
+    self.settingsItem = [app addItemWithTitle:([self english]?@"Settings…":@"Beállítások…") action:@selector(settings:) keyEquivalent:@","];
     self.settingsItem.target = self;
     [app addItem:NSMenuItem.separatorItem];
-    self.quitItem = [app addItemWithTitle:@"EVE Műhely bezárása" action:@selector(terminate:) keyEquivalent:@"q"];
-    NSMenuItem *editRoot = [[NSMenuItem alloc] initWithTitle:@"Edit" action:nil keyEquivalent:@""]; editRoot.submenu = edit; [menu addItem:editRoot];
-    for (NSArray *item in @[@[@"Undo",@"undo:",@"z"],@[@"Cut",@"cut:",@"x"],@[@"Copy",@"copy:",@"c"],@[@"Paste",@"paste:",@"v"],@[@"Select All",@"selectAll:",@"a"]])
+    self.quitItem = [app addItemWithTitle:([self english]?@"Quit EVE Workshop":@"EVE Műhely bezárása") action:@selector(terminate:) keyEquivalent:@"q"];
+    NSMenuItem *editRoot = [[NSMenuItem alloc] initWithTitle:([self english]?@"Edit":@"Szerkesztés") action:nil keyEquivalent:@""]; editRoot.submenu = edit; [menu addItem:editRoot];
+    for (NSArray *item in @[@[([self english]?@"Undo":@"Visszavonás"),@"undo:",@"z"],@[([self english]?@"Cut":@"Kivágás"),@"cut:",@"x"],@[([self english]?@"Copy":@"Másolás"),@"copy:",@"c"],@[([self english]?@"Paste":@"Beillesztés"),@"paste:",@"v"],@[([self english]?@"Select All":@"Összes kijelölése"),@"selectAll:",@"a"]])
         [edit addItemWithTitle:item[0] action:NSSelectorFromString(item[1]) keyEquivalent:item[2]];
-    NSMenuItem *viewRoot = [[NSMenuItem alloc] initWithTitle:@"View" action:nil keyEquivalent:@""]; viewRoot.submenu = view; [menu addItem:viewRoot];
-    self.reloadItem = [view addItemWithTitle:@"Újratöltés" action:@selector(reload:) keyEquivalent:@"r"]; self.reloadItem.target = self;
+    NSMenuItem *viewRoot = [[NSMenuItem alloc] initWithTitle:([self english]?@"View":@"Nézet") action:nil keyEquivalent:@""]; viewRoot.submenu = view; [menu addItem:viewRoot];
+    self.reloadItem = [view addItemWithTitle:([self english]?@"Reload":@"Újratöltés") action:@selector(reload:) keyEquivalent:@"r"]; self.reloadItem.target = self;
     self.editRoot=editRoot;self.viewRoot=viewRoot;self.editMenu=edit;NSApp.mainMenu = menu;
-    NSMenu *windows=[[NSMenu alloc] initWithTitle:@"Ablak"];
-    self.windowRoot=[[NSMenuItem alloc] initWithTitle:@"Ablak" action:nil keyEquivalent:@""];self.windowRoot.submenu=windows;[menu addItem:self.windowRoot];NSApp.windowsMenu=windows;
-    self.minimizeItem=[windows addItemWithTitle:@"Kis méret" action:@selector(performMiniaturize:) keyEquivalent:@"m"];
-    self.zoomItem=[windows addItemWithTitle:@"Nagyítás" action:@selector(performZoom:) keyEquivalent:@""];
+    NSMenu *windows=[[NSMenu alloc] initWithTitle:([self english]?@"Window":@"Ablak")];
+    self.windowRoot=[[NSMenuItem alloc] initWithTitle:([self english]?@"Window":@"Ablak") action:nil keyEquivalent:@""];self.windowRoot.submenu=windows;[menu addItem:self.windowRoot];NSApp.windowsMenu=windows;
+    self.minimizeItem=[windows addItemWithTitle:([self english]?@"Minimize":@"Kis méret") action:@selector(performMiniaturize:) keyEquivalent:@"m"];
+    self.zoomItem=[windows addItemWithTitle:([self english]?@"Zoom":@"Nagyítás") action:@selector(performZoom:) keyEquivalent:@""];
     [windows addItem:NSMenuItem.separatorItem];
-    self.frontItem=[windows addItemWithTitle:@"Összes ablak előre" action:@selector(arrangeInFront:) keyEquivalent:@""];
+    self.frontItem=[windows addItemWithTitle:([self english]?@"Bring All to Front":@"Összes ablak előre") action:@selector(arrangeInFront:) keyEquivalent:@""];
 }
 - (void)settings:(id)sender { [self.web evaluateJavaScript:@"openSettingsTab('appearance')" completionHandler:nil]; }
 - (void)reload:(id)sender {
@@ -169,7 +170,9 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
     });
 }
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
-    self.origin = [NSURL URLWithString:@"http://127.0.0.1:8765"]; self.language = @"hu";
+    self.origin = [NSURL URLWithString:@"http://127.0.0.1:8765"];
+    NSString *savedLanguage=[NSUserDefaults.standardUserDefaults stringForKey:@"EVEUILanguage"];
+    self.language=savedLanguage?:([NSLocale.preferredLanguages.firstObject hasPrefix:@"en"]?@"en":@"hu");
     // Bare CLI smoke tests have no application identity; the installed app does.
     if(NSBundle.mainBundle.bundleIdentifier){self.notificationCenter=UNUserNotificationCenter.currentNotificationCenter;self.notificationCenter.delegate=self;}
     __weak EveWindow *weakSelf=self;
@@ -180,12 +183,12 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
     self.intelMonitor=[NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer){EveWindow *app=weakSelf;if(app.ready&&!app.quitting){[app.web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts();if(typeof pollImplantAlerts==='function')void pollImplantAlerts()" completionHandler:nil];for(WKWebView *web in app.intelViews.allValues)[web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts()" completionHandler:nil];}}];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [self menu];
     self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,1320,860) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
-    self.window.title = @"EVE Műhely"; self.window.minSize = NSMakeSize(900,650); self.window.delegate = self;
+    self.window.title = [self english]?@"EVE Workshop":@"EVE Műhely"; self.window.minSize = NSMakeSize(900,650); self.window.delegate = self;
     [self registerWindow:self.window];
     self.window.backgroundColor = [NSColor colorWithSRGBRed:0.071 green:0.137 blue:0.192 alpha:1];
     self.window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
     [self.window center]; [self.window setFrameAutosaveName:@"EVEWorkshopMainWindow"];
-    NSTextField *loading = [NSTextField labelWithString:@"EVE Műhely · Indítás / Starting…"];
+    NSTextField *loading = [NSTextField labelWithString:([self english]?@"EVE Workshop · Starting…":@"EVE Műhely · Indítás…")];
     loading.textColor = NSColor.whiteColor; loading.frame = NSMakeRect(36,42,500,30); [self.window.contentView addSubview:loading];
     [self.window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES];
     self.starting=YES;
@@ -194,8 +197,8 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
         if(self.quitAfterStartup){self.quitAfterStartup=NO;[NSApp terminate:nil];return;}
         if (!ok) {
             self.startupFailed = YES;
-            NSAlert *alert = [NSAlert new]; alert.messageText = @"Az EVE Műhely nem indult el / Startup failed";
-            alert.informativeText = @"Részletek / Details: ~/Library/Application Support/EVE Muhely/launcher.log";
+            NSAlert *alert = [NSAlert new]; alert.messageText = ([self english]?@"EVE Workshop could not start":@"Az EVE Műhely nem indult el");
+            alert.informativeText = ([self english]?@"Details: ~/Library/Application Support/EVE Muhely/launcher.log":@"Részletek: ~/Library/Application Support/EVE Muhely/launcher.log");
             [alert runModal]; [NSApp terminate:nil]; return;
         }
         WKWebViewConfiguration *config = [WKWebViewConfiguration new];
@@ -211,7 +214,7 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
 - (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error {
     if (error.code==NSURLErrorCancelled) return;
     if(webView==self.web)self.startupFailed=YES;
-    NSAlert *alert=[NSAlert new];alert.messageText=@"A felület nem tölthető be / Could not load the interface";alert.informativeText=@"Indítsd újra az EVE Műhely alkalmazást / Restart EVE Workshop.";[alert runModal];
+    NSAlert *alert=[NSAlert new];alert.messageText=([self english]?@"Could not load the interface":@"A felület nem tölthető be");alert.informativeText=([self english]?@"Restart EVE Workshop.":@"Indítsd újra az EVE Műhely alkalmazást.");[alert runModal];
 }
 - (void)webView:(WKWebView *)web decidePolicyForNavigationAction:(WKNavigationAction *)action decisionHandler:(void (^)(WKNavigationActionPolicy))decide {
     NSURL *url=action.request.URL;
@@ -243,11 +246,11 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
 }
 - (void)saveFile:(NSDictionary *)body reply:(void (^)(id, NSString *))reply {
     NSString *name=body[@"filename"],*encoded=body[@"base64"];
-    if (![name isKindOfClass:NSString.class] || ![encoded isKindOfClass:NSString.class] || encoded.length>45*1024*1024) {reply(nil,@"Invalid file");return;}
+    if (![name isKindOfClass:NSString.class] || ![encoded isKindOfClass:NSString.class] || encoded.length>45*1024*1024) {reply(nil,([self english]?@"Invalid file":@"Érvénytelen fájl."));return;}
     name=name.lastPathComponent;
-    if (![@[@"csv",@"ics",@"md",@"json"] containsObject:name.pathExtension.lowercaseString] || name.length>200) {reply(nil,@"Invalid file name");return;}
+    if (![@[@"csv",@"ics",@"md",@"json"] containsObject:name.pathExtension.lowercaseString] || name.length>200) {reply(nil,([self english]?@"Invalid file name":@"Hibás fájlnév."));return;}
     NSData *data=[[NSData alloc] initWithBase64EncodedString:encoded options:0];
-    if (!data || data.length>32*1024*1024) {reply(nil,@"Invalid file data");return;}
+    if (!data || data.length>32*1024*1024) {reply(nil,([self english]?@"Invalid file data":@"Hibás fájltartalom."));return;}
     NSSavePanel *panel=NSSavePanel.savePanel;panel.nameFieldStringValue=name;panel.canCreateDirectories=YES;
     [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response){
         if(response!=NSModalResponseOK){reply(@{ @"saved":@NO },nil);return;}
@@ -256,16 +259,16 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
     }];
 }
 - (void)userContentController:(WKUserContentController *)controller didReceiveScriptMessage:(WKScriptMessage *)message replyHandler:(void (^)(id, NSString *))reply {
-    if (!message.frameInfo.mainFrame || ![self localURL:message.frameInfo.request.URL] || ![self managedWeb:message.webView] || ![message.body isKindOfClass:NSDictionary.class]) {reply(nil,@"Untrusted origin");return;}
+    if (!message.frameInfo.mainFrame || ![self localURL:message.frameInfo.request.URL] || ![self managedWeb:message.webView] || ![message.body isKindOfClass:NSDictionary.class]) {reply(nil,([self english]?@"Untrusted origin":@"Nem megbízható eredet."));return;}
     NSDictionary *body=message.body;NSString *action=body[@"action"];
-    if(message.webView!=self.web && ![@[@"clipboard",@"preferences",@"external",@"activate",@"openIntelWindow"] containsObject:action]){reply(nil,@"Main window action required");return;}
+    if(message.webView!=self.web && ![@[@"clipboard",@"preferences",@"external",@"activate",@"openIntelWindow"] containsObject:action]){reply(nil,([self english]?@"Main window action required":@"Ez a művelet csak a főablakból érhető el."));return;}
     if([@[@"intelOverlayStatus",@"configureIntelOverlay",@"syncIntelOverlay"] containsObject:action]){
         if(!self.intelOverlay)self.intelOverlay=[[EveIntelOverlay alloc] initWithDefaults:NSUserDefaults.standardUserDefaults];
         self.intelOverlay.english=[self english];self.intelOverlay.light=[self.window.appearance.name isEqual:NSAppearanceNameAqua];
         BOOL ok=YES;if([action isEqual:@"configureIntelOverlay"])ok=[self.intelOverlay configure:body[@"options"]];else if([action isEqual:@"syncIntelOverlay"])ok=[self.intelOverlay sync:body[@"data"]];
-        reply(ok?[self.intelOverlay settings]:nil,ok?nil:@"Invalid intel overlay settings");return;
+        reply(ok?[self.intelOverlay settings]:nil,ok?nil:([self english]?@"Invalid intel overlay settings":@"Érvénytelen inteljelző-beállítás."));return;
     }
-    if([action isEqual:@"openIntelWindow"]){BOOL opened=[self openIntelWindow:body[@"kind"] options:[body[@"options"] isKindOfClass:NSDictionary.class]?body[@"options"]:@{}];reply(opened?@{ @"opened":@YES }:nil,opened?nil:@"Hibás intelablak.");return;}
+    if([action isEqual:@"openIntelWindow"]){BOOL opened=[self openIntelWindow:body[@"kind"] options:[body[@"options"] isKindOfClass:NSDictionary.class]?body[@"options"]:@{}];reply(opened?@{ @"opened":@YES }:nil,opened?nil:([self english]?@"Invalid intel window.":@"Hibás intelablak."));return;}
     if([@[@"notificationStatus",@"requestNotifications",@"notify"] containsObject:action]){[self notificationAction:body reply:reply];return;}
     if ([action isEqual:@"clipboard"] && [body[@"text"] isKindOfClass:NSString.class] && [body[@"text"] length]<8*1024*1024) {
         [NSPasteboard.generalPasteboard clearContents];[NSPasteboard.generalPasteboard setString:body[@"text"] forType:NSPasteboardTypeString];reply(@YES,nil);
@@ -276,6 +279,8 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
     } else if ([action isEqual:@"save"]) [self saveFile:body reply:reply];
     else if ([action isEqual:@"preferences"]) {
         self.language=[body[@"language"] isEqual:@"en"]?@"en":@"hu";
+        self.window.title=[self english]?@"EVE Workshop":@"EVE Műhely";
+        [NSUserDefaults.standardUserDefaults setObject:self.language forKey:@"EVEUILanguage"];
         self.window.appearance=[NSAppearance appearanceNamed:[body[@"theme"] isEqual:@"light"]?NSAppearanceNameAqua:NSAppearanceNameDarkAqua];
         for(NSString *key in self.intelWindows){NSWindow *window=self.intelWindows[key];window.appearance=self.window.appearance;BOOL map=[key isEqual:@"map"];window.title=[self english]?(map?@"EVE Workshop · System map":@"EVE Workshop · Intel chat"):(map?@"EVE Műhely · Rendszertérkép":@"EVE Műhely · Intelchat");[NSApp changeWindowsItem:window title:window.title filename:NO];}
         self.windowRoot.title=[self english]?@"Window":@"Ablak";NSApp.windowsMenu.title=self.windowRoot.title;
@@ -287,7 +292,7 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
         self.settingsItem.title=[self english]?@"Settings…":@"Beállítások…";self.quitItem.title=[self english]?@"Quit EVE Workshop":@"EVE Műhely bezárása";self.reloadItem.title=[self english]?@"Reload":@"Újratöltés";reply(@YES,nil);
     } else if ([action isEqual:@"external"] && [body[@"url"] isKindOfClass:NSString.class]) {
         NSURL *url=[NSURL URLWithString:body[@"url"]];BOOL allowed=[url.scheme isEqual:@"https"] || ([self localURL:url] && [url.path hasPrefix:@"/desktop/auth/"]);
-        if(allowed){[self openExternalURL:url];reply(@YES,nil);}else reply(nil,@"Blocked URL");
+        if(allowed){[self openExternalURL:url];reply(@YES,nil);}else reply(nil,([self english]?@"Blocked URL":@"Letiltott hivatkozás."));
     } else if ([action isEqual:@"activate"]) {[self.window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];reply(@YES,nil);}
     else if ([action isEqual:@"print"]) {[[self.web printOperationWithPrintInfo:NSPrintInfo.sharedPrintInfo] runOperationModalForWindow:self.window delegate:nil didRunSelector:NULL contextInfo:NULL];reply(@YES,nil);}
     else if ([action isEqual:@"quitCheck"] && self.quitting) {
@@ -304,7 +309,7 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
     } else if ([action isEqual:@"quitFailed"]) {
         reply(@YES,nil);self.quitting=NO;[NSApp replyToApplicationShouldTerminate:NO];
         NSAlert *alert=[NSAlert new];alert.messageText=[self english]?@"Could not stop the local service. Try again.":@"A helyi szolgáltatás nem állt le. Próbáld újra.";[alert runModal];
-    } else reply(nil,@"Unknown desktop action");
+    } else reply(nil,([self english]?@"Unknown desktop action":@"Ismeretlen asztali művelet."));
 }
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)app {
     if(self.stopped)return NSTerminateNow;

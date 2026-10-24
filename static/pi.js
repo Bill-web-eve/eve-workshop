@@ -43,7 +43,7 @@ async function refreshPI(auto=false){
   if(shouldSync&&view==='pi')void startTask('/api/pi/sync',false);
 }
 function renderPI(content){
-  setHead('PLANETARY INDUSTRY','Bolygók és PI','Karakterenkénti bolygónyilvántartás, kitermelőprogramok és a gyárak útvonalon elérhető alapanyag-ellátása.');
+  setHead('BOLYGÓTERMELÉS','Bolygók és PI','Karakterenkénti bolygónyilvántartás, kitermelőprogramok és a gyárak útvonalon elérhető alapanyag-ellátása.');
   $('#plan-status').hidden=true;
   actions(`<label class="pi-horizon">Ellátási időtáv<select id="pi-hours" aria-label="PI ellátási időtáv">${[1,6,24,72].map(n=>`<option value="${n}" ${n===piHours?'selected':''}>${n} óra</option>`).join('')}</select></label><button class="button primary compact" id="pi-sync" ${state.task.running?'disabled':''}>↻ PI-adatok frissítése</button>`);
   $('#pi-sync').onclick=()=>startTask('/api/pi/sync');

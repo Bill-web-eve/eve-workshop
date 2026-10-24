@@ -120,3 +120,35 @@ test('complete delivered-job cache errors translate while preserving plan and it
  assert.equal(i.t('A(z) Project. Készlet terv készletfrissítésre vár. '+body),'Plan Project. Készlet is waiting for an inventory update. '+english);
  dom.window.close();
 });
+
+test('audited status labels and validation messages translate, including ASCII-only Hungarian',async t=>{
+ const dom=await page(),i=dom.window.EveI18n;t.after(()=>dom.window.close());i.setLanguage('en');
+ const messages={
+  'Jita-árak frissítése':'Refreshing Jita prices','Kézikönyv betöltése':'Loading the user guide','Holdadatok frissítése':'Refreshing moon data',
+  'Betöltés…':'Loading…','Becslés':'Estimate','Beállítások mentve.':'Settings saved.','Karakterek':'Characters','Sikertelen':'Failed',
+  'Még nincs betöltött jobadat:':'Job data has not been downloaded for:','Korábbi jobadatok láthatók:':'Showing earlier job data for:',
+  'Ércarányok összege:':'Total ore proportions:','· 100% felett · javítandó':'· above 100% · correction required','· Részleges összetétel':'· partial composition',
+  'jelzett gyári ciklus':'reported factory cycle','hátralévő ciklus':'remaining cycles','Még nincs hozzáadott karakter.':'No character has been added yet.',
+  'Korábbi skilladatok':'Older skill data','Kezdés UTC':'Start UTC','Befejezés UTC':'End UTC','Beszerzendő blueprint':'Blueprint to procure',
+  'Az új scope-okat az EVE Developer alkalmazásban is engedélyezni kell.':'Enable the new scopes in the EVE Developer application as well.',
+  'Hibás marketbeállítás.':'Invalid market settings.','Előbb válaszd ki a helyi marketet.':'Select the local market first.',
+  'Hibás piaci ár.':'Invalid market price.','Az ütemezés anyagegyenlege nem zárható.':'The schedule material balance could not be reconciled.',
+  'Egyéb költség: szám szükséges.':'Other cost: a number is required.',
+  'Teljes struktúra broker fee: 0 és 100 közötti szám szükséges.':'Total structure broker fee: enter a number between 0 and 100.',
+  'Rendszerköltség-index · Gyártás':'System cost index · Manufacturing','Rendszerköltség-index · Reakció':'System cost index · Reaction',
+  'Nyisd meg az':'Open the','pontosan ez legyen:':'must be exactly:','● Fedezett':'● Covered',
+ };
+ for(const [source,target]of Object.entries(messages))assert.equal(i.t(source),target,source);
+});
+
+test('dynamic PI, price and industry fragments switch both ways without translating EVE names or changing fields',async t=>{
+ const dom=await page(),w=dom.window,d=w.document;t.after(()=>w.close());
+ const stamp=w.EveI18n.date(1800000000000,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+ d.body.insertAdjacentHTML('beforeend',`<main><p>Árak ellenőrizve: ${stamp}</p><p>Ipari adatok ellenőrizve: ${stamp}</p><p>Korábbi index · ${stamp}</p><p>ESI ellenőrizve: ${stamp}</p><p><span>Helyi gyár:</span> <span data-i18n-skip>Őr Test · Gyártás</span></p><span>Becsült fedezet:</span><span>Ciklus vége:</span><input value="1 234 567"></main>`);
+ const original=d.querySelector('main').textContent,input=d.querySelector('input');input.focus();input.setSelectionRange(2,5);
+ w.EveI18n.setLanguage('en');await tick();
+ const text=d.querySelector('main').textContent;
+ for(const label of ['Prices checked:','Industry data checked:','Earlier index ·','ESI checked:','Local factory:','Estimated coverage:','Cycle ends:'])assert(text.includes(label),text);
+ assert(text.includes('Őr Test · Gyártás'));assert.equal(input.value,'1 234 567');assert.equal(input.selectionStart,2);assert.equal(d.activeElement,input);
+ w.EveI18n.setLanguage('hu');await tick();assert.equal(d.querySelector('main').textContent,original);assert.equal(input.value,'1 234 567');
+});

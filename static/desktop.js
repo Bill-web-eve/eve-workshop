@@ -15,7 +15,7 @@ globalThis.EveDesktop=(()=>{
     try{chrome.webview.postMessage({eveDesktop:1,id,payload});}catch(e){clearTimeout(timer);pending.delete(id);reject(e);}
   })}:null);
   const active=!!handler;let authGeneration=0;
-  const send=(action,data={})=>handler?Promise.resolve(handler.postMessage({action,...data})):Promise.reject(Error('Desktop window unavailable'));
+  const send=(action,data={})=>handler?Promise.resolve(handler.postMessage({action,...data})):Promise.reject(Error('Az asztali alkalmazás ablaka nem érhető el.'));
   const preferences=()=>{if(active)void send('preferences',{theme:document.documentElement.dataset.theme||'dark',language:document.documentElement.lang||'hu'}).catch(()=>{});};
   async function saveBlob(blob,filename){
     if(blob.size>32*1024*1024)throw Error('A fájl túl nagy a mentéshez.');

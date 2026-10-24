@@ -42,6 +42,8 @@ test('the compact card prices only newly planned target output and exposes indep
  const {dom,run,d}=setup();t.after(()=>dom.window.close());
  run(`financePrefs=f;document.querySelector('#production-finance').innerHTML=productionFinance(c.plan,c.materials);financePrefs=f;financeBooks=books;financeProfile=profile;applyProductionFinance();`);
  assert.equal(run('financeContext.quantity'),2);
+ assert(d.querySelector('#production-finance').textContent.includes('Munkaköltség'));
+ assert(d.querySelector('#production-finance').textContent.includes('Közvetítői díj'));
  assert.equal(d.querySelectorAll('.finance-grid>section').length,3);
  assert.equal(d.querySelectorAll('[data-finance-field=materials] option').length,6);
  assert.equal(d.querySelectorAll('[data-finance-field=sale] option').length,6);

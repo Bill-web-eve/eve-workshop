@@ -42,7 +42,7 @@ function applyMiningValues(){
   });
 }
 function renderMining(content){
-  setHead('MINING LEDGER','Bányászati napló','Az összes hozzáadott karakter bányászata, Jita-értéke és becsült finomított kihozatala.');
+  setHead('BÁNYÁSZATI NAPLÓ','Bányászati napló','Az összes hozzáadott karakter bányászata, Jita-értéke és becsült finomított kihozatala.');
   actions(`<button class="button compact" id="mining-sync" ${state.task.running?'disabled':''}>Bányászati naplók frissítése</button><button class="button compact" id="mining-export">CSV mentése</button>`);
   $('#mining-sync').onclick=()=>void startTask('/api/mining/sync');
   const d=miningData;

@@ -22,7 +22,7 @@ function renderBattleReport(session,incomplete){
   const b=session.battle;if(!b)return '';
   const option=(id,label,chosen)=>`<option value="${id}" ${chosen?'selected':''}>${label}</option>`;
   function group(g){
-    const kind={alliance:'Alliance',corporation:'Corporation',character:'Karakter'}[g.kind]||g.kind;
+    const kind={alliance:'Szövetség',corporation:'Corporation',character:'Karakter'}[g.kind]||g.kind;
     const image=['alliance','corporation'].includes(g.kind)?`<img src="https://images.evetech.net/${g.kind==='alliance'?'alliances':'corporations'}/${g.id}/logo?size=64" width="24" height="24" alt="" loading="lazy">`:'';
     return `<div class="battle-group" draggable="true" data-battle-group="${esc(g.key)}"><div class="battle-group-title">${image}<strong data-i18n-skip>${esc(g.name)}</strong>${g.own?'<span class="badge good">Saját karakter</span>':''}</div><div class="battle-group-detail"><span>${EveI18n.t(kind)}</span> · ${fmt(g.pilot_count)} <span>pilóta</span> · ${fmt(g.loss_value.count)} <span>veszteség</span> · ${battleMoney(g.loss_value)}</div><label><span>Oldal</span><select data-battle-move="${esc(g.key)}" aria-label="${esc(EveI18n.t('Csoport áthelyezése')+': '+g.name)}">${option(-1,EveI18n.t('Besorolatlan'),g.side===-1)}${b.sides.map(s=>option(s.id,battleSideName(s),g.side===s.id)).join('')}</select><small>${EveI18n.t(g.manual?'Kézi besorolás':'Becsült besorolás')}${g.conflicts?' · '+EveI18n.t('Ellentmondó lövési kapcsolat'):''}</small></label></div>`;
   }
