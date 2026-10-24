@@ -225,7 +225,7 @@ class ZKill:
 
 
 class Fleet:
-    def __init__(self,store,catalog,eve):
+    def __init__(self,store,catalog,eve,market=None):
         self.store=store;self.catalog=catalog;self.eve=eve;schema(store);battle.schema(store)
         self.universe=intel_universe.load(store);self.zkill=ZKill(store)
         self.lock=threading.RLock();self.location_lock=threading.Lock();self.stop_event=threading.Event();self.thread=None
@@ -233,6 +233,9 @@ class Fleet:
         self.location_status={'running':False,'character':'','checked':None}
         from .fleet_live import LiveFeed
         self.live=LiveFeed(self)
+        from .implants import ImplantWatch
+        from .market import Market
+        self.implants=ImplantWatch(store,catalog,eve,market or Market(store))
     def actors(self):
         p=preferences(self.store);return [c for c in self.store.characters() if p['character_ids'] is None or c['id'] in p['character_ids']]
     def start(self):
@@ -246,6 +249,7 @@ class Fleet:
     def _work(self):
         while not self.stop_event.is_set():
             try:
+                self.implants.tick(self.stop_event)
                 if preferences(self.store)['tracking']:self.locations()
                 # Public kill history refreshes independently of location sampling.
                 actors=self.actors()

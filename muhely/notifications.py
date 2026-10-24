@@ -7,7 +7,7 @@ import time
 from . import skills, pi, extractions
 from .planner import PlanningError
 
-CATEGORIES=('skills','jobs','pi','moons','intel')
+CATEGORIES=('skills','jobs','pi','moons','intel','implants')
 DEFAULTS={'os_enabled':False,'auto_refresh':True,'moon_days':3,'personal':True,'corporations':True,
           'categories':{k:True for k in CATEGORIES},'moon_owners':{}}
 
@@ -143,6 +143,9 @@ def collect(store,catalog,now=None):
     intel_data=collect_alerts(store,now=now)
     observed.update(intel_data['observed_domains'])
     for item in intel_data['items']:alerts[item['id']]=item
+    from .implants import events as implant_events
+    for item in implant_events(store,now):alerts[item['id']]=item
+    observed.update('implants:'+str(c['id']) for c in chars)
     rows=sorted(alerts.values(),key=lambda a:(not a['reliable'],a['when'] is None,a['when'] or 0,a['subject'].casefold(),a['id']))
     return {'items':rows,'observed_domains':sorted(observed),'corporations':[{'id':cid,'name':name} for cid,name in sorted(corps.items(),key=lambda x:x[1])],
             'moons':moon_rows,'preferences':prefs,'calculated_at':now,
@@ -171,7 +174,7 @@ def claim(store,data,now=None):
             old=db.execute('SELECT * FROM notification_events WHERE id=?',(a['id'],)).fetchone()
             # A closed kill batch is a past event, never a rearmed proximity
             # episode when switching regions or notification preferences.
-            if a['kind']=='intel_kill' and old and old['sent']:continue
+            if a['kind'] in {'intel_kill','implant_undock'} and old and old['sent']:continue
             episode=old['episode'] if old else 1
             if old and (not old['active'] or old['fingerprint']!=fingerprint):episode+=1;old=None
             if old and (old['sent'] or old['lease_until']>now):continue

@@ -69,11 +69,16 @@
     if((self=[super init])){
         self.defaults=defaults;self.placements=[[defaults dictionaryForKey:@"EVEIntelOverlayPlacements"] mutableCopy]?:[NSMutableDictionary new];self.screenID=[defaults stringForKey:@"EVEIntelOverlayScreen"];
         self.items=@[];self.seconds=60;self.clock=^{return NSDate.date.timeIntervalSince1970;};
-        __weak EveIntelOverlay *weakSelf=self;self.timer=[NSTimer scheduledTimerWithTimeInterval:.25 repeats:YES block:^(NSTimer *timer){[weakSelf refresh];}];
+        __weak EveIntelOverlay *weakSelf=self;self.timer=[NSTimer timerWithTimeInterval:.25 repeats:YES block:^(NSTimer *timer){[weakSelf refresh];}];
+        [NSRunLoop.mainRunLoop addTimer:self.timer forMode:NSRunLoopCommonModes];
+        [NSRunLoop.mainRunLoop addTimer:self.timer forMode:NSEventTrackingRunLoopMode];
+        [NSRunLoop.mainRunLoop addTimer:self.timer forMode:NSModalPanelRunLoopMode];
         [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(screensChanged:) name:NSApplicationDidChangeScreenParametersNotification object:nil];
+        [NSWorkspace.sharedWorkspace.notificationCenter addObserver:self selector:@selector(screensChanged:) name:NSWorkspaceDidActivateApplicationNotification object:nil];
+        [NSWorkspace.sharedWorkspace.notificationCenter addObserver:self selector:@selector(screensChanged:) name:NSWorkspaceActiveSpaceDidChangeNotification object:nil];
     }return self;
 }
-- (void)dealloc {[self.timer invalidate];[NSNotificationCenter.defaultCenter removeObserver:self];}
+- (void)dealloc {[self.timer invalidate];[NSNotificationCenter.defaultCenter removeObserver:self];[NSWorkspace.sharedWorkspace.notificationCenter removeObserver:self];}
 - (NSString *)identifier:(NSScreen *)screen {return [screen.deviceDescription[@"NSScreenNumber"] stringValue]?:@"main";}
 - (NSScreen *)selectedScreen {for(NSScreen *screen in NSScreen.screens)if([[self identifier:screen] isEqual:self.screenID])return screen;return NSScreen.mainScreen?:NSScreen.screens.firstObject;}
 - (NSDictionary *)placement:(NSScreen *)screen {
@@ -87,7 +92,8 @@
 - (void)ensurePanel {
     if(self.panel)return;
     self.panel=[[EveOverlayPanel alloc] initWithContentRect:NSMakeRect(0,0,330,120) styleMask:NSWindowStyleMaskBorderless|NSWindowStyleMaskNonactivatingPanel backing:NSBackingStoreBuffered defer:NO];
-    self.panel.title=@"EVE Intel Overlay";self.panel.opaque=NO;self.panel.backgroundColor=NSColor.clearColor;self.panel.hasShadow=NO;self.panel.hidesOnDeactivate=NO;self.panel.becomesKeyOnlyIfNeeded=YES;self.panel.level=NSStatusWindowLevel;
+    self.panel.title=@"EVE Intel Overlay";self.panel.opaque=NO;self.panel.backgroundColor=NSColor.clearColor;self.panel.hasShadow=NO;self.panel.hidesOnDeactivate=NO;self.panel.becomesKeyOnlyIfNeeded=YES;
+    self.panel.floatingPanel=YES;self.panel.canHide=NO;self.panel.level=NSScreenSaverWindowLevel+1;
     self.panel.collectionBehavior=NSWindowCollectionBehaviorCanJoinAllSpaces|NSWindowCollectionBehaviorFullScreenAuxiliary|NSWindowCollectionBehaviorIgnoresCycle;
     if(@available(macOS 13.0,*))self.panel.collectionBehavior|=NSWindowCollectionBehaviorCanJoinAllApplications;
     self.panel.excludedFromWindowsMenu=YES;self.panel.tabbingMode=NSWindowTabbingModeDisallowed;self.panel.releasedWhenClosed=NO;self.panel.delegate=self;
@@ -148,6 +154,8 @@
     self.panel.appearance=[NSAppearance appearanceNamed:self.light?NSAppearanceNameAqua:NSAppearanceNameDarkAqua];
     BOOL changed=self.canvas.editing!=self.editing||self.canvas.english!=self.english||self.canvas.light!=self.light||![self.canvas.cards isEqual:cards];
     self.canvas.cards=cards;self.canvas.editing=self.editing;self.canvas.english=self.english;self.canvas.light=self.light;self.canvas.done.hidden=!self.editing;self.canvas.done.title=self.english?@"Done":@"Kész";
-    if(changed)self.canvas.needsDisplay=YES;if(!self.panel.visible)[self.panel orderFrontRegardless];
+    // Another app can raise a borderless game window without making this panel
+    // invisible. Reassert its order while cards are alive, without taking focus.
+    if(changed)self.canvas.needsDisplay=YES;[self.panel orderFrontRegardless];
 }
 @end

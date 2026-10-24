@@ -27,7 +27,7 @@ from . import moon_transfer
 from .trade import Trade
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
-from .esi import EveConnection, EsiError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES, INTEL_SCOPES
+from .esi import EveConnection, EsiError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES, INTEL_SCOPES, IMPLANT_SCOPES
 from .corporations import dashboard as corporation_dashboard
 from .skills import dashboard as skill_dashboard
 from .production import profiles as production_profiles
@@ -64,7 +64,7 @@ class App:
         self.planning_lock = threading.RLock()
         self.task = {'running': False, 'kind': None, 'message': '', 'finished': None, 'results': []}
         self.intel=intel.IntelMonitor(self.store,self.catalog,self.eve)
-        self.fleet=fleet.Fleet(self.store,self.catalog,self.eve)
+        self.fleet=fleet.Fleet(self.store,self.catalog,self.eve,self.market)
         self.asset_locations=AssetLocations(self.store,self.eve)
 
     def desktop_auth_start(self, url):
@@ -203,6 +203,7 @@ class App:
     def notification_data(self):
         with self.catalog.lock:
             data=notifications.collect(self.store,self.catalog)
+        data['implants']=self.fleet.implants.dashboard()
         data.update(task=self.task_snapshot(),next_sync_at=self.refresh_policy.next_at(self.refresh_domains('notifications')))
         return data
 
@@ -542,7 +543,7 @@ class App:
                 'locations': locations, 'jobs': [j for j in jobs if j.get('status') in ['active', 'paused', 'ready']],
                 'blueprint_count': len(bps), 'stale_characters': stale, 'sde': self.catalog.meta,
                 'recipe_count': sum(self.catalog.types.get(i, {}).get('published', 0) for i in self.catalog.recipes),
-                'fleet_running':self.fleet.status()['task']['running'],'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,'market_scopes':self.trade.dashboard()['scopes'],'mining_scopes':mining.MINING_SCOPES,
+                'fleet_running':self.fleet.status()['task']['running'],'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,'implant_scopes':IMPLANT_SCOPES,'market_scopes':self.trade.dashboard()['scopes'],'mining_scopes':mining.MINING_SCOPES,
                 'crypto_available': crypto_available()}
 
 
@@ -681,6 +682,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/activity':return self.send(200,self.app.activity())
             if path == '/api/notifications':
                 return self.send(200,self.app.notification_data())
+            if path == '/api/implants':return self.send(200,self.app.fleet.implants.dashboard())
             if path == '/api/desktop/auth':
                 with self.app.desktop_auth_lock:
                     item = self.app.desktop_auth.get(query.get('ticket',[''])[0])
@@ -889,13 +891,20 @@ class Handler(BaseHTTPRequestHandler):
                     if char_id not in {c['id'] for c in self.app.store.characters()}:
                         raise PlanningError('A karakter már nincs hozzáadva.')
                 feature=data.get('feature')
-                if feature not in [None,'skills','pi','corporations','moons','intel','mining','markets','all']:raise PlanningError('Ismeretlen engedélyezési cél.')
+                if feature not in [None,'skills','pi','corporations','moons','intel','mining','markets','implants','all']:raise PlanningError('Ismeretlen engedélyezési cél.')
                 url = self.app.eve.start(self.app.cookie, self.app.origin+'/callback',char_id,feature)
                 return self.send(200,self.app.desktop_auth_start(url) if data.get('desktop') is True else {'url':url})
             elif path == '/api/characters/remove':
                 self.app.eve.forget(integer(data.get('id'), 'Karakter', 2**53-1, 1))
             elif path == '/api/notifications/preferences':
                 return self.send(200,notifications.save_preferences(self.app.store,data))
+            elif path == '/api/implants/preferences':
+                from .implants import save_preferences
+                save_preferences(self.app.store,data)
+                return self.send(200,self.app.fleet.implants.dashboard())
+            elif path == '/api/implants/claim':
+                from .implants import events
+                return self.send(200,{'items':notifications.claim(self.app.store,{'items':events(self.app.store),'observed_domains':['implants:'+str(c['id']) for c in self.app.store.characters()]})})
             elif path == '/api/notifications/claim':
                 snapshot=self.app.notification_data()
                 with self.app.task_lock:

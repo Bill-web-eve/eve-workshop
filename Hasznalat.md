@@ -644,3 +644,15 @@ A táblázatok **Sor oldalanként** mezőjével 25, 50 vagy 100 sor választhat�
 A teljes személyes és corporation készlet **Állapot** szűrője a készletben ténylegesen előforduló állapotokat kínálja fel. A **Hely / tárolási hely** oszlop a rendszer, állomás vagy struktúra nevét mutatja; az azonosító a cella súgójában és CSV-exportban megmarad. A névfeloldás háttérben történik, az ismert nevek gyorsítótárazódnak. Privát struktúrához struktúraolvasási ESI-jog és az adott karakter dokkolási hozzáférése szükséges. Ha a név nem hozzáférhető, az ID megmarad és az app jelzi az engedélyigényt.
 
 A **főablak bezárógombja**, a rendszer Quit parancsa és az **Alkalmazás leállítása** ugyanahhoz a teljes leállításhoz vezet. Leáll a helyi szolgáltatás és az intel-/flottafigyelés, felszabadul a helyi port, bezárulnak a külön intelablakok és az overlay. Indulás közbeni bezárás sem hagy háttérszolgáltatást futni. A külön térkép- vagy chatablak önálló bezárása továbbra is csak azt az ablakot zárja. A saját mentett adatok megmaradnak.
+
+## Implantfigyelés kidokkoláskor
+
+A **Beállítások → Értesítések → Implantfigyelés kidokkoláskor** résznél karakterenként kapcsolható be a figyelés, és ISK-ban megadható az értékhatár. Az alapérték 1 milliárd ISK; a karakterfigyelés kezdetben ki van kapcsolva. Az összérték az aktív klón implantjainak Jita sell árán alapul. A rendszerértesítések, a Személyes jelzések és az Implantfigyelés jelzéstípus is legyen bekapcsolva.
+
+Az **Implantfigyelés engedélyezése** gombbal add meg az `esi-location.read_location.v1` és `esi-clones.read_implants.v1` engedélyeket. Saját Client ID esetén az implantengedélyt az EVE Developer alkalmazásban is hozzá kell adni. A Minden hozzáférés gomb ezt is kéri.
+
+A figyelés futó app mellett, a többi EVE-frissítéstől függetlenül működik. A helyzetet 5 másodpercenként figyeli; az implantadatok az ESI legalább 120 másodperces gyorsítótárát követik. A Jita-árak a meglévő 15 perces automatikus árfrissítési korlátot használják. Friss klónváltás után átmenetileg még korábbi implantlista érkezhet. A rendszer nem tudja megakadályozni a kidokkolást.
+
+Csak a megfigyelt dokkolt → űrben átmenetre küld értesítést, kidokkolásonként egyszer. Induláskor már űrben lévő karakterre vagy hosszú adathiány után nem küld utólagos riasztást. Hibás helyzetadatból nem következtet kidokkolásra. Hiányos árak mellett csak akkor jelez, ha az ismert részösszeg önmagában is meghaladja a határt; ilyenkor **Legalább** jelölést használ. Az értesítés az Értesítések személyes lapján is megjelenik, 5 percig.
+
+A Mac intel overlay kattintás nélkül, fókuszváltáskor is az ablakok előtt marad. Az EVE kliensre kattintás nem rövidíti le a jelzés beállított élettartamát; a lejárt vagy kikapcsolt jelzés nem jelenik meg újra.

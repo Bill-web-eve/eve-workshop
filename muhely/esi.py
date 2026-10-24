@@ -33,7 +33,8 @@ MOON_SCOPES = ['esi-calendar.read_calendar_events.v1','esi-industry.read_corpora
 MINING_SCOPES=['esi-industry.read_character_mining.v1']
 INTEL_SCOPES=['esi-location.read_location.v1','esi-location.read_online.v1']
 MARKET_SCOPES=['esi-markets.structure_markets.v1','esi-universe.read_structures.v1','esi-search.search_structures.v1','esi-characters.read_standings.v1']
-ALL_SCOPES = SCOPES + CORPORATION_SCOPES + MOON_SCOPES + INTEL_SCOPES + MINING_SCOPES + MARKET_SCOPES
+IMPLANT_SCOPES=['esi-location.read_location.v1','esi-clones.read_implants.v1']
+ALL_SCOPES = list(dict.fromkeys(SCOPES + CORPORATION_SCOPES + MOON_SCOPES + INTEL_SCOPES + MINING_SCOPES + MARKET_SCOPES + IMPLANT_SCOPES))
 USER_AGENT = 'EveMuhely/0.1 (local personal industry planner)'
 COMPATIBILITY = '2026-10-15'
 
@@ -278,9 +279,9 @@ class EveConnection:
         requested=SCOPES
         if feature == 'all':
             requested=list(dict.fromkeys(ALL_SCOPES))
-        elif feature in ['skills','pi','corporations','moons','intel','mining','markets']:
+        elif feature in ['skills','pi','corporations','moons','intel','mining','markets','implants']:
             existing=self.vault.read().get(str(character_id),{}) if character_id else {}
-            wanted=set(INDUSTRY_SCOPES+{'skills':SKILL_SCOPES,'pi':PI_SCOPES,'corporations':CORPORATION_SCOPES,'moons':MOON_SCOPES,'intel':INTEL_SCOPES,'mining':MINING_SCOPES,'markets':MARKET_SCOPES+SKILL_SCOPES}[feature])
+            wanted=set(INDUSTRY_SCOPES+{'skills':SKILL_SCOPES,'pi':PI_SCOPES,'corporations':CORPORATION_SCOPES,'moons':MOON_SCOPES,'intel':INTEL_SCOPES,'mining':MINING_SCOPES,'markets':MARKET_SCOPES+SKILL_SCOPES,'implants':IMPLANT_SCOPES}[feature])
             wanted.update(set(existing.get('scopes',[])) & set(ALL_SCOPES))
             requested=[scope for scope in ALL_SCOPES if scope in wanted]
         with self.lock:

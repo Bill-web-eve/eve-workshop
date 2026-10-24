@@ -14,7 +14,7 @@ globalThis.EveActivity=(()=>{
     '/api/state':'Műhelyadatok betöltése','/api/plan':'Gyártási terv számítása','/api/schedule':'Gyártás ütemezése','/api/search':'Termékkeresés',
     '/api/skills':'Skilladatok összesítése','/api/pi':'PI-adatok összesítése','/api/moons':'Holdadatok összesítése','/api/moons/systems':'Rendszerkeresés',
     '/api/prices':'Jita-árak ellenőrzése','/api/prices/refresh':'Jita-árak frissítése','/api/industry':'Ipari költségadatok ellenőrzése','/api/industry/refresh':'Ipari költségadatok frissítése','/api/industry/estimate':'Gyártási költség számítása','/api/industry/system':'Rendszerindex ellenőrzése',
-    '/api/notifications':'Értesítések összesítése','/api/notifications/claim':'Értesítések előkészítése','/api/notifications/sent':'Értesítések visszaigazolása',
+    '/api/implants':'Implantadatok ellenőrzése…','/api/implants/preferences':'Implantfigyelés mentése','/api/notifications':'Értesítések összesítése','/api/notifications/claim':'Értesítések előkészítése','/api/notifications/sent':'Értesítések visszaigazolása',
     '/api/corporations':'Corp-adatok összesítése','/api/accounts':'Accountadatok kezelése','/api/plans/shopping':'Összes terv anyaghiányának számítása','/api/documentation':'Kézikönyv betöltése','/api/export':'Fájl előkészítése',
     '/api/auth/start':'EVE-belépés előkészítése','/api/desktop/auth':'EVE-belépés ellenőrzése','/api/shutdown':'Alkalmazás leállítása'
   };
@@ -129,7 +129,7 @@ globalThis.EveActivity=(()=>{
   }
   async function run(path,operation){
     const key='request:'+(++serial),route=base(path);
-    const quiet=(route==='/api/fleet'&&String(path).includes('background=1'))||route==='/api/intel/alerts'||route==='/api/intel/claim'||(route==='/api/intel'&&String(path).includes('background=1'))||route==='/api/activity'||(route==='/api/state'&&monitoring())||(route==='/api/prices'&&active.has('market'));
+    const quiet=(route==='/api/fleet'&&String(path).includes('background=1'))||route==='/api/implants/claim'||route==='/api/intel/alerts'||route==='/api/intel/claim'||(route==='/api/intel'&&String(path).includes('background=1'))||route==='/api/activity'||(route==='/api/state'&&monitoring())||(route==='/api/prices'&&active.has('market'));
     if(!quiet)start(key,label(path));
     try{const result=await operation();observe(path,result);if(!quiet)finish(key);return result;}
     catch(error){if(!quiet)finish(key,'error',error.message||'A kérés nem sikerült.');throw error;}

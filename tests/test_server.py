@@ -13,6 +13,16 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class ServerTests(unittest.TestCase):
+    def test_implant_routes_require_session_and_csrf_and_reject_unknown_characters(self):
+        self.app.store.add_character(123,'Pilot')
+        self.assertEqual(self.request('/api/implants',Cookie='')[0],403)
+        body={'characters':[{'id':123,'enabled':True,'threshold':'1000000000'}]}
+        self.assertEqual(self.request('/api/implants/preferences',body,Origin='https://other.invalid')[0],403)
+        status,data,_=self.request('/api/implants/preferences',body)
+        self.assertEqual(status,200);self.assertTrue(data['characters'][0]['enabled']);self.assertFalse(data['characters'][0]['authorized'])
+        self.assertEqual(self.request('/api/implants/claim',{})[1]['items'],[])
+        self.assertEqual(self.request('/api/implants/preferences',{'characters':[dict(body['characters'][0],id=999)]})[0],400)
+
     def test_full_asset_browser_is_authenticated_and_independent_of_planning(self):
         self.app.store.add_character(123,'Asset Pilot')
         now=time.time();snapshot={'data':[dict(item_id=1,type_id=23757,quantity=1,location_id=6001,is_singleton=True,location_flag='Hangar')],'fetched':now,'expires':now+600,'etag':None}
@@ -53,7 +63,7 @@ class ServerTests(unittest.TestCase):
     def test_all_access_route_is_character_bound_and_preserves_individual_routes(self):
         self.app.store.add_character(123,'Test')
         self.app.eve.start=Mock(return_value='https://login.eveonline.com/authorize')
-        for feature in ['all','skills','pi','corporations','moons','intel','mining']:
+        for feature in ['all','skills','pi','corporations','moons','intel','mining','implants']:
             status,data,_=self.request('/api/auth/start',{'character_id':123,'feature':feature})
             self.assertEqual(status,200)
             self.assertEqual(data['url'],'https://login.eveonline.com/authorize')

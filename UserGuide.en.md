@@ -646,3 +646,15 @@ Use **Rows per page** to display 25, 50 or 100 rows. The saved preference applie
 The full personal and corporation inventory **Status** filter offers the statuses present in that inventory. **Location / storage** displays the system, station or structure name; its ID remains in the cell tooltip and CSV export. Names resolve in the background and are cached. Private structures require structure-reading ESI permission and docking access for an authorized character. If a name is unavailable, the ID remains visible and the app explains the access requirement.
 
 The **main window close button**, system Quit command and **Quit application** all perform a complete shutdown: local service, intel/fleet monitoring, detached intel windows and overlay stop, and the local port is released. Closing during startup also stops the backend. Closing a detached map or chat window still closes only that window. Saved personal data is retained.
+
+## Implant warning on undock
+
+Open **Settings → Notifications → Implant warning on undock**. Enable monitoring per character and set an ISK threshold. The default threshold is 1 billion ISK; character monitoring starts disabled. The active clone’s implants are valued at Jita sell prices. Enable system notifications, personal alerts and the Implant watch category.
+
+Use **Authorize implant monitoring** to grant `esi-location.read_location.v1` and `esi-clones.read_implants.v1`. Add the implant scope to your EVE Developer application if using your own Client ID. Authorize all access includes this permission.
+
+Monitoring runs while the app is open, independently of other EVE refreshes. Locations are checked every 5 seconds; implant requests respect ESI’s cache of at least 120 seconds. Jita prices use the existing 15-minute automatic price refresh interval. Immediately after switching clones, ESI may still return the previous implant list. This is a warning after undocking and cannot prevent the undock.
+
+Only an observed docked-to-space transition triggers an alert, once per undock. There is no retrospective alert for characters already in space at startup or after a long gap in location data. Failed requests do not count as undocking. With missing prices, an alert is sent only if the known subtotal alone exceeds the threshold, labelled **At least**. Alerts also remain in the personal Notifications tab for 5 minutes.
+
+The Mac intel overlay remains above windows without taking focus. Clicking the EVE client does not shorten the configured display lifetime. Expired or disabled reports are not brought back by focus changes.

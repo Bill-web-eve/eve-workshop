@@ -128,7 +128,7 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
             [identifier rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._:-"].invertedSet].location==NSNotFound&&
             [title isKindOfClass:NSString.class]&&title.length<=200&&[text isKindOfClass:NSString.class]&&text.length<=1500&&
             [scope isKindOfClass:NSString.class]&&scope.length<=20&&([scope isEqual:@"personal"]||[scope rangeOfCharacterFromSet:NSCharacterSet.decimalDigitCharacterSet.invertedSet].location==NSNotFound)&&
-            [@[@"skills",@"jobs",@"pi",@"moons",@"intel",@"all"] containsObject:category];
+            [@[@"skills",@"jobs",@"pi",@"moons",@"intel",@"implants",@"all"] containsObject:category];
         if(!valid){dispatch_async(dispatch_get_main_queue(),^{reply(nil,@"Hibás rendszerértesítés.");});return;}
         UNMutableNotificationContent *content=[UNMutableNotificationContent new];content.title=title;content.body=text;
         content.userInfo=@{ @"scope":scope,@"category":category };
@@ -177,7 +177,7 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
         EveWindow *app=weakSelf;
         if(app.ready&&!app.quitting)[app.web evaluateJavaScript:@"if(typeof refreshNotifications==='function'&&!notificationSettingsBusy)void refreshNotifications()" completionHandler:nil];
     }];
-    self.intelMonitor=[NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer){EveWindow *app=weakSelf;if(app.ready&&!app.quitting){[app.web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts()" completionHandler:nil];for(WKWebView *web in app.intelViews.allValues)[web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts()" completionHandler:nil];}}];
+    self.intelMonitor=[NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer){EveWindow *app=weakSelf;if(app.ready&&!app.quitting){[app.web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts();if(typeof pollImplantAlerts==='function')void pollImplantAlerts()" completionHandler:nil];for(WKWebView *web in app.intelViews.allValues)[web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts()" completionHandler:nil];}}];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [self menu];
     self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,1320,860) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
     self.window.title = @"EVE Műhely"; self.window.minSize = NSMakeSize(900,650); self.window.delegate = self;
