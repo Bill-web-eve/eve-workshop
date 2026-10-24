@@ -52,6 +52,15 @@ def stop_backend(origin,timeout=15):
         # Depending on the Windows socket/urllib layer, WSAECONNREFUSED can
         # arrive as a plain OSError rather than ConnectionRefusedError.
         return isinstance(error,ConnectionRefusedError) or getattr(error,'winerror',None)==10061 or getattr(error,'errno',None) in {errno.ECONNREFUSED,10061}
+    def windows_listener():
+        if sys.platform!='win32':return None
+        try:
+            from muhely.windows_network import listener_present
+            return listener_present(parsed.port)
+        except OSError:
+            # Keep the authenticated shutdown path usable if IP Helper fails.
+            return None
+    if windows_listener() is False:return True
     opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect(),urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
     try:
         with opener.open(origin+'/health',timeout=2) as response:info=json.load(response)
@@ -76,8 +85,15 @@ def stop_backend(origin,timeout=15):
         pass
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
+        listening=windows_listener()
+        if listening is False:return True
+        if listening is True:
+            time.sleep(.1)
+            continue
         try:
-            with socket.create_connection(('127.0.0.1',parsed.port),timeout=.3):pass
+            # Windows can report a closed port later than a 300 ms timeout.
+            probe_timeout=5 if sys.platform=='win32' else .3
+            with socket.create_connection(('127.0.0.1',parsed.port),timeout=min(probe_timeout,max(.01,deadline-time.monotonic()))):pass
         except OSError as error:
             if refused(error):return True
             connection_error=(type(error).__name__,getattr(error,'errno',None),getattr(error,'winerror',None))
