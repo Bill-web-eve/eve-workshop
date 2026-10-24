@@ -1,6 +1,6 @@
 # Kész csomagok közzététele
 
-A jelenlegi kiadás **1.3.0**, Mac Apple Silicon és Windows 11 x64 csomaggal, magyar–angol felülettel és mindkét platformon saját ablakos alkalmazással. Újdonság a flottamenetek és harci oldalak áttekintése, valamint az élő, csoportosított régiós kill/intel jelzés. A korábbi gyártásütemező, holdnaptár, bányászati napló, Jita-árazás és PI-előrejelzés megmarad. A `v1.3.0/manifest.json` felsorolja a hat ellenőrzött mellékletet és SHA-256 összegüket.
+A jelenlegi kiadás **1.4.0**, saját ablakos Mac Apple Silicon és Windows 11 x64 csomaggal, magyar–angol felülettel. Újdonság a helyi market árazása, a tervenkénti teljes költség- és profitösszesítés, a négy külön import/export szállítási díj és a tömeges holdexport/scanimport. A `v1.4.0/manifest.json` felsorolja a hat ellenőrzött mellékletet és SHA-256 összegüket.
 
 A helyi kiadási commit elkészítése után a GitHub Desktopban a **Push origin** indítja a feltöltést. A main ágra érkezett kiadási változás elindítja a **Mac es Windows csomagok kozzetetele** munkafolyamatot. Siker után a csomagok itt tölthetők le: https://github.com/Bill-web-eve/eve-workshop/releases.
 

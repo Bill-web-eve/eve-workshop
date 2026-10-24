@@ -4,7 +4,7 @@ Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple S
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.3.0**, **Windows 11 x64 1.3.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.4.0**, **Windows 11 x64 1.4.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -21,6 +21,16 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Választható helyi station/struktúra market buy/sell/split árakkal, külön ESI-olvasóval; a privát piac gyorsítótára elkülönül Jitától és más olvasóktól.
 - Kompakt tervenkénti bekerülés/bevétel/profit, független anyag- és eladási árforrással, Accounting/standing alapú NPC-díjakkal, megadható struktúra broker fee-vel és egyéb költségekkel.
 - Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
+
+## Az 1.4.0 kiadás újdonságai
+
+- Helyi nullsec market beállítása: rendszer- és struktúraválasztás, olvasási ESI-engedélyek, Jita és helyi buy/sell/split árazás.
+- Kompakt, tervenként mentett költség- és bevételösszesítés: anyag, blueprint, job cost, egyéb költség, eladói skillek/standingek, adók és nettó profit.
+- Külön Jita import/export és helyi market import/export ISK/m³ szállítási díjak, csomagolt anyag- és készterméktérfogattal.
+- A meg nem adott BPC-költség nullával számol, látható jelzéssel; a BPO-val fedezett gyártás blueprintköltsége nulla.
+- A teljes holdnyilvántartás JSON exportja és tömeges visszaimportja, játékbeli moon scan beillesztése több holdra, előnézettel és atomi mentéssel.
+- A scanfrissítés megőrzi a meglévő bérletet és struktúrát; a hold-, bolygó-, rendszer- és ércazonosítókat ellenőrzi. A Mac saját ablakában natív JSON mentés és fájlbetöltés működik.
+- Magyar–angol dokumentáció, valamint személyes adat nélküli Mac Apple Silicon és Windows 11 x64 csomag. Frissítéskor a külön tárolt helyi profil megmarad.
 
 ## Az 1.3.0 kiadás újdonságai
 
