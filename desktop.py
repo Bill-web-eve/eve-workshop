@@ -40,20 +40,27 @@ def stop_backend(origin,timeout=15):
     """Stop our exact local service and wait for its listening socket to close."""
     import http.cookiejar
     import socket
+    import errno
+    import logging
     import urllib.parse
     parsed=urllib.parse.urlsplit(origin)
     if parsed.scheme!='http' or parsed.hostname!='127.0.0.1' or not parsed.port or parsed.path or parsed.query or parsed.username or parsed.password:
         raise ValueError('Invalid local service origin')
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self,*args,**kwargs):return None
+    def refused(error):
+        # Depending on the Windows socket/urllib layer, WSAECONNREFUSED can
+        # arrive as a plain OSError rather than ConnectionRefusedError.
+        return isinstance(error,ConnectionRefusedError) or getattr(error,'winerror',None)==10061 or getattr(error,'errno',None) in {errno.ECONNREFUSED,10061}
     opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect(),urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
     try:
         with opener.open(origin+'/health',timeout=2) as response:info=json.load(response)
     except urllib.error.URLError as error:
-        if isinstance(error.reason,ConnectionRefusedError):return True
+        if refused(error.reason):return True
         info=None
     except (OSError,ValueError):info=None
     if info is not None and (not isinstance(info,dict) or info.get('app')!='eve-muhely'):return False
+    requested=False;endpoint_error=None;connection_error=None
     try:
         if info is None:raise OSError('Service is already closing')
         opener.open(origin+'/',timeout=2).close()
@@ -62,16 +69,20 @@ def stop_backend(origin,timeout=15):
         if not isinstance(csrf,str) or not csrf:return False
         request=urllib.request.Request(origin+'/api/shutdown',data=b'{}',headers={'Content-Type':'application/json','Origin':origin,'X-CSRF-Token':csrf})
         opener.open(request,timeout=5).close()
-    except (OSError,ValueError):
+        requested=True
+    except (OSError,ValueError) as error:
+        endpoint_error=type(error).__name__
         # A shutdown already requested by the UI may be closing the socket now.
         pass
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
         try:
             with socket.create_connection(('127.0.0.1',parsed.port),timeout=.3):pass
-        except ConnectionRefusedError:return True
-        except OSError:pass
+        except OSError as error:
+            if refused(error):return True
+            connection_error=(type(error).__name__,getattr(error,'errno',None),getattr(error,'winerror',None))
         time.sleep(.1)
+    logging.getLogger(__name__).warning('Shutdown socket check timed out: requested=%s endpoint_error=%s connection_error=%s',requested,endpoint_error,connection_error)
     return False
 
 

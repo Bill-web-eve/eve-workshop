@@ -11,6 +11,17 @@ from tools.build_macos_release import public_config,audit_bundle,install_window_
 
 
 class CleanReleaseTests(unittest.TestCase):
+    def test_windows_refused_connection_codes_are_accepted_without_a_posix_exception_subclass(self):
+        import urllib.error
+        opener=Mock();opener.open.side_effect=urllib.error.URLError(OSError(10061,'synthetic closed Windows socket'))
+        with patch('desktop.urllib.request.build_opener',return_value=opener):
+            self.assertTrue(desktop.stop_backend('http://127.0.0.1:8765',timeout=.1))
+        opener.open.assert_called_once()
+        response=Mock();response.read.side_effect=[b'{"app":"eve-muhely"}',b'{"csrf":"synthetic"}']
+        opener=Mock();opener.open.return_value.__enter__=Mock(return_value=response);opener.open.return_value.__exit__=Mock(return_value=False)
+        with patch('desktop.urllib.request.build_opener',return_value=opener),patch('socket.create_connection',side_effect=OSError(10061,'synthetic closed Windows socket')):
+            self.assertTrue(desktop.stop_backend('http://127.0.0.1:8765',timeout=.1))
+
     def test_developer_launcher_can_stop_service_before_setup_or_profile_creation(self):
         import launch
         with patch.object(launch.sys,'argv',['launch.py','--shutdown','--port','18995']),patch('desktop.stop_backend',return_value=True) as stop,patch.object(launch,'python_path') as runtime:

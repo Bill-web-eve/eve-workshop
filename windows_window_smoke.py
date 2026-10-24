@@ -3,6 +3,8 @@ import argparse
 import faulthandler
 import json
 import os
+import socket
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -77,13 +79,21 @@ def check(report_path=None):
     os.environ['SSL_CERT_FILE']=certifi.where()
     import webview
     faulthandler.dump_traceback_later(55)
-    from muhely.server import App,Server,ROOT
-    from muhely.windows_window import WindowHost,webview_runtime_present
+    from muhely.windows_window import WindowHost,webview_runtime_present,ensure_backend
+    from desktop import stop_backend
     if not webview_runtime_present():raise RuntimeError('WebView2 Runtime is missing')
     with tempfile.TemporaryDirectory(prefix='eve-window-smoke-',ignore_cleanup_errors=True) as folder:
-        app=App(folder,ROOT/'data/catalog.sqlite3',0);server=Server(app)
-        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
-        host=WindowHost(webview,app.origin,folder);window=host.create_main();results={};finished=threading.Event();external=[]
+        # Use the production topology: the UI must not own the server's socket.
+        # WebView2 child processes are then created only by the UI process.
+        with socket.socket() as probe:
+            probe.bind(('127.0.0.1',0));port=probe.getsockname()[1]
+        processes=[];popen=subprocess.Popen
+        def spawn(*args,**kwargs):
+            process=popen(*args,**kwargs);processes.append(process);return process
+        with patch('muhely.windows_window.subprocess.Popen',side_effect=spawn):origin=ensure_backend(port,folder)
+        assert len(processes)==1,'The test must own its separate backend process'
+        print('Separate production backend started.',flush=True)
+        host=WindowHost(webview,origin,folder);window=host.create_main();results={};finished=threading.Event();external=[]
         window.events.closed+=finished.set
         def confirm(title,message):
             print(json.dumps({'close_confirmation':'accepted for disposable test profile'}),flush=True)
@@ -175,10 +185,12 @@ def check(report_path=None):
                 webview.start(gui='edgechromium',debug=False,private_mode=False,storage_path=str(Path(folder)/'webview2'),user_agent='EVEWorkshopDesktop/Windows')
         finally:
             faulthandler.cancel_dump_traceback_later()
-            server.shutdown();server.server_close();thread.join(timeout=5)
+            results['backend_stopped']=stop_backend(origin)
+            for process in processes:process.wait(timeout=10)
+            results['backend_process_exited']=all(p.returncode==0 for p in processes)
         results['overlay_disposed']=host.overlay is not None and host.overlay.disposed
         if report_path:Path(report_path).write_text(json.dumps(results,indent=2))
-        if results.get('error') or not results.get('clipboard_readback') or not results.get('native_overlay') or not results['overlay_disposed']:raise RuntimeError(results.get('error','Native result incomplete'))
+        if results.get('error') or not results.get('clipboard_readback') or not results.get('native_overlay') or not results['overlay_disposed'] or not results['backend_stopped'] or not results['backend_process_exited']:raise RuntimeError(results.get('error','Native result incomplete'))
         return results
 
 
