@@ -17,7 +17,7 @@ from .refresh_policy import RefreshPolicy,AUTO_SECONDS
 
 ACCOUNTING=16622
 BROKER_RELATIONS=3446
-DEFAULTS={'system_id':None,'reader_id':None,'location_id':None,'location':None,'search':'' ,'structure_broker_fee':None}
+DEFAULTS={'system_id':None,'reader_id':None,'location_id':None,'location':None,'search':'' ,'structure_broker_fee':None,'hauling_isk_per_m3':'0'}
 FINANCE={'materials':'jita:sell','sale':'jita:sell','seller_id':None,'sale_order':'auto','other_isk':'0','blueprints_isk':None}
 
 def decimal(value,name,minimum=0,maximum=100):
@@ -117,7 +117,7 @@ class Trade:
 
     def save(self,data):
         if not isinstance(data,dict):raise PlanningError('Hibás marketbeállítás.')
-        p=self.settings();sid=self.system(data.get('system_id'));cid=self.character(data.get('reader_id'))
+        sid=self.system(data.get('system_id'));cid=self.character(data.get('reader_id'))
         location_id=data.get('location_id') or None;location=None
         if location_id:
             location_id=integer(location_id,'Állomás',2**53-1,1)
@@ -128,8 +128,19 @@ class Trade:
         fee=None if fee in [None,''] else decimal(fee,'Teljes struktúra broker fee',0,100)
         search=str(data.get('search','')).strip()
         if len(search)>120:raise PlanningError('Túl hosszú marketnév.')
-        p.update(system_id=sid,reader_id=cid,location_id=location_id,location=location,search=search,structure_broker_fee=fee)
-        with self.store.db() as db:db.execute('INSERT OR REPLACE INTO trade_settings VALUES(1,?)',(json.dumps(p),))
+        with self.lock:
+            p=self.settings();p.update(system_id=sid,reader_id=cid,location_id=location_id,location=location,search=search,structure_broker_fee=fee)
+            with self.store.db() as db:db.execute('INSERT OR REPLACE INTO trade_settings VALUES(1,?)',(json.dumps(p),))
+        return self.dashboard()
+
+    def save_hauling(self,data):
+        if not isinstance(data,dict):raise PlanningError('Hibás szállítási beállítás.')
+        value=decimal(data.get('hauling_isk_per_m3'),'Szállítási díj',0,10**12)
+        if Decimal(value)!=Decimal(value).quantize(Decimal('.0001')):raise PlanningError('A szállítási díj legfeljebb 4 tizedesjegy lehet.')
+        value=format(Decimal(value).quantize(Decimal('.0001')),'f')
+        with self.lock:
+            p=self.settings();p['hauling_isk_per_m3']=value
+            with self.store.db() as db:db.execute('INSERT OR REPLACE INTO trade_settings VALUES(1,?)',(json.dumps(p),))
         return self.dashboard()
 
     def public(self,kind,item):

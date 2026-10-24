@@ -16,10 +16,9 @@ test('material and sale sources are independent and include all configured costs
  const buy=run(`financeValues(c,{...f,sale:'local:buy'},books,profile,{complete:true,cents:'10000'})`);
  assert.equal(buy.values.broker_fee,0n);assert.equal(buy.values.gross,10000000n);assert.equal(buy.values.profit,9606500n);
 });
-test('missing local prices, BPC costs, job costs or seller rates prevent a fake complete profit',t=>{
+test('missing local prices, job costs or seller rates prevent a fake complete profit',t=>{
  const {dom,run}=setup();t.after(()=>dom.window.close());
  for(const expression of [
- `financeValues(c,{...f,blueprints_isk:null},books,profile,{complete:true,cents:'10000'})`,
  `financeValues(c,f,{...books,local:{quotes:{}}},profile,{complete:true,cents:'10000'})`,
  `financeValues(c,f,books,null,{complete:true,cents:'10000'})`,
  `financeValues(c,f,books,profile,null)`])assert.equal(run(expression).values.profit,null);
@@ -69,4 +68,41 @@ test('refreshing only missing items retains already fresh target and material qu
  await run('loadFinancePrices()');
  assert.equal(run("financeBooks.jita.quotes['1'].sell"),'100000');assert.equal(run("financeBooks.jita.quotes['2'].sell"),'20');assert.equal(run("financeBooks.jita.quotes['4'].sell"),'6');
  assert.deepEqual(Array.from(calls.find(([path,body])=>body)[1].ids),[4]);
+});
+
+test('unspecified BPC costs use zero and a note, including owned copies; BPO-only plans have neither cost nor note',t=>{
+ const {dom,run}=setup();t.after(()=>dom.window.close());
+ const missing=run(`financeValues(c,{...f,blueprints_isk:null},books,profile,{complete:true,cents:'10000'})`);
+ assert.equal(missing.values.blueprints,0n);assert.equal(missing.bpcUnspecified,true);assert.notEqual(missing.values.profit,null);
+ const owned=run(`financeValues({...c,plan:{...c.plan,blueprint_shortages:[],queue:[{activity:'manufacturing',parameters:{kind:'BPC'}}]}},{...f,blueprints_isk:null},books,profile,{complete:true,cents:'10000'})`);
+ assert.equal(owned.values.blueprints,0n);assert.equal(owned.bpcUnspecified,true);
+ const bpo=run(`financeValues({...c,plan:{...c.plan,blueprint_shortages:[],queue:[{activity:'manufacturing',parameters:{kind:'BPO'}}]}},f,books,profile,{complete:true,cents:'10000'})`);
+ assert.equal(bpo.values.blueprints,0n);assert.equal(bpo.bpcUnspecified,false);
+ assert.equal(run(`financeValues(c,{...f,blueprints_isk:'0'},books,profile,{complete:true,cents:'10000'}).bpcUnspecified`),false);
+ run(`financePrefs={...f,blueprints_isk:null};document.querySelector('#production-finance').innerHTML=productionFinance(c.plan,c.materials);financePrefs={...f,blueprints_isk:null};financeBooks=books;financeProfile=profile;applyProductionFinance();EveI18n.setLanguage('en');EveI18n.translate(document.documentElement);`);
+ assert.match(dom.window.document.querySelector('[data-finance-bpc-note]').textContent,/BPC cost not provided; calculated as 0 ISK/);
+ assert.notEqual(dom.window.document.querySelector('[data-finance-value=total]').textContent,'–');
+});
+test('hauling uses only outstanding non-blueprint purchases, rounds once, and is part of total and profit',t=>{
+ const {dom,run}=setup();t.after(()=>dom.window.close());
+ const h=run(`financeHauling({shopping:[{id:1,buy:3,volume:.005},{id:2,buy:2,volume:.005},{id:3,buy:100,volume:1,is_blueprint:true},{id:4,buy:0,volume:100}]},'1')`);
+ assert.equal(h.volume,2500000n);assert.equal(h.cents,3n);
+ const missing=run(`financeHauling({shopping:[{buy:2}]},'100')`);assert.equal(missing.cents,null);
+ assert.equal(run(`financeHauling({shopping:[{buy:2}]},'0').cents`),0n);
+ run(`tradeData={settings:{hauling_isk_per_m3:'125.4321'}}`);
+ const out=run(`financeValues({...c,plan:{...c.plan,shopping:[{id:2,buy:10,volume:.01}]}},f,books,profile,{complete:true,cents:'10000'})`);
+ assert.equal(out.values.hauling,1254n);assert.equal(out.values.total,57254n);assert.equal(out.values.profit,19059746n);
+});
+test('missing reaction formulas remain priced separately from optional BPC estimates',t=>{
+ const {dom,run}=setup();t.after(()=>dom.window.close());
+ const out=run(`financeValues({...c,plan:{...c.plan,blueprint_shortages:[...c.plan.blueprint_shortages,{id:2,buy:1,unit:'db'}]}},{...f,blueprints_isk:null},books,profile,{complete:true,cents:'10000'})`);
+ assert.equal(out.values.blueprints,4000n);assert.equal(out.bpcUnspecified,true);
+});
+test('the hauling setting can be saved before market setup without changing selected hub or reader',async t=>{
+ const {dom,w,run,d}=setup();t.after(()=>w.close());const calls=[];
+ w.api=async(path,body)=>{calls.push([path,body]);return {settings:{hauling_isk_per_m3:body.hauling_isk_per_m3},status:{running:false},characters:[],scopes:[]};};
+ run(`const panel=(title,sub,body)=>'<section><h2>'+title+'</h2>'+body+'</section>';tradeData={settings:{hauling_isk_per_m3:'0'},status:{running:false},characters:[],scopes:[]};renderTradeSettings(document.querySelector('main'));`);
+ const form=d.querySelector('#hauling-settings');form.elements.hauling_isk_per_m3.value='250.1234';form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+ assert.equal(calls[0][0],'/api/trade/hauling');assert.deepEqual(Object.keys(calls[0][1]),['hauling_isk_per_m3']);assert.equal(calls[0][1].hauling_isk_per_m3,'250.1234');
+ run(`EveI18n.setLanguage('en');EveI18n.translate(document.documentElement);`);assert.match(form.textContent,/Hauling rate/);assert(!/[áéíóöőúüű]/i.test(form.textContent));
 });

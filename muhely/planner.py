@@ -216,6 +216,7 @@ class Planner:
                    'wip': in_progress, 'missing': missing, 'runs': 0, 'manufactured': 0, 'buy': 0,
                    'surplus': max(0, available+in_progress-required), 'seconds': 0,
                    'jobs': 0, 'batches': [], 'parameters': params,
+                   'volume': c.types.get(tid,{}).get('packaged_volume') if c.types.get(tid,{}).get('packaged_volume') is not None else c.types.get(tid,{}).get('volume'),
                    'manual_stock': local.get('quantity') is not None, 'manual_wip': local.get('wip') is not None,
                    'warning': warning, 'materials': [],
                    'category': 'Vételre állított köztes' if c.recipes.get(tid) and not recipe else

@@ -26,7 +26,8 @@ def import_sde(archive_path, target):
             db.executescript('''
                 CREATE TABLE meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
                 CREATE TABLE types(id INTEGER PRIMARY KEY,name TEXT NOT NULL,search TEXT NOT NULL,
-                    group_id INTEGER,published INTEGER NOT NULL,pi INTEGER NOT NULL DEFAULT 0);
+                    group_id INTEGER,published INTEGER NOT NULL,pi INTEGER NOT NULL DEFAULT 0,
+                    volume REAL,packaged_volume REAL);
                 CREATE TABLE recipes(product_id INTEGER PRIMARY KEY,bp_id INTEGER NOT NULL,
                     activity TEXT NOT NULL,output INTEGER NOT NULL,seconds INTEGER NOT NULL,
                     copy_limit INTEGER NOT NULL,materials TEXT NOT NULL,skills TEXT NOT NULL DEFAULT '[]');
@@ -46,10 +47,10 @@ def import_sde(archive_path, target):
             meta = next(r for r in rows('_sde.jsonl') if r['_key'] == 'sde')
             db.executemany('INSERT INTO meta VALUES (?,?)',
                            [(key, str(meta[key])) for key in ['buildNumber', 'releaseDate']])
-            db.executemany('INSERT INTO types(id,name,search,group_id,published) VALUES (?,?,?,?,?)',
+            db.executemany('INSERT INTO types(id,name,search,group_id,published,volume,packaged_volume) VALUES (?,?,?,?,?,?,?)',
                            ((r['_key'], r.get('name', {}).get('en', str(r['_key'])),
                              normalize(r.get('name', {}).get('en', str(r['_key']))),
-                             r.get('groupID'), int(r.get('published', False))) for r in rows('types.jsonl')))
+                             r.get('groupID'), int(r.get('published', False)),r.get('volume'),r.get('packagedVolume')) for r in rows('types.jsonl')))
             if 'planetSchematics.jsonl' in archive.namelist():
                 schematics=list(rows('planetSchematics.jsonl'))
                 pi = {int(v['_key']) for r in schematics
@@ -139,6 +140,11 @@ class Catalog:
             if self.pi_fallback and self.pi_fallback.resolve()!=self.path.resolve():
                 with closing(sqlite3.connect(self.pi_fallback)) as fallback:
                     meta=dict(fallback.execute('SELECT key,value FROM meta'))
+                    type_columns={r[1] for r in fallback.execute('PRAGMA table_info(types)')}
+                    if meta.get('buildNumber')==self.meta.get('buildNumber') and {'volume','packaged_volume'}.issubset(type_columns):
+                        for tid,volume,packaged in fallback.execute('SELECT id,volume,packaged_volume FROM types'):
+                            if tid in self.types:
+                                self.types[tid].setdefault('volume',volume);self.types[tid].setdefault('packaged_volume',packaged)
                     columns={r[1] for r in fallback.execute('PRAGMA table_info(recipes)')}
                     if meta.get('buildNumber')==self.meta.get('buildNumber') and 'skills' in columns:
                         for tid,skills in fallback.execute('SELECT product_id,skills FROM recipes'):

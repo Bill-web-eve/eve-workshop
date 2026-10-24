@@ -1,6 +1,21 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Szállítási díj": "Hauling rate",
+  "Szállítási díj (ISK/m³)": "Hauling rate (ISK/m³)",
+  "A díj a terv még beszerzendő anyagainak csomagolt térfogatára vonatkozik. A meglévő készletet, a blueprintet és a késztermék elszállítását nem tartalmazza. 0: nincs szállítási díj.": "The rate applies to the packaged volume of materials still to procure. It excludes existing stock, blueprints and outbound finished products. 0: no hauling fee.",
+  "Szállítási díj mentése": "Save hauling rate",
+  "Szállítási díj mentve.": "Hauling rate saved.",
+  "Szállítás": "Hauling",
+  "Egyéb költségek": "Other costs",
+  "Egyéb költségek (ISK)": "Other costs (ISK)",
+  "Nincs megadva · BPC: 0 ISK": "Not provided · BPC: 0 ISK",
+  "BPC-költség nincs megadva; 0 ISK-kal számolunk.": "BPC cost not provided; calculated as 0 ISK.",
+  "A hiányzó reakcióformula ára nem ismert; add meg a Blueprintköltség mezőben.": "A missing reaction formula has no known price; enter it in the blueprint cost field.",
+  "Néhány beszerzendő anyag térfogata hiányzik; a szállítási díj és a teljes költség nem számolható.": "Some procurement volumes are missing; hauling and total cost cannot be calculated.",
+  "Hibás szállítási beállítás.": "Invalid hauling setting.",
+  "A szállítási díj legfeljebb 4 tizedesjegy lehet.": "The hauling rate allows at most 4 decimal places.",
+
   "Szemben álló felek": "Opposing sides",
   "Oldal": "Side",
   "Felek száma": "Number of sides",

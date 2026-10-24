@@ -1,4 +1,4 @@
-import tempfile,time,unittest
+import tempfile,time,unittest,sqlite3,shutil
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -36,6 +36,30 @@ class TradeTests(unittest.TestCase):
         for data in [{'system_id':30000142,'reader_id':11,'location_id':LOC['id']},{'system_id':30004600,'reader_id':12},{'system_id':30004600,'reader_id':11,'structure_broker_fee':'-0.1'}]:
             with self.assertRaises(PlanningError):self.trade.save(data)
             self.assertEqual(old,self.trade.settings())
+    def test_hauling_rate_persists_without_requiring_a_market_and_preserves_hub(self):
+        self.assertEqual(self.trade.settings()['hauling_isk_per_m3'],'0')
+        self.trade.save_hauling({'hauling_isk_per_m3':'125.4321'})
+        self.assertEqual(Trade(self.store,self.catalog,self.eve).settings()['hauling_isk_per_m3'],'125.4321')
+        self.settings('0');self.assertEqual(self.trade.settings()['hauling_isk_per_m3'],'125.4321')
+        old=self.trade.settings()
+        for value in ['-1','NaN','Infinity','0.00001',True,'1000000000001']:
+            with self.assertRaises(PlanningError):self.trade.save_hauling({'hauling_isk_per_m3':value})
+            self.assertEqual(self.trade.settings(),old)
+        self.trade.save_hauling({'hauling_isk_per_m3':'1.230000'})
+        self.assertEqual(self.trade.settings()['hauling_isk_per_m3'],'1.2300')
+        self.trade.save_hauling({'hauling_isk_per_m3':'0'})
+        self.assertEqual(self.trade.settings()['location'],LOC)
+
+    def test_old_downloaded_catalogue_gets_matching_packaged_volumes_without_mutation(self):
+        old=Path(self.tmp.name)/'old.sqlite3';shutil.copy2(self.catalog.path,old)
+        with sqlite3.connect(old) as db:
+            db.execute('ALTER TABLE types DROP COLUMN volume');db.execute('ALTER TABLE types DROP COLUMN packaged_volume')
+        before=old.read_bytes();catalog=Catalog(old,self.catalog.path)
+        self.assertEqual(catalog.types[643]['packaged_volume'],50000)
+        self.assertEqual(catalog.types[643]['volume'],470000)
+        self.assertEqual(catalog.types[34]['volume'],.01)
+        self.assertEqual(before,old.read_bytes())
+
     def test_unconfigured_local_quotes_never_fall_back_to_jita(self):
         self.store.save_market_quote(34,{'buy':'1','sell':'2','id':34,'checked':1000,'expires':2000})
         data=self.trade.prices([34],True)
@@ -120,4 +144,7 @@ class TradeApiTests(unittest.TestCase):
         self.assertEqual(self.request('/api/trade/plan')[1]['materials'],'local:buy')
         self.assertEqual(self.request('/api/prices?ids=34&source=bad')[0],400)
         data=self.request('/api/prices?ids=34&source=local')[1];self.assertEqual(data['quotes'],{});self.assertIn('34',data['errors'])
+        self.assertEqual(self.request('/api/trade/hauling',{'hauling_isk_per_m3':'123.45'},Origin='https://other.invalid')[0],403)
+        self.assertEqual(self.request('/api/trade/hauling',{'hauling_isk_per_m3':'123.45'})[0],200)
+        self.assertEqual(self.request('/api/trade')[1]['settings']['hauling_isk_per_m3'],'123.4500')
         self.assertEqual(self.request('/trade.js')[0],200)

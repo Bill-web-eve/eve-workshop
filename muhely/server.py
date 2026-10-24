@@ -793,6 +793,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.app.industry.start(manual=data.get('manual') is True);return self.send(200,self.app.industry.status())
             elif path == '/api/industry/estimate':
                 with self.app.catalog.lock:return self.send(200,self.app.industry.estimate(data.get('rows'),self.app.store.settings(),self.app.catalog))
+            elif path == '/api/trade/hauling':return self.send(200,self.app.trade.save_hauling(data))
             elif path == '/api/trade/settings':return self.send(200,self.app.trade.save(data))
             elif path == '/api/trade/discover':return self.send(200,self.app.trade.discover(data))
             elif path == '/api/trade/plan':return self.send(200,self.app.trade.save_finance(data))

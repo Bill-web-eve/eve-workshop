@@ -38,6 +38,14 @@ class PlannerTests(unittest.TestCase):
     def plan(self, **kw):return self.p.calculate(100, 1, self.settings, **kw)
     def rows(self, result):return {r['id']:r for r in result['rows']}
 
+    def test_procurement_volume_prefers_packaged_and_is_not_multiplied_twice(self):
+        self.catalog.types[200].update(volume=470000,packaged_volume=50000)
+        result=self.plan(stock={200:2})
+        row=next(r for r in result['shopping'] if r['id']==200)
+        self.assertEqual(row['volume'],50000);self.assertEqual(row['buy'],60)
+        del self.catalog.types[200]['packaged_volume']
+        self.assertEqual(self.rows(self.plan())[200]['volume'],470000)
+
     def test_shared_stock_is_deducted_once_after_all_parent_demand(self):
         r=self.rows(self.plan(stock={130:10}))
         self.assertEqual(r[130]['required'],31)
