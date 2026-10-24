@@ -1,0 +1,30 @@
+{
+  "tag": "v1.5.0",
+  "title": "EVE Workshop 1.5.0 – Contracts and notifications",
+  "assets": [
+    {
+      "name": "EVE_Muhely-1.5.0-Windows11-x64.sha256",
+      "sha256": "36492069c9ddd9212acd49b3b16f028ce194613bfc26a733d35b658b3f007364"
+    },
+    {
+      "name": "EVE_Muhely-1.5.0-Windows11-x64.zip",
+      "sha256": "ce05efc0ea964a14ce762cf8bfba0845648ce1035c62c77bef50df19add05902"
+    },
+    {
+      "name": "EVE_Muhely-1.5.0-macOS-AppleSilicon.dmg",
+      "sha256": "64dafe985e42742a06e21733b1e360446f21833213887d88819a5421766bb33a"
+    },
+    {
+      "name": "EVE_Muhely-1.5.0-macOS-AppleSilicon.sha256",
+      "sha256": "31746b85386e3f39cd122b9249927210ca3ddf37c46cb6931810602f2f66e9be"
+    },
+    {
+      "name": "EVE_Muhely-Telepites.txt",
+      "sha256": "43e68a27441600ceab594cc11d49db84a0d73fd95337a09b92a06a2d37b547bf"
+    },
+    {
+      "name": "EVE_Muhely-Windows-Telepites.txt",
+      "sha256": "aa329c6e8536e35491d1e8d50218a292b49569faa7f623eb5a46609489d1016a"
+    }
+  ]
+}

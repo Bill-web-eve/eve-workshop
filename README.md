@@ -4,7 +4,7 @@ Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple S
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.4.1**, **Windows 11 x64 1.4.1**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.5.0**, **Windows 11 x64 1.5.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -21,6 +21,15 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Választható helyi station/struktúra market buy/sell/split árakkal, külön ESI-olvasóval; a privát piac gyorsítótára elkülönül Jitától és más olvasóktól.
 - Kompakt tervenkénti bekerülés/bevétel/profit, független anyag- és eladási árforrással, Accounting/standing alapú NPC-díjakkal, megadható struktúra broker fee-vel és egyéb költségekkel.
 - Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
+
+## Az 1.5.0 kiadás újdonságai
+
+- Személyes és corporation-szerződések külön nézetben, karakter/corp és kiadási dátum szerinti szűréssel, tétellistával és helyi állapotelőzményekkel.
+- Értesítés új, közvetlenül karakternek vagy corporationnek címzett szerződésről és saját kiadott szerződés elfogadásáról. Az első import nem küld régi értesítéseket. Az ESI 30 napos és folyamatban lévő listájából beolvasott adatok később is megmaradnak a helyi archívumban.
+- Új szerződésengedélyek a Beállítások → Adathozzáférések alatt. A kikapcsolt corporationökhöz nem indul szerződéslekérés; automatikusan legfeljebb 15 percenként ellenőriz az alkalmazás.
+- Karakterenként kapcsolható implantérték-figyelés: kidokkoláskor figyelmeztet, ha az aktív klón implantjainak ismert értéke meghaladja a megadott határt. Új ESI-engedély és külön bekapcsolás szükséges.
+- A Mac intel overlay az EVE-re kattintáskor is megmarad a beállított lejáratig. Magyar–angol felületi és Mac-menüfordítások javítva.
+- A főablak bezárása a teljes alkalmazást leállítja; javított Windowsos leállásellenőrzés. Készletnézet: állapotválasztó szűrő, helynevek, keskenyebb mennyiségoszlop; állítható 25/50/100 soros táblázatok.
 
 ## Az 1.4.1 kiadás újdonságai
 
