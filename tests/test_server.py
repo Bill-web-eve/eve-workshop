@@ -13,6 +13,25 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class ServerTests(unittest.TestCase):
+    def test_contract_routes_are_authenticated_scoped_and_independent_of_planning(self):
+        from muhely import contracts
+        from test_contracts import contract,NOW
+        self.app.store.add_character(1,'Pilot');self.app.store.character_corporation(1,99,'Corp')
+        contracts.ingest(self.app.store,'personal',1,1,{'rows':[contract()],'fetched':NOW,'expires':NOW+300},now=NOW)
+        self.assertEqual(self.request('/api/contracts',Cookie='')[0],403)
+        with patch.object(self.app,'plan',side_effect=AssertionError('Contracts must not calculate production')):
+            status,data,_=self.request('/api/contracts')
+        self.assertEqual(status,200);self.assertEqual(data['rows'][0]['contract_id'],1)
+        self.assertEqual(self.request('/api/contracts?scope=corporation')[1]['rows'],[])
+        for path in ['/api/contracts?scope=invalid','/api/contracts?owner=999','/api/contracts?start=invalid','/api/contracts?start=2026-10-25&end=2026-10-01','/api/contracts/details?owner=999&id=1','/api/contracts/details?owner=no&id=1']:
+            self.assertEqual(self.request(path)[0],400,path)
+        self.assertEqual(self.request('/contracts.js')[0],200)
+        self.app.start_task=Mock()
+        self.assertEqual(self.request('/api/contracts/sync',{},Origin='https://other.invalid')[0],403);self.app.start_task.assert_not_called()
+        self.assertEqual(self.request('/api/contracts/sync',{})[0],200);self.app.start_task.assert_called_once_with('contracts',manual=False)
+        self.app.start_task.reset_mock();self.app.eve.finish=Mock(return_value=1);self.app.eve.authorized_feature='contracts'
+        self.assertEqual(self.request('/callback?state=test&code=test')[0],303);self.app.start_task.assert_called_once_with('contracts')
+
     def test_implant_routes_require_session_and_csrf_and_reject_unknown_characters(self):
         self.app.store.add_character(123,'Pilot')
         self.assertEqual(self.request('/api/implants',Cookie='')[0],403)
@@ -63,7 +82,7 @@ class ServerTests(unittest.TestCase):
     def test_all_access_route_is_character_bound_and_preserves_individual_routes(self):
         self.app.store.add_character(123,'Test')
         self.app.eve.start=Mock(return_value='https://login.eveonline.com/authorize')
-        for feature in ['all','skills','pi','corporations','moons','intel','mining','implants']:
+        for feature in ['all','skills','pi','corporations','moons','intel','mining','implants','contracts']:
             status,data,_=self.request('/api/auth/start',{'character_id':123,'feature':feature})
             self.assertEqual(status,200)
             self.assertEqual(data['url'],'https://login.eveonline.com/authorize')

@@ -21,6 +21,10 @@ int main(){@autoreleasepool{
     [window notificationAction:@{@"action":@"notify",@"id":@"eve.implant-test",@"title":@"EVE Workshop",@"body":@"Pilot undocked · 1 100 000 000 ISK",@"scope":@"personal",@"category":@"implants",@"sound":@YES} reply:^(id result,NSString *error){replied=YES;failure=error;}];
     NSDate *limit=[NSDate dateWithTimeIntervalSinceNow:2];while(!replied&&limit.timeIntervalSinceNow>0)[NSRunLoop.mainRunLoop runMode:NSDefaultRunLoopMode beforeDate:limit];
     require(replied&&!failure,@"implant category rejected");require([center.request.content.userInfo[@"category"] isEqual:@"implants"],@"wrong notification target");require(center.request.content.sound!=nil,@"no notification sound");
+    replied=NO;failure=nil;
+    [window notificationAction:@{@"action":@"notify",@"id":@"eve.contract-test",@"title":@"EVE Workshop",@"body":@"New contract #101",@"scope":@"99",@"category":@"contracts",@"sound":@YES} reply:^(id result,NSString *error){replied=YES;failure=error;}];
+    limit=[NSDate dateWithTimeIntervalSinceNow:2];while(!replied&&limit.timeIntervalSinceNow>0)[NSRunLoop.mainRunLoop runMode:NSDefaultRunLoopMode beforeDate:limit];
+    require(replied&&!failure,@"contract category rejected");require([center.request.content.userInfo[@"category"] isEqual:@"contracts"],@"wrong contract category");require([center.request.content.userInfo[@"scope"] isEqual:@"99"],@"wrong corporation target");require(center.request.content.sound!=nil,@"no contract notification sound");
     for(NSString *language in @[@"en",@"hu"]){
         window.language=language;replied=NO;failure=nil;
         [window menu];

@@ -658,3 +658,17 @@ Monitoring runs while the app is open, independently of other EVE refreshes. Loc
 Only an observed docked-to-space transition triggers an alert, once per undock. There is no retrospective alert for characters already in space at startup or after a long gap in location data. Failed requests do not count as undocking. With missing prices, an alert is sent only if the known subtotal alone exceeds the threshold, labelled **At least**. Alerts also remain in the personal Notifications tab for 5 minutes.
 
 The Mac intel overlay remains above windows without taking focus. Clicking the EVE client does not shorten the configured display lifetime. Expired or disabled reports are not brought back by focus changes.
+
+## Personal and corporation contracts
+
+The **Contracts** menu has separate Personal and Corporations tabs, independent of production plans. Filter by owner and issue date. Date filters use EVE/UTC days; timestamps display in local time. Columns are sortable, filters start collapsed, and page sizes are 25/50/100.
+
+Under **Settings → Data access → Authorize contracts**, grant `esi-contracts.read_character_contracts.v1` and `esi-contracts.read_corporation_contracts.v1`. Enable both scopes in your Developer application if using your own Client ID. Each authorized character’s personal contracts are read; corporation contracts are read once per corporation, trying other authorized members when needed. Disabled corporation monitoring prevents new corporation requests while retaining the local archive.
+
+**Refresh ESI contracts** checks EVE manually. General EVE refreshes and automatic notification data checks include contracts once a character has authorized them. Automatic requests are at least 15 minutes apart; EVE’s five-minute cache also applies to manual refreshes. The activity indicator shows the source and page. **Reload saved list** reads only the local archive.
+
+ESI returns contracts from the past 30 days and those still in progress. Downloaded contracts and observed status changes are retained locally. Contracts that had already disappeared from ESI before first use cannot be backfilled. Large archives show the latest 10,000 source rows; narrow the issue dates or owner.
+
+Click a title for contract terms, offered/requested items and locally observed status history. Old item lists are retained only if they were previously opened and successfully downloaded. Unresolved locations retain their IDs; structure names may require additional access.
+
+The first complete import establishes a baseline without sending historical alerts. Later, newly observed open contracts directly assigned to a character or corporation and acceptance of your issued contracts generate one-time notifications. Enable **Settings → Notifications → Contracts** and the relevant personal/corporation scope. Alerts appear on separate personal/corporation tabs and open the corresponding contract view. ESI has no immediate event push: changes are detected on the next successful check.

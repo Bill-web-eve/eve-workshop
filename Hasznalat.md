@@ -656,3 +656,17 @@ A figyelés futó app mellett, a többi EVE-frissítéstől függetlenül műkö
 Csak a megfigyelt dokkolt → űrben átmenetre küld értesítést, kidokkolásonként egyszer. Induláskor már űrben lévő karakterre vagy hosszú adathiány után nem küld utólagos riasztást. Hibás helyzetadatból nem következtet kidokkolásra. Hiányos árak mellett csak akkor jelez, ha az ismert részösszeg önmagában is meghaladja a határt; ilyenkor **Legalább** jelölést használ. Az értesítés az Értesítések személyes lapján is megjelenik, 5 percig.
 
 A Mac intel overlay kattintás nélkül, fókuszváltáskor is az ablakok előtt marad. Az EVE kliensre kattintás nem rövidíti le a jelzés beállított élettartamát; a lejárt vagy kikapcsolt jelzés nem jelenik meg újra.
+
+## Szerződések: személyes és corporation
+
+A **Szerződések** menüpont külön Személyes és Corporationok lapon mutatja a karakterek és vállalatok szerződéseit. A nézet független a gyártási tervtől. Tulajdonos és kiállítási dátum szerint szűrhető; a dátumszűrés EVE/UTC napokat használ, a megjelenített időpontok helyi időben jelennek meg. Az oszlopok rendezhetők, a szűrősor alapból csukva van, a lapméret 25/50/100 sor.
+
+A **Beállítások → Adathozzáférések → Szerződések engedélyezése** gomb a `esi-contracts.read_character_contracts.v1` és `esi-contracts.read_corporation_contracts.v1` engedélyeket kéri. Saját Developer alkalmazás esetén ezeket is engedélyezni kell a Client ID-nál. A személyes olvasás minden felvitt, jogosult karakterre vonatkozik; corporationönként egyszer olvasunk, az engedélyezett tagkarakterek közül választva. Kikapcsolt corporationfigyelésnél nem indul új corp-lekérés; a helyi előzmények megmaradnak.
+
+Az **ESI-szerződések frissítése** kézi ellenőrzést indít. A közös EVE-frissítés és az automatikus értesítési adatellenőrzés is beolvassa a szerződéseket, ha már van jogosult karakter. Az automatikus időköz legalább 15 perc; az ESI 5 perces gyorsítótára a kézi frissítéskor is érvényes. A folyamatjelző mutatja a forrást és az adatoldalt. A **Mentett lista újraolvasása** csak a helyi archívumot tölti újra.
+
+Az ESI legfeljebb az elmúlt 30 nap szerződéseit és a még folyamatban lévőket adja vissza. A beolvasott szerződéseket és észlelt állapotváltozásokat helyben megőrizzük, így később is megtekinthetők. Az app első használata előtti, ESI-ből már kiesett szerződéseket nem tudjuk visszamenőleg letölteni. Nagy archívumnál a legújabb 10 000 forrássor látszik; dátum- vagy tulajdonosszűréssel szűkíthető.
+
+A címre kattintva megnyílnak a feltételek, a felajánlott/kért tételek és a helyben megfigyelt állapotelőzmények. A régi szerződések tétellistáját csak akkor őrizzük meg, ha azt korábban megnyitottad és sikerült letölteni. Ismeretlen helynévnél az ID marad látható; a névfeloldás jogosultságtól is függhet.
+
+Az első sikeres teljes beolvasás alapállapot, nem küld régi értesítéseket. Ezután új, közvetlenül karakternek vagy corporationnek címzett, még nyitott szerződésről és saját kiadott szerződés elfogadásáról küld egyszeri értesítést. A **Beállítások → Értesítések → Szerződések** kategória és a megfelelő személyes/corp kör legyen engedélyezve. Az értesítések személyes és corporation füleken is megjelennek; kattintásuk a megfelelő szerződésnézetet nyitja meg. Az ESI nem küld azonnali eseményt: a változás a következő sikeres ellenőrzéskor észlelhető.

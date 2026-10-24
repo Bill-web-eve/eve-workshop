@@ -7,7 +7,7 @@ import time
 from . import skills, pi, extractions
 from .planner import PlanningError
 
-CATEGORIES=('skills','jobs','pi','moons','intel','implants')
+CATEGORIES=('skills','jobs','pi','moons','intel','implants','contracts')
 DEFAULTS={'os_enabled':False,'auto_refresh':True,'moon_days':3,'personal':True,'corporations':True,
           'categories':{k:True for k in CATEGORIES},'moon_owners':{}}
 
@@ -146,6 +146,10 @@ def collect(store,catalog,now=None):
     from .implants import events as implant_events
     for item in implant_events(store,now):alerts[item['id']]=item
     observed.update('implants:'+str(c['id']) for c in chars)
+    from .contracts import alerts as contract_alerts
+    for item in contract_alerts(store,now):alerts[item['id']]=item
+    observed.update('contracts:personal:'+str(c['id']) for c in chars)
+    observed.update('contracts:corporation:'+str(c['id']) for c in store.corporations() if c['monitoring_enabled'])
     rows=sorted(alerts.values(),key=lambda a:(not a['reliable'],a['when'] is None,a['when'] or 0,a['subject'].casefold(),a['id']))
     return {'items':rows,'observed_domains':sorted(observed),'corporations':[{'id':cid,'name':name} for cid,name in sorted(corps.items(),key=lambda x:x[1])],
             'moons':moon_rows,'preferences':prefs,'calculated_at':now,
@@ -174,7 +178,7 @@ def claim(store,data,now=None):
             old=db.execute('SELECT * FROM notification_events WHERE id=?',(a['id'],)).fetchone()
             # A closed kill batch is a past event, never a rearmed proximity
             # episode when switching regions or notification preferences.
-            if a['kind'] in {'intel_kill','implant_undock'} and old and old['sent']:continue
+            if a['kind'] in {'intel_kill','implant_undock','contract_new','contract_accepted'} and old and old['sent']:continue
             episode=old['episode'] if old else 1
             if old and (not old['active'] or old['fingerprint']!=fingerprint):episode+=1;old=None
             if old and (old['sent'] or old['lease_until']>now):continue

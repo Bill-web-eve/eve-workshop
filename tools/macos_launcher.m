@@ -129,7 +129,7 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
             [identifier rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._:-"].invertedSet].location==NSNotFound&&
             [title isKindOfClass:NSString.class]&&title.length<=200&&[text isKindOfClass:NSString.class]&&text.length<=1500&&
             [scope isKindOfClass:NSString.class]&&scope.length<=20&&([scope isEqual:@"personal"]||[scope rangeOfCharacterFromSet:NSCharacterSet.decimalDigitCharacterSet.invertedSet].location==NSNotFound)&&
-            [@[@"skills",@"jobs",@"pi",@"moons",@"intel",@"implants",@"all"] containsObject:category];
+            [@[@"skills",@"jobs",@"pi",@"moons",@"intel",@"implants",@"contracts",@"all"] containsObject:category];
         if(!valid){dispatch_async(dispatch_get_main_queue(),^{reply(nil,(english?@"Invalid system notification.":@"Hibás rendszerértesítés."));});return;}
         UNMutableNotificationContent *content=[UNMutableNotificationContent new];content.title=title;content.body=text;
         content.userInfo=@{ @"scope":scope,@"category":category };

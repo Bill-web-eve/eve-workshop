@@ -181,3 +181,19 @@ test('compound partial moon refresh warning is fully translated and explains pla
  assert(english.includes('This moon data warning does not itself prevent production planning.'));
  assert(!/[áéíóöőúüű]/i.test(english),english);
 });
+
+test('contract notifications open the correct owner and history, and an instant refresh never calculates a production plan',async t=>{
+ const {w,d,run,calls,fixture,notificationFixture:n}=await setup(null);t.after(()=>w.close());
+ const original=w.fetch,row={contract_id:101,owner_id:99,title:'Shipment',type:'courier',status:'in_progress',issuer_id:77,issuer_name:'Issuer',assignee_id:99,assignee_name:'Corp A',acceptor_id:99,acceptor_name:'Corp A',owners:[{id:99,name:'Corp A'}],date_issued:'2026-10-25T10:00:00Z',date_expired:'2026-11-01T10:00:00Z'};
+ w.fetch=async(url,options)=>{
+  if(url.startsWith('/api/contracts')){calls.push(url);if(url==='/api/contracts/sync'){fixture.task={running:false,kind:'contracts',message:'Done',results:[],finished:1000};return {ok:true,json:async()=>({ok:true})};}return {ok:true,json:async()=>url.includes('/details')?{contract:row,items:[],history:[]}:{rows:[row],owners:[{id:99,name:'Corp A'}],sources:[]}};}
+  return original(url,options);
+ };
+ n.corporations=[{id:99,name:'Corp A'}];n.items=[{...notificationItem(101,99),category:'contracts',kind:'contract_accepted',contract_id:101,owner_id:99,owner_name:'Corp A',contract_scope:'corporation'}];
+ run('contractStart="2020-01-01";contractEnd="2020-01-02";openNotificationCenter("corporations","contracts");');await tick();
+ const plansBefore=calls.filter(p=>p.startsWith('/api/plan?')).length;
+ d.querySelector('[data-notification-open="job:101"]').click();await tick();await tick();
+ assert.equal(run('view'),'contracts');assert.equal(run('contractScope'),'corporation');assert.equal(run('contractOwner'),'99');assert.equal(run('contractStart'), '');assert.equal(run('contractEnd'),'');assert.equal(run('contractSelected'),101);assert(d.querySelector('#contract-detail section,#contract-detail .panel'));
+ d.querySelector('#contract-sync').click();await tick();await tick();assert.equal(calls.filter(p=>p.startsWith('/api/plan?')).length,plansBefore);assert.equal(run('view'),'contracts');assert.equal(d.querySelector('.plan-selector').hidden,true);
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('#view-content').textContent));
+});

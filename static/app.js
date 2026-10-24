@@ -110,6 +110,7 @@ async function reloadState() {
   const requestedScope=corporationId,nextState=await api(scoped('/api/state'));
   if(requestedScope!==corporationId)return;
   state=nextState;corporationData=null;scheduleRevision++;
+  contractData=null;contractRevision++;
   assetData=null;assetError='';assetRevision++;
   jobData=null;jobError='';jobRevision++;
   shoppingData=null;shoppingRevision++;
@@ -208,7 +209,9 @@ function scheduleTaskPoll() {
         lastTaskFinished=state.task.finished;if(state.task.kind!=='notifications')toast(state.task.message);
         if(view==='settings'&&settingsTab==='access')void loadSettingsAccess();
         if(!['skills','pi','notifications','mining'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
-        if(view==='jobs'){render();}
+        if(view==='contracts'){await loadContracts(true);}
+        else if(state.task.kind==='contracts'){void refreshNotifications();render();}
+        else if(view==='jobs'){render();}
         else if(state.task.kind==='notifications'){skillData=null;piData=null;moonData=null;settingsAccessData=null;void refreshNotifications();if(view==='mining')await refreshMining();else if(view==='skills')await refreshSkills();else if(view==='pi')await refreshPI();else if(view==='moons')await refreshMoons();}
         else if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else if(view==='settings')render();else await calculate(false);}
         else if(state.task.kind==='skills') await refreshSkills();
@@ -279,9 +282,9 @@ function navigate(next) {
   syncMoonNavigation();
   clearTimeout(skillTimer);
   clearTimeout(piTimer);
-  if(['fleet','mining','intel','skills','pi','notifications'].includes(next))error('');
+  if(['contracts','fleet','mining','intel','skills','pi','notifications'].includes(next))error('');
   $$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
-  const names={fleet:'Flottatevékenység',mining:'Bányászati napló',intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
+  const names={contracts:'Szerződések',fleet:'Flottatevékenység',mining:'Bányászati napló',intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
   $('#breadcrumb').textContent='Műhely / '+names[view]; render();return true;
 }
 function render() {
@@ -297,8 +300,9 @@ function render() {
   const content=$('#view-content'); actions();
   const finance=$('#production-finance');if(finance)finance.hidden=true;
   document.body.classList.toggle('manual-view',view==='documentation');
-  $('.plan-selector').hidden=['fleet','jobs','mining','intel','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures')||(view==='inventory'&&inventoryMode!=='plan');
+  $('.plan-selector').hidden=['contracts','fleet','jobs','mining','intel','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures')||(view==='inventory'&&inventoryMode!=='plan');
   $('#plan-status').hidden=view==='jobs'||!plan?.stale_characters.length;
+  if(view==='contracts'){ $('#plan-status').hidden=true;return renderContracts(content); }
   if(view==='fleet'){ $('#plan-status').hidden=true;return renderFleet(content); }
   if(view==='mining'){ $('#plan-status').hidden=true;return renderMining(content); }
   if(view==='intel')return renderIntel(content);
@@ -677,12 +681,14 @@ async function startTask(path,manual=true) {
     if(Object.keys(dirty).length) throw new Error('A frissítés előtt alkalmazd a megadott módosításokat.');
     await api(path,{manual}); await reloadState();
     if(!manual&&!state.task.running)return;
-    if(['jobs','mining','skills','pi','corporations','moons','settings'].includes(view))render();
+    if(['contracts','jobs','mining','skills','pi','corporations','moons','settings'].includes(view))render();
     if(!state.task.running) {
       if(manual)toast(state.task.message);
       if(view==='settings'&&settingsTab==='access')void loadSettingsAccess();
       if(!['skills','pi','notifications','mining'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
-      if(view==='jobs'){render();}
+      if(view==='contracts'){await loadContracts(true);}
+      else if(state.task.kind==='contracts'){void refreshNotifications();render();}
+      else if(view==='jobs'){render();}
       else if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else if(view==='settings')render();else await calculate(false);}
       else if(state.task.kind==='skills')await refreshSkills();
       else if(state.task.kind==='mining')await refreshMining();

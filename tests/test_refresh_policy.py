@@ -45,6 +45,22 @@ class PolicyTests(unittest.TestCase):
             self.assertEqual(app.refresh_policy.next_at(['industry']),2500)
             self.assertFalse(app.start_task('sync',manual=False))
 
+    def test_contract_refresh_joins_authorized_batches_and_respects_automatic_interval(self):
+        from muhely.esi import CONTRACT_SCOPES
+        app=App(self.tmp.name,ROOT/'data/catalog.sqlite3',0);self.addCleanup(app.intel.stop)
+        app.store.add_character(1,'Pilot');app.eve.granted_scopes=Mock(return_value={1:CONTRACT_SCOPES})
+        app.eve.sync=Mock(return_value=[]);app.eve.sync_skills=Mock(return_value=[]);app.eve.sync_pi=Mock(return_value=[])
+        self.assertIn('contracts',app.refresh_domains('notifications'))
+        def finish():
+            deadline=time.monotonic()+3
+            while app.task['running'] and time.monotonic()<deadline:time.sleep(.01)
+            self.assertFalse(app.task['running'])
+        with patch('muhely.server.contracts.sync',return_value=[{'id':1,'ok':True,'scope':'personal'}]) as sync:
+            app.start_task('notifications',manual=False);finish();sync.assert_called_once_with(app.eve)
+            self.assertFalse(app.start_task('contracts',manual=False));sync.assert_called_once()
+            app.start_task('contracts',manual=True);finish();self.assertEqual(sync.call_count,2)
+        app.eve.granted_scopes.return_value={1:[]};self.assertNotIn('contracts',app.refresh_domains('notifications'))
+
     def test_corporation_monitoring_survives_metadata_rediscovery(self):
         self.store.add_character(1,'Pilot');self.store.character_corporation(1,99,'Corp')
         self.store.set_corporation_monitoring(99,False)

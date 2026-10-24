@@ -21,13 +21,13 @@ import uuid
 import webbrowser
 
 from . import __version__
-from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe, mining, assets, jobs as job_browser, fleet
+from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe, mining, assets, jobs as job_browser, fleet, contracts
 from .market import Market,validate_ids as market_ids
 from . import moon_transfer
 from .trade import Trade
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
-from .esi import EveConnection, EsiError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES, INTEL_SCOPES, IMPLANT_SCOPES
+from .esi import EveConnection, EsiError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES, INTEL_SCOPES, IMPLANT_SCOPES, CONTRACT_SCOPES
 from .corporations import dashboard as corporation_dashboard
 from .skills import dashboard as skill_dashboard
 from .production import profiles as production_profiles
@@ -91,6 +91,7 @@ class App:
             if any(c['monitoring_enabled'] for c in self.store.corporations()):domains.append('corporations')
             if any(self.store.snapshot(c['id'],k) for c in self.store.characters() for k in ['moon_calendar','moon_timers','moon_notifications']):domains.append('extractions')
             if any('esi-industry.read_character_mining.v1' in scopes for scopes in self.eve.granted_scopes().values()):domains.append('mining')
+            if any(set(CONTRACT_SCOPES)&set(scopes) for scopes in self.eve.granted_scopes().values()):domains.append('contracts')
             return domains
         return ['industry' if kind=='sync' else 'moon-universe' if kind=='moons' else kind]
 
@@ -123,7 +124,8 @@ class App:
                 include_corps='corporations' in allowed
                 include_moons='extractions' in allowed
                 include_mining='mining' in allowed
-                phases=sum(d in allowed for d in ['industry','skills','pi'])+int(include_corps)+int(include_moons)+int(include_mining) if kind in ['sync','notifications'] else 1
+                include_contracts='contracts' in allowed
+                phases=sum(d in allowed for d in ['industry','skills','pi'])+int(include_corps)+int(include_moons)+int(include_mining)+int(include_contracts) if kind in ['sync','notifications'] else 1
                 if kind in ['sync','notifications']:
                     if not self.store.characters():
                         raise PlanningError('Előbb adj hozzá egy karaktert az EVE-kapcsolat oldalon.')
@@ -148,6 +150,12 @@ class App:
                     if include_mining:
                         mining_results=phase('Bányászati naplók',lambda:mining.sync(self.eve),'mining')
                         message+=f" Bányászati naplók frissítve: {sum(r['ok'] for r in mining_results)}/{len(mining_results)} karakter."
+                    if include_contracts:
+                        contract_results=phase('Szerződések',lambda:contracts.sync(self.eve),'contracts')
+                        message+=f" Szerződésadatok frissítve: {sum(r['ok'] for r in contract_results)}/{len(contract_results)} forrás."
+                elif kind == 'contracts':
+                    result=phase('Szerződések',lambda:contracts.sync(self.eve),'contracts')
+                    message=f"Szerződésadatok frissítve: {sum(r['ok'] for r in result)}/{len(result)} forrás."
                 elif kind == 'mining':
                     result=phase('Bányászati naplók',lambda:mining.sync(self.eve),'mining')
                     message=f"Bányászati naplók frissítve: {sum(r['ok'] for r in result)}/{len(result)} karakter."
@@ -543,7 +551,7 @@ class App:
                 'locations': locations, 'jobs': [j for j in jobs if j.get('status') in ['active', 'paused', 'ready']],
                 'blueprint_count': len(bps), 'stale_characters': stale, 'sde': self.catalog.meta,
                 'recipe_count': sum(self.catalog.types.get(i, {}).get('published', 0) for i in self.catalog.recipes),
-                'fleet_running':self.fleet.status()['task']['running'],'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,'implant_scopes':IMPLANT_SCOPES,'market_scopes':self.trade.dashboard()['scopes'],'mining_scopes':mining.MINING_SCOPES,
+                'fleet_running':self.fleet.status()['task']['running'],'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,'implant_scopes':IMPLANT_SCOPES,'contract_scopes':CONTRACT_SCOPES,'market_scopes':self.trade.dashboard()['scopes'],'mining_scopes':mining.MINING_SCOPES,
                 'crypto_available': crypto_available()}
 
 
@@ -641,7 +649,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -682,6 +690,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/activity':return self.send(200,self.app.activity())
             if path == '/api/notifications':
                 return self.send(200,self.app.notification_data())
+            if path == '/api/contracts':return self.send(200,contracts.dashboard(self.app.store,query.get('scope',['personal'])[0],query.get('owner',[None])[0],query.get('start',[None])[0],query.get('end',[None])[0],self.app.eve.granted_scopes(),self.app.asset_locations))
+            if path == '/api/contracts/details':return self.send(200,contracts.details(self.app.eve,self.app.catalog,query.get('scope',['personal'])[0],int(query.get('owner',['0'])[0]),int(query.get('id',['0'])[0])))
             if path == '/api/implants':return self.send(200,self.app.fleet.implants.dashboard())
             if path == '/api/desktop/auth':
                 with self.app.desktop_auth_lock:
@@ -697,6 +707,9 @@ class Handler(BaseHTTPRequestHandler):
                     raise PlanningError('Az EVE-belépés megszakadt. Az EVE-kapcsolat oldalon újraindítható.')
                 self.app.eve.finish(query.get('state', [''])[0], query.get('code', [''])[0], self.app.cookie)
                 if self.app.eve.authorized_feature=='intel':self.app.intel.request_locations()
+                if self.app.eve.authorized_feature=='contracts':
+                    try:self.app.start_task('contracts')
+                    except PlanningError:pass
                 if self.app.eve.authorized_feature=='mining':
                     try:self.app.start_task('mining')
                     except PlanningError:pass
@@ -891,7 +904,7 @@ class Handler(BaseHTTPRequestHandler):
                     if char_id not in {c['id'] for c in self.app.store.characters()}:
                         raise PlanningError('A karakter már nincs hozzáadva.')
                 feature=data.get('feature')
-                if feature not in [None,'skills','pi','corporations','moons','intel','mining','markets','implants','all']:raise PlanningError('Ismeretlen engedélyezési cél.')
+                if feature not in [None,'skills','pi','corporations','moons','intel','mining','markets','implants','contracts','all']:raise PlanningError('Ismeretlen engedélyezési cél.')
                 url = self.app.eve.start(self.app.cookie, self.app.origin+'/callback',char_id,feature)
                 return self.send(200,self.app.desktop_auth_start(url) if data.get('desktop') is True else {'url':url})
             elif path == '/api/characters/remove':
@@ -923,8 +936,8 @@ class Handler(BaseHTTPRequestHandler):
                 with self.app.task_lock:
                     started=False if self.app.task['running'] else self.app.start_task('notifications',manual=data.get('manual') is True)
                 return self.send(200,{'ok':True,'started':started,'next_sync_at':self.app.refresh_policy.next_at(self.app.refresh_domains('notifications'))})
-            elif path in ['/api/sync','/api/skills/sync','/api/mining/sync','/api/pi/sync','/api/corporations/sync']:
-                kind={'/api/sync':'sync','/api/skills/sync':'skills','/api/mining/sync':'mining','/api/pi/sync':'pi','/api/corporations/sync':'corporations'}[path]
+            elif path in ['/api/sync','/api/contracts/sync','/api/skills/sync','/api/mining/sync','/api/pi/sync','/api/corporations/sync']:
+                kind={'/api/contracts/sync':'contracts','/api/sync':'sync','/api/skills/sync':'skills','/api/mining/sync':'mining','/api/pi/sync':'pi','/api/corporations/sync':'corporations'}[path]
                 self.app.start_task(kind,manual=data.get('manual') is True)
             elif path == '/api/sde/update':
                 self.app.start_task('sde')

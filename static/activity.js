@@ -7,7 +7,7 @@ globalThis.EveActivity=(()=>{
   const detailText=value=>Array.isArray(value)?value.map(p=>p.raw?p.text:t(p.text,...(p.args||[]))).join(' · '):t(value);
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const labels={
-    '/api/trade':'Marketadatok lekérése','/api/trade/discover':'Helyi market keresése','/api/trade/settings':'Marketbeállítások mentése','/api/trade/plan':'Terv költségbeállításainak mentése','/api/trade/seller':'Eladó díjainak ellenőrzése','/api/trade/seller/refresh':'Eladó skillek és standingek frissítése',
+    '/api/contracts':'Szerződések betöltése','/api/contracts/details':'Szerződés részleteinek betöltése','/api/contracts/sync':'Szerződések frissítése','/api/trade':'Marketadatok lekérése','/api/trade/discover':'Helyi market keresése','/api/trade/settings':'Marketbeállítások mentése','/api/trade/plan':'Terv költségbeállításainak mentése','/api/trade/seller':'Eladó díjainak ellenőrzése','/api/trade/seller/refresh':'Eladó skillek és standingek frissítése',
     '/api/fleet/sides':'Harci oldalak mentése','/api/fleet':'Flottaadatok betöltése…','/api/fleet/refresh':'Killmailek frissítése','/api/assets':'Teljes EVE-készlet betöltése',
     '/api/mining':'Bányászati naplók összesítése','/api/mining/sync':'Bányászati naplók frissítése',
     '/api/intel/characters':'Pilótaazonosítók ellenőrzése…','/api/intel':'Inteladatok betöltése','/api/intel/channels':'Intelcsatornák keresése','/api/intel/locations':'ESI-helyzetek frissítése',
@@ -18,8 +18,8 @@ globalThis.EveActivity=(()=>{
     '/api/corporations':'Corp-adatok összesítése','/api/accounts':'Accountadatok kezelése','/api/plans/shopping':'Összes terv anyaghiányának számítása','/api/documentation':'Kézikönyv betöltése','/api/export':'Fájl előkészítése',
     '/api/auth/start':'EVE-belépés előkészítése','/api/desktop/auth':'EVE-belépés ellenőrzése','/api/shutdown':'Alkalmazás leállítása'
   };
-  const taskLabels={mining:'Bányászati naplók frissítése',sync:'EVE-adatok frissítése',notifications:'EVE-adatok ellenőrzése',skills:'Skilladatok frissítése',pi:'PI-adatok frissítése',corporations:'Corp-adatok frissítése',moons:'Holdrendszerek ellenőrzése',extractions:'Holdadatok frissítése',sde:'Receptadatbázis frissítése'};
-  const starts=new Set(['/api/mining/sync','/api/sync','/api/notifications/sync','/api/skills/sync','/api/pi/sync','/api/corporations/sync','/api/moons/sync','/api/moons/extractions/sync','/api/sde/update','/api/prices/refresh','/api/industry/refresh']);
+  const taskLabels={contracts:'Szerződések frissítése',mining:'Bányászati naplók frissítése',sync:'EVE-adatok frissítése',notifications:'EVE-adatok ellenőrzése',skills:'Skilladatok frissítése',pi:'PI-adatok frissítése',corporations:'Corp-adatok frissítése',moons:'Holdrendszerek ellenőrzése',extractions:'Holdadatok frissítése',sde:'Receptadatbázis frissítése'};
+  const starts=new Set(['/api/contracts/sync','/api/mining/sync','/api/sync','/api/notifications/sync','/api/skills/sync','/api/pi/sync','/api/corporations/sync','/api/moons/sync','/api/moons/extractions/sync','/api/sde/update','/api/prices/refresh','/api/industry/refresh']);
   const base=path=>String(path).split('?')[0];
   function label(path){const key=base(path);if(labels[key])return labels[key];if(starts.has(key))return 'Adatfrissítés indítása';if(/\/(save|settings|preferences|parameters|inventory|reservation|remove)$/.test(key))return 'Módosítások mentése';return 'Adatok lekérése';}
   function elements(){

@@ -20,6 +20,14 @@ def b64(value):return base64.urlsafe_b64encode(value).decode().rstrip('=')
 
 
 class ConnectionTests(unittest.TestCase):
+    def test_contract_consent_requests_both_scopes_and_preserves_existing_grants(self):
+        from muhely.esi import CONTRACT_SCOPES,MARKET_SCOPES,ALL_SCOPES
+        self.vault.set(123,{'scopes':MARKET_SCOPES})
+        url=self.eve.start('browser','http://127.0.0.1:8765/callback',123,feature='contracts')
+        scopes=urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)['scope'][0].split()
+        self.assertTrue(set(CONTRACT_SCOPES+MARKET_SCOPES)<=set(scopes))
+        self.assertTrue(set(CONTRACT_SCOPES)<=set(ALL_SCOPES));self.assertEqual(len(scopes),len(set(scopes)))
+
     def test_implant_consent_preserves_other_grants_and_requests_active_clone_and_location(self):
         from muhely.esi import IMPLANT_SCOPES,MARKET_SCOPES
         self.vault.set(123,{'scopes':MARKET_SCOPES})
