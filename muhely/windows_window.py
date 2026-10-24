@@ -64,7 +64,7 @@ class WindowHost:
         self.main=None;self.children={};self.lock=threading.RLock()
         self.quitting=False;self.stopped=False;self.ready=False
         self.theme='dark';self.language='hu';self.tray=None;self.notification_granted=False
-        self.self_test_callback=None
+        self.self_test_callback=None;self.overlay=None
         try:
             prefs=json.loads((self.folder/'windows-shell.json').read_text())
             self.language='en' if prefs.get('language')=='en' else 'hu'
@@ -115,7 +115,18 @@ class WindowHost:
                 ctypes.windll.dwmapi.DwmSetWindowAttribute(ctypes.c_void_p(form.Handle.ToInt64()),20,ctypes.byref(dark),ctypes.sizeof(dark))
             except OSError:pass
         self._ui(window,frame)
+        if self.overlay is not None:self._ui(self.main,lambda:self.overlay.preferences(self.theme,self.language))
         return True
+
+    def _overlay_action(self,action,body):
+        def apply():
+            if self.overlay is None:
+                from .windows_overlay import NativeOverlay
+                self.overlay=NativeOverlay(self.folder,self.theme,self.language)
+            if action=='intelOverlayStatus':return self.overlay.settings()
+            if action=='configureIntelOverlay':return self.overlay.configure(body.get('options'))
+            return self.overlay.sync(body.get('data'))
+        return self._ui(self.main,apply)
 
     def _notification(self,body):
         title=body.get('title');message=body.get('body')
@@ -186,7 +197,7 @@ class WindowHost:
         if action=='requestNotifications':
             self.notification_granted=True;self._save_preferences();return {'status':'authorized'}
         if action=='notify':return self._notification(body)
-        if action=='intelOverlayStatus':return {'available':False}
+        if action in {'intelOverlayStatus','configureIntelOverlay','syncIntelOverlay'}:return self._overlay_action(action,body)
         if action=='quitCheck':
             if not self.quitting:raise ValueError('No close request is pending')
             message=('Unsaved changes or EVE requests are still in progress. Close EVE Workshop?' if self.language=='en' else 'Még nem mentett módosítás vagy folyamatban lévő lekérés van. Bezárod az EVE Műhelyt?')
@@ -196,6 +207,7 @@ class WindowHost:
         if action=='quitFailed':self.quitting=False;return True
         if action=='stopped':
             self.stopped=True
+            if self.overlay is not None:self._ui(self.main,self.overlay.dispose)
             for child in list(self.children.values()):child.destroy()
             if self.tray is not None:self._ui(self.main,self.tray.Dispose)
             self.main.destroy();return True

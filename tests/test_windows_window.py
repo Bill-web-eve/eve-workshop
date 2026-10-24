@@ -21,7 +21,7 @@ class WindowsWindowTests(unittest.TestCase):
                 with self.assertRaises(ValueError):self.host.dispatch(self.window,url,{'action':'activate'})
 
     def test_child_window_cannot_save_files_send_notifications_or_quit_app(self):
-        for action in ['save','chooseIntelFolder','notify','requestNotifications','stopped','quitCheck']:
+        for action in ['save','chooseIntelFolder','notify','requestNotifications','stopped','quitCheck','intelOverlayStatus','configureIntelOverlay','syncIntelOverlay']:
             with self.subTest(action=action),self.assertRaises(ValueError):self.host.dispatch(Mock(),self.host.origin,{'action':action})
 
     def test_external_links_exclude_file_scripts_credentials_and_control_characters(self):
@@ -81,5 +81,19 @@ class WindowsWindowTests(unittest.TestCase):
     def test_unknown_native_actions_and_non_dict_messages_are_rejected(self):
         for body in [{},[],{'action':'execute'},{'action':'selfTestResult'}]:
             with self.subTest(body=body),self.assertRaises(ValueError):self.host.dispatch(self.window,self.host.origin,body)
+
+    def test_overlay_is_lazy_and_all_native_calls_use_main_ui_thread(self):
+        with patch('muhely.windows_overlay.NativeOverlay') as factory,patch.object(self.host,'_ui',side_effect=lambda window,fn:fn()) as ui:
+            self.assertIsNone(self.host.overlay)
+            self.host.dispatch(self.window,self.host.origin,{'action':'intelOverlayStatus'})
+            factory.assert_called_once_with(self.host.folder,'dark','hu')
+            factory.return_value.settings.assert_called_once()
+            self.host.dispatch(self.window,self.host.origin,{'action':'configureIntelOverlay','options':{'editing':True}})
+            factory.return_value.configure.assert_called_once_with({'editing':True})
+            self.host.dispatch(self.window,self.host.origin,{'action':'syncIntelOverlay','data':{'enabled':False,'seconds':60,'items':[]}})
+            factory.return_value.sync.assert_called_once_with({'enabled':False,'seconds':60,'items':[]})
+            self.host.dispatch(self.window,self.host.origin,{'action':'stopped'})
+            factory.return_value.dispose.assert_called_once()
+            self.assertTrue(all(c.args[0] is self.window for c in ui.call_args_list))
 
 if __name__=='__main__':unittest.main()

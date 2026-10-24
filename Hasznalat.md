@@ -16,7 +16,7 @@ A nézet a már letöltött adatokat használja; az EVE-frissítés tölti le az
 
 Bontsd ki a teljes Windows ZIP-et, és indítsd az **EVE_Muhely.exe** fájlt. A felület saját ablakban nyílik meg. Az EVE engedélykérése a rendszerböngészőt használja; jóváhagyás után térj vissza a Műhelybe. A sötét/világos téma és a nyelv a **Settings → Appearance and language** oldalon állítható. A vágólap, a mentési párbeszédablak, a nyomtatás és a külön intel-térkép/chatablak támogatott.
 
-Microsoft Edge WebView2 Runtime és .NET Framework szükséges; ezek Windows 11-en rendszerint már megvannak. WebView2 hiányakor az indító a Microsoft hivatalos oldalát jelzi. Az app nem telepít rendszerkomponenseket automatikusan. A Windows rendszerértesítései külön engedélyezhetők; megjelenésüket a Windows értesítési és Ne zavarjanak beállításai is befolyásolják. Az átlátszó inteloverlay ebben a Windows-változatban még nem támogatott.
+Microsoft Edge WebView2 Runtime és .NET Framework szükséges; ezek Windows 11-en rendszerint már megvannak. WebView2 hiányakor az indító a Microsoft hivatalos oldalát jelzi. Az app nem telepít rendszerkomponenseket automatikusan. A Windows rendszerértesítései külön engedélyezhetők; megjelenésüket a Windows értesítési és Ne zavarjanak beállításai is befolyásolják. Az átlátszó inteloverlay a Beállítások → Intelbeállítások alatt kapcsolható és helyezhető el.
 
 Leállításkor az app figyelmeztet a nem mentett módosításokra és a futó lekérésekre. A helyi profil továbbra is a **%LOCALAPPDATA%\EVE Muhely** mappában van. A teljes ZIP cseréje előtt állítsd le a régi appot; a személyes adatok megmaradnak. Az **Ellenorzes_ablak.cmd** elkülönített, üres profilon vizsgálja a natív ablakot, az exportot és az intelablakokat. Opcionális böngészős tartalékindítás: az indító `--browser` kapcsolóval.
 
@@ -559,13 +559,13 @@ Egy térkép- és egy chatablak lehet nyitva; az ismételt megnyitás a meglév�
 
 ## Átlátszó inteljelző
 
-Beállítások → Intelbeállítások → **Átlátszó inteljelző**: külön, keret nélküli Mac-ablak. A beállított riasztási jumptávolságon belüli, friss és egyértelmű jelentéseket mutatja, megbízható karakterhelyzet alapján. Nem igényel macOS-értesítési engedélyt, és nem ad külön értesítési hangot. Clear vagy a pilóta új helyszíne megszünteti a korábbi aktív jelentést.
+Beállítások → Intelbeállítások → **Átlátszó inteljelző**: külön, keret nélküli Mac- vagy Windows-ablak. A beállított riasztási jumptávolságon belüli, friss és egyértelmű jelentéseket mutatja, megbízható karakterhelyzet alapján. Nem igényel OS-értesítési engedélyt, és nem ad külön értesítési hangot. Clear vagy a pilóta új helyszíne megszünteti a korábbi aktív jelentést.
 
 Alapértelmezett megjelenítés: **60 másodperc**, 1–3600 között egész másodpercre állítható. Az üzenet időpontjától számolunk: a frissítés vagy újranyitás nem indítja újra a visszaszámlálást. Az előzmények a chatben megmaradnak. Egyszerre legfeljebb öt friss jelentés látszik: rendszer, jump, jelentett pilóták, ismert hajók és a saját referenciakarakter.
 
-Üresen teljesen eltűnik. Normál módban nincs címsora, nem veszi el a billentyűzet fókuszát, és a kattintásokat átengedi az alatta lévő alkalmazásnak. A normál és teljes képernyős alkalmazások fölött lebeg; a macOS rendszer- és biztonsági felületei elsőbbséget élvezhetnek.
+Üresen teljesen eltűnik. Normál módban nincs címsora, nem veszi el a billentyűzet fókuszát, és a kattintásokat átengedi az alatta lévő alkalmazásnak. A normál és teljes képernyős alkalmazások fölött lebeg; a macOS rendszer- és biztonsági felületei elsőbbséget élvezhetnek. Windowson a normál és a keret nélküli teljes képernyős ablakok felett jelenik meg. Exkluzív teljes képernyős játék és a Windows biztonsági képernyői eltakarhatják; EVE-hez a keret nélküli ablakos módot használd.
 
-Válaszd ki a monitort, az X/Y pozíciót és a szélességet, majd mentsd. Az X/Y az adott monitor bal felső sarkától mért képernyőpont. Monitoronként megmarad a hely. Az **Inteljelző mozgatása** gomb egy húzható mintát mutat akkor is, ha nincs jelentés. Húzd a kívánt monitorra, majd kattints a mintán a **Kész** gombra. Az **Elhelyezés kész · pozíció beolvasása** lezárja a mozgatást és visszaolvassa a beállítási mezőkbe a helyet. Ha a mentett monitor nincs csatlakoztatva, elérhető monitorra helyezi az ablakot, annak határain belül. A pozíció ezen a Macen tárolódik. Az app bezárásával az inteljelző is leáll.
+Válaszd ki a monitort, az X/Y pozíciót és a szélességet, majd mentsd. Az X/Y az adott monitor bal felső sarkától mért képernyőpont. Monitoronként megmarad a hely. Az **Inteljelző mozgatása** gomb egy húzható mintát mutat akkor is, ha nincs jelentés. Húzd a kívánt monitorra, majd kattints a mintán a **Kész** gombra. Az **Elhelyezés kész · pozíció beolvasása** lezárja a mozgatást és visszaolvassa a beállítási mezőkbe a helyet. Ha a mentett monitor nincs csatlakoztatva, elérhető monitorra helyezi az ablakot, annak határain belül. A pozíció ezen a gépen tárolódik. Az app bezárásával az inteljelző is leáll.
 
 ## Corporationfigyelés és frissítési időköz
 

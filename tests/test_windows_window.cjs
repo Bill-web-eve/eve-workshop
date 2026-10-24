@@ -12,7 +12,15 @@ test('Windows WebView2 bridge supports clipboard and native file export without 
  await w.navigator.clipboard.writeText('Ferrofluid');assert.equal(messages.find(m=>m.payload.action==='clipboard').payload.text,'Ferrofluid');
  await w.EveDesktop.saveBlob(new w.Blob(['\ufeffFerrofluid;25\r\n']),'materials.csv');
  const saved=messages.find(m=>m.payload.action==='save').payload;assert.equal(saved.filename,'materials.csv');assert.equal(Buffer.from(saved.base64,'base64').toString(),'\ufeffFerrofluid;25\r\n');
- assert.equal(w.EveDesktop.overlayAvailable,false);
+ assert.equal(w.EveDesktop.overlayAvailable,true);
+});
+test('Windows overlay settings and reports use the checked native message bridge',async t=>{
+ const {w,messages}=fixture();t.after(()=>w.close());
+ await w.EveDesktop.intelOverlayStatus();await w.EveDesktop.configureIntelOverlay({editing:true,screen_id:'monitor',x:20,y:50,width:330});
+ await w.EveDesktop.syncIntelOverlay({enabled:false,seconds:60,items:[]});
+ assert(messages.some(m=>m.payload.action==='intelOverlayStatus'));
+ assert.equal(messages.find(m=>m.payload.action==='configureIntelOverlay').payload.options.screen_id,'monitor');
+ assert.equal(messages.find(m=>m.payload.action==='syncIntelOverlay').payload.data.enabled,false);
 });
 test('a normal Edge browser never acquires the desktop bridge',t=>{
  const {w,messages}=fixture(false);t.after(()=>w.close());assert.equal(w.EveDesktop.active,false);assert.equal(w.navigator.clipboard,undefined);assert.equal(messages.length,0);

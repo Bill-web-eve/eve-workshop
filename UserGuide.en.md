@@ -16,7 +16,7 @@ The view uses downloaded snapshots. Refresh EVE data fetches new assets; Reload 
 
 Extract the entire Windows ZIP and start **EVE_Muhely.exe**. Workshop opens in its own window. EVE authorization uses the system browser; return to Workshop after approval. Choose theme and language under **Settings → Appearance and language**. Clipboard, native file saving, printing and separate intel map/chat windows are supported.
 
-Microsoft Edge WebView2 Runtime and .NET Framework are required and are normally present on Windows 11. If WebView2 is missing, startup displays Microsoft's official download page. No system components are installed automatically. Windows system notifications are opt-in and are also affected by Windows notification and Do not disturb settings. The transparent intel overlay is not supported in this Windows version yet.
+Microsoft Edge WebView2 Runtime and .NET Framework are required and are normally present on Windows 11. If WebView2 is missing, startup displays Microsoft's official download page. No system components are installed automatically. Windows system notifications are opt-in and are also affected by Windows notification and Do not disturb settings. Enable and position the transparent intel overlay under Settings → Intel settings.
 
 Closing checks unsaved edits and running requests. Profiles remain in **%LOCALAPPDATA%\EVE Muhely**. Stop the old app before replacing the package; existing personal data is preserved. **Ellenorzes_ablak.cmd** checks the actual native window, exports and intel windows using an isolated empty profile. An optional browser fallback is available with the launcher's `--browser` argument.
 
@@ -561,13 +561,13 @@ One map and one chat window can be open. Opening one again focuses the existing 
 
 ## Intel overlay
 
-Settings → Intel settings → **Intel overlay** enables a separate borderless Mac panel. It uses the configured alert jump distance and only reliable positions and unambiguous fresh reports. It does not require OS notification permission and does not send extra notification sounds. A clear report or a pilot moving elsewhere removes the corresponding active report.
+Settings → Intel settings → **Intel overlay** enables a separate borderless Mac or Windows panel. It uses the configured alert jump distance and only reliable positions and unambiguous fresh reports. It does not require OS notification permission and does not send extra notification sounds. A clear report or a pilot moving elsewhere removes the corresponding active report.
 
 The default display duration is **60 seconds**, editable as whole seconds from 1 to 3600. Age is measured from the message timestamp, so polling or reopening the app does not restart the countdown. Older reports remain in chat. Up to five recent reports are visible at once, with system, jump distance, reported pilots, known ships and your reference character.
 
-When empty the panel is hidden completely. In normal use it has no title bar, does not take keyboard focus and allows mouse clicks through to the underlying app. It floats above ordinary and full-screen applications; macOS system/security interfaces can take precedence.
+When empty the panel is hidden completely. In normal use it has no title bar, does not take keyboard focus and allows mouse clicks through to the underlying app. It floats above ordinary and full-screen applications; macOS system/security interfaces can take precedence. On Windows it appears above normal and borderless full-screen windows. Exclusive full-screen games and Windows security screens can cover it; use borderless windowed mode in EVE.
 
-Select a **Monitor**, **X**, **Y** and **Width**, then **Save overlay**. Coordinates are measured from that monitor’s top-left corner in screen points. Each monitor remembers its own placement. **Move overlay** displays a draggable placeholder, even without reports. Drag it onto the desired monitor and click its **Done** button. **Finish positioning · reload position** locks the panel and reads its current position back into Settings. When a saved monitor is unavailable, the panel uses an available monitor and stays within its bounds. Placement is saved locally on that Mac. Closing the app stops the overlay.
+Select a **Monitor**, **X**, **Y** and **Width**, then **Save overlay**. Coordinates are measured from that monitor’s top-left corner in screen points. Each monitor remembers its own placement. **Move overlay** displays a draggable placeholder, even without reports. Drag it onto the desired monitor and click its **Done** button. **Finish positioning · reload position** locks the panel and reads its current position back into Settings. When a saved monitor is unavailable, the panel uses an available monitor and stays within its bounds. Placement is saved locally on that computer. Closing the app stops the overlay.
 
 ## Corporation monitoring and refresh interval
 

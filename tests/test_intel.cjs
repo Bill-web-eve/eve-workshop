@@ -106,8 +106,8 @@ test('intel overlay receives fresh report details independently of OS notificati
  const original=w.fetch;w.fetch=async(url,options)=>url==='/api/notifications/preferences'?(intel.notifications_enabled=JSON.parse(opts.body).categories.intel,Object.assign(notifications.preferences.categories,JSON.parse(opts.body).categories),notifications.preferences):url==='/api/intel/alerts'?{ok:true,json:async()=>({enabled:true,overlay:{enabled:true,seconds:75},items:intel.alerts})}:original(url,options);
  await run('pollIntelAlerts()');assert.equal(sent.length,1);assert.equal(sent[0].seconds,75);assert.equal(sent[0].items[0].system,'J5A-IX');assert.equal(sent[0].items[0].pilots,'Reported Pilot');assert.equal(sent[0].items[0].ships,'Buzzard');assert(!calls.includes('/api/intel/claim'));
 });
-test('overlay settings expose monitor selection, exact seconds and explicit move/lock controls',async t=>{
- const {w,d,run}=await fixture();t.after(()=>w.close());w.EveDesktop.active=true;
+for(const platform of ['mac','windows'])test(platform+' overlay settings expose monitor selection, exact seconds and explicit move/lock controls',async t=>{
+ const {w,d,run}=await fixture();t.after(()=>w.close());w.EveDesktop.active=true;w.EveDesktop.platform=platform;
  w.EveDesktop.intelOverlayStatus=async()=>({screens:[{id:'1',name:'Test monitor',width:1920,height:1080,placement:{x:20,y:40,width:330}}],screen_id:'1',placement:{x:20,y:40,width:330},editing:false});
  run('openSettingsTab("intel")');await tick();await tick();const form=d.querySelector('#intel-overlay-form');assert(form);assert.equal(form.elements.overlay_seconds.value,'60');assert.equal(form.elements.screen_id.value,'1');assert(d.querySelector('#intel-overlay-move'));assert(d.querySelector('#intel-overlay-lock'));assert(!/[áéíóöőúüű]/i.test(d.querySelector('#intel-overlay-settings').textContent));
 });
@@ -126,9 +126,9 @@ test('intel notification toggle changes only intel and keeps the map and chat en
  assert.equal(notifications.preferences.categories.intel,true);
 });
 
-test('intel notification switch clears a visible overlay and blocks stale enabled payloads',async t=>{
+for(const platform of ['mac','windows'])test(platform+' intel notification switch clears a visible overlay and blocks stale enabled payloads',async t=>{
  const {w,d,run,intel}=await fixture();t.after(()=>w.close());const sent=[];
- w.EveDesktop.active=true;w.EveDesktop.platform='mac';w.EveDesktop.syncIntelOverlay=async data=>sent.push(data);
+ w.EveDesktop.active=true;w.EveDesktop.platform=platform;w.EveDesktop.syncIntelOverlay=async data=>sent.push(data);
  intel.alerts=[{system_id:300001,system_name:'J5A-IX',character_name:'Own Pilot',jumps:2,overlay_reports:[{id:'visible',when:1800000000,pilots:['Reported Pilot'],ships:['Buzzard']}]}];
  w.overlayPayload={enabled:true,notifications_enabled:true,overlay:{enabled:true,seconds:75},items:intel.alerts};
  await run('syncIntelOverlay(overlayPayload)');assert.equal(sent.at(-1).enabled,true);assert.equal(sent.at(-1).items.length,1);

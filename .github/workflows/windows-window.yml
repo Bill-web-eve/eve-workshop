@@ -4,9 +4,11 @@ on:
     branches: [main]
     paths:
       - muhely/windows_window.py
+      - muhely/windows_overlay.py
       - windows_desktop.py
       - windows_window_smoke.py
       - static/desktop.js
+      - static/intel.js
       - tools/windows-runtime-lock.json
       - tools/windows_ci_smoke.py
       - tools/build_windows_release.py
