@@ -18,6 +18,8 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Struktúrabónuszok és tervenként választott karakter skilljeivel számolt gyártási idő.
 - Skill- és tanulási sor figyelése, PI-áttekintés időalapú termelési becsléssel, sötét mód, rendezhető és szűrhető táblázatok.
 - Jita buy/sell/split alapanyagárak, termékeladási érték, ESI-rendszerindex és beállítható ipari díjak.
+- Választható helyi station/struktúra market buy/sell/split árakkal, külön ESI-olvasóval; a privát piac gyorsítótára elkülönül Jitától és más olvasóktól.
+- Kompakt tervenkénti bekerülés/bevétel/profit, független anyag- és eladási árforrással, Accounting/standing alapú NPC-díjakkal, megadható struktúra broker fee-vel és egyéb költségekkel.
 - Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
 
 ## Az 1.3.0 kiadás újdonságai

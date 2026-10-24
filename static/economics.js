@@ -50,6 +50,7 @@ function applyEconomics(){
     el.querySelectorAll('[data-economic-value]').forEach(cell=>{const amount=values[cell.dataset.economicValue];const unit=cell.dataset.economicValue==='sell_unit';cell.textContent=unit?EveCosts.formatUnit(amount):EveCosts.format(amount);cell.dataset.sortValue=amount==null?'':String(Number(amount)/(unit?10000:100));cell.classList.toggle('danger',amount!=null&&amount<0n);});
     el.querySelector('[data-economic-warning]').textContent=warnings.join(' ');
   });
+  if(typeof applyProductionFinance==='function')applyProductionFinance();
   if(industryData)$$('[data-industry-status]').forEach(el=>el.textContent=industryData.running?'Ipari költségadatok betöltése…':Object.keys(industryData.errors||{}).length?'Az ipari költségadatok nem frissültek; korábbi adatokkal számolhatunk.':industryData.resources.systems.checked?'Ipari adatok ellenőrizve: '+date(Math.min(industryData.resources.systems.checked,industryData.resources.prices.checked||Infinity)):'Az ipari költségadatok még nem érkeztek meg.');
 }
 async function refreshJobCosts(){

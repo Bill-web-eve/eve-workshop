@@ -301,21 +301,25 @@ A kiadásban nincs karakter, mentett terv, saját készlet vagy belépés. Csak 
 Az **Ellenorzes.cmd** külön ideiglenes tesztprofillal ellenőrzi a Windows-titkosítást, a helyi API-t, a tervmentést és az EVE HTTPS-kapcsolatot. Saját karaktert nem ad hozzá és saját tervet nem módosít. Az összeállítás ezen a Macen történt; natív Windows 11 futtatási próba itt nem volt elérhető. A Windows-csomag nincs kiadói tanúsítvánnyal aláírva. A vírusvédelmet és a SmartScreent nem kell kikapcsolni.
 
 
-## Jita-árak és anyagköltség
+## Marketek, gyártási költség és értékesítés
 
-A holdtermelés, a gyártási terv és az alapanyaghiány oldalán az **Árazás** mezőben választható a Jita sell, buy vagy split érték. A split a vételi és eladási ár átlaga. A választás minden költségnézetre érvényes és megmarad a böngészőben.
+Az árazásnál **Jita buy/sell/split** és **Helyi buy/sell/split** választható. A split a legjobb vételi és eladási ár átlaga. Jita alatt kizárólag Jita 4-4 értendő; a helyi ár a kiválasztott konkrét állomásról vagy struktúrából származik. Hiányzó helyi árat nem helyettesítünk Jitával. A piaci mennyiségi mélységet nem becsüljük.
 
-A gyártási anyagköltség a felhasználásra kerülő meglévő anyagok értékét is tartalmazza. A hiánylista összege csak a beszerzendő mennyiségeket mutatja. Az ár nélküli tételek kimaradnak a részösszegből, és külön figyelmeztetést kapsz. A BPC-runokhoz nem használunk BPO-árat. A gyártási díjakat, a system indexet és a facility tax értékét a külön job cost számítás tartalmazza.
+A **Beállítások → Marketek és értékesítés** alatt gépelj rendszernevet, válassz találatot, állíts be olvasó karaktert, majd keress marketnévre vagy adj meg Structure ID-t. Válaszd ki a megfelelő állomást és mentsd el. Saját helyi példánk: **C-N4OD – C-N4OD - Fountain of Life**. Privát struktúrához dokkolási hozzáférés és ESI market/search/structure engedély szükséges; ezt a **Market-hozzáférés engedélyezése** gombbal kérheted. A felsorolt új scope-okat az EVE Developer alkalmazásban is engedélyezni kell. A korábbi jogosultságok megmaradnak.
 
-Az árak Jita 4-4 nyilvános piaci ajánlataiból származnak, háttérben töltődnek be. A frissítés gomb az EVE ötperces gyorsítótárát betartja. A régi árak dátuma és az árazatlan tételek száma látható. A Production by moon és Ore volume and processing táblák holdszűrőiben a felsorolt holdakból választhatsz.
+A **Gyártási költség és várható bevétel** kompakt panel a hátralévő munkák előtt jelenik meg. Az anyagok/blueprintek árazása és az eladási árforrás külön állítható. Válassz eladó karaktert, majd frissítsd az adatait. Ezek a beállítások mentett tervenként megmaradnak; egy új terv mentése átviszi a piszkozat költségbeállításait is.
 
-A **Holdak és kitermelés → Fogyasztás** oldalon a **Fuel Block típusa** legördülőben válassz a négy blokk közül. A választás minden holdfúró költségére érvényes. A **Kézi Fuel Block egységár (ISK)** mezővel felülírhatod a blokk piaci árát; üresen visszaáll a kiválasztott Jita-árazás. Az **Üzemanyagár alkalmazása** menti a beállításokat. A Magmatic Gas továbbra is a Jita buy/sell/split választással számít. A 30 napos összeg holdanként, struktúratípusonként és összesen is látható, és a megadott bekapcsolásokat is tartalmazza.
+A bekerülésben szerepel a hátralévő gyártáshoz felhasznált készlet és köztes WIP piaci értéke, a beszerzendő alapanyag, a hiányzó blueprint, a job cost és a kézzel megadott szállítás/egyéb költség. A tervben gyártott köztes termék alapanyagait egyszer számoljuk. A **További költségek és részletek** alatt találod a kézi költségeket és az anyag/job részletezést. Hiányzó BPC-runhoz nem használunk BPO-piaci árat: add meg a tényleges beszerzési vagy másolási költséget. Ismeretlen költségnél a teljes összeg és profit ismeretlen marad.
 
-## Job cost és késztermék-eladási érték
+A bevétel a hátralévő jobok **új céltermékkimenetével** számol, a runkerekítés többletével együtt. A már meglévő kész célterméket és az elindított céltermékjobokat nem értékesíti újra a profitban. Látható az egységár, bruttó eladási érték, eladási adó, broker fee, nettó bevétel, teljes gyártási bekerülés és nettó profit. Az alapanyaghiány oldalon csak a még beszerzendő mennyiségek értéke számít; az egyesített lista a készletet egyszer használja fel.
 
-A **Struktúrák és bónuszok** alatt válassz gyártási rendszert a kereső találatai közül, külön a manufacturing és a reakció mezőben. Az indexet az ESI tölti be. Add meg a **Facility tax** értékét; a struktúra job cost kedvezménye, SCC és az esetleges Alpha-pótdíj is ugyanitt állítható. A **Bónuszok mentése** után a terv anyagköltségénél látható a job cost, a teljes hátralévő gyártási költség és a részletes díjbontás. Az indexek és a díjalaphoz használt adjusted price háttérben frissül, a CCP gyorsítótárát betartva.
+Eladási adó = 7,5% × (1 − 0,11 × aktív Accounting-szint). Az NPC broker fee a Broker Relations skillt és az állomástulajdonos corporation/faction felé érvényes, módosítatlan standingeket használja. Struktúránál ez az NPC-kedvezmény nem érvényes: add meg az EVE-ben rád érvényes **teljes broker fee-t SCC-vel együtt**. Ezt az ESI nem közli. Azonnali eladásnál nincs új megbízási broker fee; eladási megbízásnál van, legalább 100 ISK. Alapból buy árhoz azonnali eladás, sell/split árhoz megbízás tartozik; az eladási mód külön felülírható.
 
-A terv késztermékének **Jita buy** és **Jita sell** eladási értéke egyszerre látható, a teljes célmennyiségre, bruttó összegként. A megadott termékre hiányzó Jita-ajánlat `–` értéket ad. A már meglévő késztermékek miatt a hátralévő gyártás költsége és a célmennyiség teljes eladási értéke eltérő mennyiségi alapot is jelenthet.
+A market- és standingadatok gyorsítótárazva tárolódnak. Automatikusan legalább 15 perc telik el új lekérések között; a kézi frissítés is betartja az ESI gyorsítótárát. A korábbi és hiányzó adatokat jelöljük. A split tájékoztató középár. Újraárazást, későbbi árváltozást és be nem írt költséget nem becsülünk.
+
+## Job cost és gyártási hely
+
+A **Beállítások → Struktúrák és bónuszok** alatt külön rendszer választható manufacturing és reakció számára. Az ESI rendszerindexe és adjusted price adatai adják a díjalapot; a facility tax, a struktúra kedvezménye, SCC és Alpha-pótdíj itt állítható. A kompakt összesítő a job costot a többi bekerülési költséghez adja. Hiányzó index vagy adjusted price esetén a teljes költség és profit ismeretlen.
 
 ## A holdtermelés profitja
 

@@ -7,6 +7,7 @@ globalThis.EveActivity=(()=>{
   const detailText=value=>Array.isArray(value)?value.map(p=>p.raw?p.text:t(p.text,...(p.args||[]))).join(' · '):t(value);
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const labels={
+    '/api/trade':'Marketadatok lekérése','/api/trade/discover':'Helyi market keresése','/api/trade/settings':'Marketbeállítások mentése','/api/trade/plan':'Terv költségbeállításainak mentése','/api/trade/seller':'Eladó díjainak ellenőrzése','/api/trade/seller/refresh':'Eladó skillek és standingek frissítése',
     '/api/fleet/sides':'Harci oldalak mentése','/api/fleet':'Flottaadatok betöltése…','/api/fleet/refresh':'Killmailek frissítése','/api/assets':'Teljes EVE-készlet betöltése',
     '/api/mining':'Bányászati naplók összesítése','/api/mining/sync':'Bányászati naplók frissítése',
     '/api/intel/characters':'Pilótaazonosítók ellenőrzése…','/api/intel':'Inteladatok betöltése','/api/intel/channels':'Intelcsatornák keresése','/api/intel/locations':'ESI-helyzetek frissítése',
@@ -78,19 +79,22 @@ globalThis.EveActivity=(()=>{
     if(base(path)==='/api/fleet')fleet(data.status,data.location_status);
     if(data.task)task(data.task);
     if(data.intel)intel(data.intel);
+    if(base(path).startsWith('/api/trade')&&data.status)trade(data.status);
     const key=base(path);
     if(key.startsWith('/api/prices'))market(data);
     if(key==='/api/industry'||key==='/api/industry/refresh')industry(data);
     if(starts.has(key)&&!key.startsWith('/api/prices')&&!key.startsWith('/api/industry')){if(![...active.keys()].some(k=>k.startsWith('task:')))start('pending:task','Adatfrissítés','A folyamat állapotának lekérése');pollSoon(0);}
   }
   function market(data){
+    const key=data.source_key&&data.source_key!=='jita'?'market-local':'market';
     const detail=[part('Árak ellenőrizve: {0} / {1}',data.done||0,data.total||0)];
     if(data.current_name)detail.push({text:data.current_name,raw:true});
     if(data.page)detail.push(data.pages?part('{0} / {1} oldal',data.page,data.pages):part('{0}. oldal',data.page));
     const errors=typeof data.errors==='number'?data.errors:Object.keys(data.errors||{}).length;
-    background('market','Jita-árak frissítése',data.running,errors&&!data.running?[part('{0} ár nem frissült; a korábbi adatok megmaradtak.',errors)]:detail,data.total?{done:data.done||0,total:data.total}:null,errors?'warning':'success');
+    background(key,key==='market'?'Jita-árak frissítése':'Piaci árak frissítése',data.running,errors&&!data.running?[part('{0} ár nem frissült; a korábbi adatok megmaradtak.',errors)]:detail,data.total?{done:data.done||0,total:data.total}:null,errors?'warning':'success');
     if(data.running)pollSoon();
   }
+  function trade(data){background('trade','Marketadatok lekérése',!!data.running,[part(data.phase||'Marketadatok lekérése'),...(data.error?[part(data.error)]:[])],{done:data.done||0,total:data.total||1},data.error?'warning':'success');if(data.running)pollSoon();}
   function industry(data){
     const names={systems:'Rendszerindexek',prices:'ESI alapárak'};
     const detail=data.running?[part(names[data.current]||'Ipari költségadatok'),part('Ellenőrizve: {0} / {1}',data.done||0,2)]:Object.keys(data.errors||{}).length?'Néhány ipari költségadat nem frissült.':'Az ipari költségadatok ellenőrizve.';
@@ -110,14 +114,14 @@ globalThis.EveActivity=(()=>{
     background('fleet-location','ESI-helyzetek frissítése',!!location.running,location.character?[{text:location.character,raw:true}]:[part('Helyzetadatok ellenőrzése')]);
     if(data.running||location.running)pollSoon();
   }
-  function monitoring(){return [...active.keys()].some(key=>key==='fleet'||key==='fleet-location'||key==='intel-names'||key==='intel'||key==='market'||key==='industry'||key==='pending:task'||key.startsWith('task:'));}
+  function monitoring(){return [...active.keys()].some(key=>key==='fleet'||key==='fleet-location'||key==='intel-names'||key==='intel'||key==='market'||key==='market-local'||key==='trade'||key==='industry'||key==='pending:task'||key.startsWith('task:'));}
   function pollSoon(delay=700){if(!pollTimer&&!polling)pollTimer=setTimeout(()=>{pollTimer=null;void poll();},delay);}
   async function poll(){
     if(polling)return;polling=true;
     try{
       const response=await fetch('/api/activity');if(!response.ok)throw Error('status');const data=await response.json();monitorFailures=0;
       if(data.task?.kind)task(data.task);else if(active.has('pending:task'))finish('pending:task','success','Nincs folyamatban adatfrissítés.');
-      fleet(data.fleet?.task,data.fleet?.location);market(data.market||{});industry(data.industry||{});intel(data.intel||{});finish('monitor','success','Az állapotjelzés helyreállt.');
+      fleet(data.fleet?.task,data.fleet?.location);market(data.market||{});if(data.local_market?.source_key)market(data.local_market);trade(data.trade||{});industry(data.industry||{});intel(data.intel||{});finish('monitor','success','Az állapotjelzés helyreállt.');
     }catch{
       monitorFailures++;
       const row=start('monitor','Az állapot most nem ellenőrizhető.','Újrapróbáljuk az állapot lekérését; a folyamat befejezése még nem igazolt.');row.state='warning';render();

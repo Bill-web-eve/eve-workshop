@@ -3,8 +3,8 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const manual=require('../static/documentation.js');
 test('bundled guides expose complete searchable chapters in both languages',()=>{
   for(const [lang,name,topics] of [
-    ['hu','Hasznalat.md',['Gyártásütemező','Bányászkristályok','Accountok, Omega és MCT','Kitermelési naptár','Jita-árak','Gyakori helyzetek']],
-    ['en','UserGuide.en.md',['Production scheduler','Mining crystals','Accounts, Omega and MCT','Extraction calendar','Jita prices','Troubleshooting']]
+    ['hu','Hasznalat.md',['Gyártásütemező','Bányászkristályok','Accountok, Omega és MCT','Kitermelési naptár','Marketek, gyártási költség','Gyakori helyzetek']],
+    ['en','UserGuide.en.md',['Production scheduler','Mining crystals','Accounts, Omega and MCT','Extraction calendar','Markets, production cost','Troubleshooting']]
   ]){
     const parsed=manual.parse(fs.readFileSync(path.join(__dirname,'..',name),'utf8'));
     assert(parsed.sections.length>=25);assert.equal(new Set(parsed.sections.map(s=>s.id)).size,parsed.sections.length);

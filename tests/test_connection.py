@@ -20,6 +20,13 @@ def b64(value):return base64.urlsafe_b64encode(value).decode().rstrip('=')
 
 
 class ConnectionTests(unittest.TestCase):
+    def test_market_consent_requests_market_and_standing_reads_and_active_skills(self):
+        from muhely.esi import MARKET_SCOPES
+        url=self.eve.start('browser','http://127.0.0.1:8765/callback',feature='markets')
+        query=urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+        scopes=set(query['scope'][0].split())
+        self.assertTrue(set(MARKET_SCOPES+SKILL_SCOPES).issubset(scopes))
+
     @classmethod
     def setUpClass(cls):
         cls.private = rsa.generate_private_key(public_exponent=65537,key_size=2048)

@@ -1,6 +1,6 @@
 'use strict';
 let settingsTab='appearance',settingsAccessData=null,settingsAccessRequest=null;
-const settingsSections={intel:'Intelbeállítások',notifications:'Értesítések',appearance:'Megjelenés és nyelv',structures:'Struktúrák és bónuszok',connection:'EVE-kapcsolat',access:'Adathozzáférések',moons:'Holdak számítási beállításai',calendar:'Naptárszinkron',accounts:'Accountok és tanulás'};
+const settingsSections={market:'Marketek és értékesítés',intel:'Intelbeállítások',notifications:'Értesítések',appearance:'Megjelenés és nyelv',structures:'Struktúrák és bónuszok',connection:'EVE-kapcsolat',access:'Adathozzáférések',moons:'Holdak számítási beállításai',calendar:'Naptárszinkron',accounts:'Accountok és tanulás'};
 function settingsShortcut(message,tab='access'){
   return `<div class="banner"><span>${esc(message)}</span> <button class="text-button" data-open-settings="${tab}">Beállítások megnyitása</button></div>`;
 }
@@ -32,7 +32,8 @@ function renderSettings(content){
   $$('[data-settings-tab]').forEach(button=>button.onclick=()=>openSettingsTab(button.dataset.settingsTab));
   const target=$('#settings-content');
   $('#plan-status').hidden=true;
-  if(settingsTab==='notifications')renderNotificationSettings(target);
+  if(settingsTab==='market')renderTradeSettings(target);
+  else if(settingsTab==='notifications')renderNotificationSettings(target);
   else if(settingsTab==='intel')renderIntelSettings(target);
   else if(settingsTab==='appearance')renderAppearanceSettings(target);
   else if(settingsTab==='structures')renderStructureSettings(target);
@@ -53,19 +54,19 @@ function generalAccessPanel(){
   const feature=(char,key)=>{
     if(!d)return '<span>Adatok betöltése…</span>';
     const entry=d[key]?.characters.find(c=>c.id===char.id),status=key==='corporations'?entry?.access:entry;
-    const label=!status?'Még nincs lekérdezés':status.error?status.error:status.needs_auth?'Engedélyezés szükséges':'Olvasási engedély megadva';
+    const label=key==='markets'?(entry?.market_access&&entry?.standings_access?'Olvasási engedély megadva':'Engedélyezés szükséges'):!status?'Még nincs lekérdezés':status.error?status.error:status.needs_auth?'Engedélyezés szükséges':'Olvasási engedély megadva';
     return `<span>${esc(label)}</span>`;
   };
-  const labels={skills:'Skillek engedélyezése',pi:'PI engedélyezése',corporations:'Corp-hozzáférés engedélyezése',mining:'Mining ledger engedélyezése'};
+  const labels={markets:'Market-hozzáférés engedélyezése',skills:'Skillek engedélyezése',pi:'PI engedélyezése',corporations:'Corp-hozzáférés engedélyezése',mining:'Mining ledger engedélyezése'};
   return panel('Karakterek adathozzáférései','Skillek, PI, corporation és mining ledger olvasási engedélyek',`<div class="panel-body"><div class="section-actions"><button class="button compact" id="access-status-refresh">Hozzáférések ellenőrzése</button>${Object.entries({skills:'Skilladatok frissítése',pi:'PI-adatok frissítése',corporations:'Corp-adatok frissítése',mining:'Bányászati naplók frissítése'}).map(([key,label])=>`<button class="button compact" data-access-sync="${key}" ${state.task.running?'disabled':''}>${esc(label)}</button>`).join('')}</div><p>Minden hozzáférés: személyes készlet, blueprintek, jobok, skillek, PI, corporationadatok, holdadatok, intel és mining ledger egyetlen EVE-jóváhagyással.</p>${d?.error?'<p class="warning-text">Néhány hozzáférési állapot nem olvasható. Próbáld újra az ellenőrzést.</p>':''}</div>`+
-    (state.characters.length?table(['Karakter','Minden hozzáférés','Skillek és tanulás','Bolygók és PI','Corporationok','Mining ledger'],state.characters.map(char=>`<tr><td>${verbatim(char.name)}</td><td><button class="button compact" data-access-feature="all" data-access-character="${char.id}">Minden hozzáférés engedélyezése</button></td>${Object.entries(labels).map(([key,label])=>`<td>${feature(char,key)}<div><button class="text-button" data-access-feature="${key}" data-access-character="${char.id}">${esc(label)}</button></div></td>`).join('')}</tr>`),'access-overview'):empty('Még nincs hozzáadott karakter','Az EVE-kapcsolat oldalon add hozzá a karaktereidet.'))+
-    `<details class="panel-body"><summary>Szükséges jogosultságok</summary>${Object.entries(labels).map(([key,label])=>`<h3>${esc(label)}</h3><code>${(state[{skills:'skill_scopes',pi:'pi_scopes',corporations:'corporation_scopes',mining:'mining_scopes'}[key]]||[]).map(esc).join('\n')}</code>`).join('')}<p>Az új scope-okat az EVE Developer alkalmazásban is engedélyezni kell. A meglévő karaktert válaszd újra az engedélyezéskor.</p><p>A corp készlethez és blueprintekhez Director, a jobokhoz Factory Manager szerepkör szükséges.</p></details>`);
+    (state.characters.length?table(['Karakter','Minden hozzáférés','Marketek és standingek','Skillek és tanulás','Bolygók és PI','Corporationok','Mining ledger'],state.characters.map(char=>`<tr><td>${verbatim(char.name)}</td><td><button class="button compact" data-access-feature="all" data-access-character="${char.id}">Minden hozzáférés engedélyezése</button></td>${Object.entries(labels).map(([key,label])=>`<td>${feature(char,key)}<div><button class="text-button" data-access-feature="${key}" data-access-character="${char.id}">${esc(label)}</button></div></td>`).join('')}</tr>`),'access-overview'):empty('Még nincs hozzáadott karakter','Az EVE-kapcsolat oldalon add hozzá a karaktereidet.'))+
+    `<details class="panel-body"><summary>Szükséges jogosultságok</summary>${Object.entries(labels).map(([key,label])=>`<h3>${esc(label)}</h3><code>${(state[{markets:'market_scopes',skills:'skill_scopes',pi:'pi_scopes',corporations:'corporation_scopes',mining:'mining_scopes'}[key]]||[]).map(esc).join('\n')}</code>`).join('')}<p>Az új scope-okat az EVE Developer alkalmazásban is engedélyezni kell. A meglévő karaktert válaszd újra az engedélyezéskor.</p><p>A corp készlethez és blueprintekhez Director, a jobokhoz Factory Manager szerepkör szükséges.</p></details>`);
 }
 async function loadSettingsAccess(){
   if(settingsAccessRequest)return settingsAccessRequest;
   settingsAccessRequest=(async()=>{
-    const keys=['skills','pi','corporations','mining'];
-    const results=await Promise.allSettled(keys.map(key=>api('/api/'+key)));
+    const keys=['skills','pi','corporations','mining','markets'];
+    const results=await Promise.allSettled(keys.map(key=>api('/api/'+(key==='markets'?'trade':key))));
     settingsAccessData={error:results.some(r=>r.status==='rejected')};
     results.forEach((result,i)=>{if(result.status==='fulfilled')settingsAccessData[keys[i]]=result.value;});
     if(view==='settings'&&settingsTab==='access')render();

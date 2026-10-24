@@ -39,12 +39,12 @@ def expiry(headers,now):
     return now+ttl
 
 
-def best_quotes(orders):
+def best_quotes(orders,station=STATION):
     if not isinstance(orders,list):raise EsiError('Hibás Jita-piaci válasz.')
     buy=[];sell=[]
     for o in orders:
         if not isinstance(o,dict):raise EsiError('Hibás Jita-piaci válasz.')
-        if o.get('location_id')!=STATION or o.get('volume_remain',0)<=0:continue
+        if o.get('location_id')!=station or o.get('volume_remain',0)<=0:continue
         if not isinstance(o.get('is_buy_order'),bool):raise EsiError('Hibás Jita-piaci válasz.')
         try:price=Decimal(str(o['price']))
         except (KeyError,InvalidOperation):raise EsiError('Hibás Jita-piaci ár.') from None
@@ -54,20 +54,33 @@ def best_quotes(orders):
 
 
 class Market:
-    def __init__(self,store,http=None,clock=None):
+    def __init__(self,store,http=None,clock=None,region=REGION,station=STATION,cache_key=None):
         self.store=store;self.http=http or Transport();self.clock=clock or time.time
+        self.region=region;self.station=station;self.cache_key=cache_key
         self.refresh_policy=RefreshPolicy(store)
         self.lock=threading.RLock();self.pending=set();self.manual_pending=set();self.running=False
         self.total=0;self.done=0;self.errors={};self.retry_after={};self.current=None;self.page=None;self.pages=None
 
+    def cached(self,tid):
+        if self.cache_key:
+            row=self.store.universe_cached('market-quote:'+self.cache_key,tid)
+            return row['data'] if row else None
+        return self.store.market_quote(tid)
+
+    def save_quote(self,tid,result):
+        if self.cache_key:self.store.save_universe_cache('market-quote:'+self.cache_key,tid,result,result['checked'])
+        else:self.store.save_market_quote(tid,result)
+
+    def refresh_key(self,tid):return 'market:'+(self.cache_key+':' if self.cache_key else '')+str(tid)
+
     def quote(self,tid,manual=False):
-        old=self.store.market_quote(tid);now=self.clock()
+        old=self.cached(tid);now=self.clock()
         if old and (old['expires'] if manual else old.get('next_check',old['expires']))>now:return old
-        if not self.refresh_policy.claim(['market:'+str(tid)],manual,now):
+        if not self.refresh_policy.claim([self.refresh_key(tid)],manual,now):
             if old:return old
             raise EsiError('Az automatikus árlekérés 15 perces időköze még nem telt le.')
         try:return self._fetch_quote(tid,old,now)
-        finally:self.refresh_policy.claim(['market:'+str(tid)],manual=True,now=self.clock())
+        finally:self.refresh_policy.claim([self.refresh_key(tid)],manual=True,now=self.clock())
 
     def _fetch_quote(self,tid,old,now):
         pages=[];count=1;page=1
@@ -76,7 +89,7 @@ class Market:
             prior=(old or {}).get('pages',[])
             prior=prior[page-1] if len(prior)>=page else None
             headers={'If-None-Match':prior['etag']} if prior and prior.get('etag') else {}
-            orders,h=self.http.request(f'{ESI}/markets/{REGION}/orders/?order_type=all&type_id={tid}&page={page}',headers=headers)
+            orders,h=self.http.request(f'{ESI}/markets/{self.region}/orders/?order_type=all&type_id={tid}&page={page}',headers=headers)
             h={k.lower():v for k,v in h.items()}
             try:count=int(h.get('x-pages',prior.get('count',1) if prior else 1))
             except (TypeError,ValueError):raise EsiError('Hibás Jita-piaci oldalszám.') from None
@@ -85,7 +98,7 @@ class Market:
             if orders is None:
                 if not prior:raise EsiError('Üres Jita-válasz korábbi ár nélkül.')
                 quotes=prior['quotes']
-            else:quotes=best_quotes(orders)
+            else:quotes=best_quotes(orders,self.station)
             pages.append({'quotes':quotes,'etag':h.get('etag') or (prior or {}).get('etag'),
                           'count':count,'expires':expiry(h,now)})
             page+=1
@@ -94,13 +107,13 @@ class Market:
         result={'id':tid,'buy':format(max(buys),'f') if buys else None,'sell':format(min(sells),'f') if sells else None,
                 'checked':now,'expires':min(p['expires'] for p in pages),'next_check':now+AUTO_SECONDS,'pages':pages}
         # Failed pages never replace a previously complete quote.
-        self.store.save_market_quote(tid,result)
+        self.save_quote(tid,result)
         return result
 
     def snapshot(self,ids):
         now=self.clock();quotes={}
         for tid in ids:
-            row=self.store.market_quote(tid)
+            row=self.cached(tid)
             if row:
                 quotes[str(tid)]={k:row[k] for k in ['id','buy','sell','checked','expires']}
                 quotes[str(tid)]['stale']=row['expires']<=now
@@ -108,13 +121,14 @@ class Market:
             return {'quotes':quotes,'running':self.running,'done':self.done,'total':self.total,
                     'errors':{str(k):v for k,v in self.errors.items() if k in ids},
                     'retry_after':{str(k):v for k,v in self.retry_after.items() if k in ids},
-                    'station_id':STATION,'region_id':REGION}
+                    'station_id':self.station,'region_id':self.region,'source_key':self.cache_key or 'jita',
+                    'page':self.page,'pages':self.pages,'current':self.current}
 
     def start(self,ids,manual=False):
         with self.lock:
             now=self.clock();needed=[]
             for tid in ids:
-                old=self.store.market_quote(tid)
+                old=self.cached(tid)
                 if (not old or (old['expires'] if manual else old.get('next_check',old['expires']))<=now) and (manual or self.retry_after.get(tid,0)<=now) and tid not in self.pending:needed.append(tid)
             if not needed:return
             if not self.running:self.total=0;self.done=0;self.errors={}

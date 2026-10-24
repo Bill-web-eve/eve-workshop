@@ -320,15 +320,21 @@ The character filter applies within the same time window. The separate 100-job p
 
 No mandatory waiting time is inserted between jobs. A successor can start as soon as its inputs, slot and blueprint are available. The scheduler never produces extra runs solely to fill the minimum. BPC boundaries, recipe run caps and maximum job duration still apply; unavoidable shorter jobs are marked in the tables.
 
-## Jita prices and material cost
+## Markets, production cost and selling
 
-Select **Jita sell**, **Jita buy** or **Jita split** outside the cost tables. Split is the mean of buy and sell. The choice is shared across pricing views and remembered by the browser.
+Pricing menus offer **Jita buy/sell/split** and **Local buy/sell/split**. Split is the midpoint of the best buy and sell quotes. Jita means Jita 4-4 only; the local source means the selected station or structure, never the entire region. Missing local quotes are not replaced with Jita prices. Depth and order fulfilment are not estimated.
 
-Prices are based on public Jita 4-4 market orders, loaded in the background. Refresh respects EVE's market cache. Price timestamps and the number of unpriced items are shown. Missing prices are excluded from subtotals and flagged, rather than treated as confirmed zero prices. BPC runs are not valued using BPO market prices.
+Configure the local hub under **Settings → Markets and selling**: type a system name and choose a result, select a connected reader, and search the market name or enter a Structure ID. Choose the matching location and save. For example, select C-N4OD and search for C-N4OD - Fountain of Life. Private structure markets require a character with docking access and the market/search/structure read scopes; use **Authorize market access**. Add the scopes displayed there to the EVE Developer application as well. Authorization extends existing permissions.
 
-**Production material cost** includes the value of existing inputs used by remaining production. Shortfall cost includes only quantities still to buy. Shortfall rows show individual values and an overall total. In a combined saved-plan list the same inventory is not counted twice.
+The compact **Production cost and expected revenue** panel appears before **Remaining work**. Set material/blueprint pricing and product selling pricing independently. Choose a selling character and refresh their data. These settings are saved separately for each saved plan; saving a new draft plan carries its finance settings over.
 
-The target product's gross **Jita buy** and **Jita sell** sales values are displayed together for the full target quantity. **Sell price per unit · Jita sell** shows its unit sell price independently of input-price mode. Missing offers give an unknown value. Because finished stock reduces remaining work, the remaining production cost and full-target sales value can have different quantity bases.
+Costs include market-valued existing or incoming intermediates consumed by remaining work, purchased raw materials, missing blueprints, remaining job fees and optional hauling/other costs. Intermediates manufactured by this plan are not charged again on top of their inputs. Expand **Additional costs and details** for optional costs, blueprint overrides and item/job breakdowns. Missing BPC runs have no reliable BPO unit price: enter their actual acquisition/copying cost. An unknown cost keeps total cost and profit unknown.
+
+Revenue values **new target output from remaining planned jobs**, including any run-rounding surplus. Already-covered finished target stock and active target jobs are excluded so that the revenue and remaining-work costs use the same scope. The card shows unit and gross selling value, sales tax, broker fee, net proceeds, total production cost and net profit. In Material shortfall, values cover only quantities still to procure; the combined view shares stock once.
+
+Accounting uses active skill levels: sales tax = 7.5% × (1 − 0.11 × Accounting level). NPC broker fees use Broker Relations and the unmodified standing towards the station owner and faction. Structure broker fees do not receive that NPC skill/standing reduction: enter your effective total broker fee, including SCC, from EVE. ESI does not expose that structure fee. Immediate selling has no new-order broker fee; sell orders include it, with the 100 ISK minimum. By default buy pricing means immediate selling, while sell/split means a sell order; execution can be selected explicitly.
+
+Prices and standings use persistent caches and conditional requests. Automatic requests observe the 15-minute app interval; explicit refresh still respects ESI cache validity. Stale and missing data are labelled. Split is indicative, and order relisting, future price moves and unentered costs are excluded.
 
 ## Job cost and production location
 
@@ -336,7 +342,7 @@ Under **Settings → Structures and bonuses**, choose a system from the filtered
 
 After saving bonuses, the production cost summary shows job cost, total remaining production cost and a fee breakdown. The fee base uses adjusted prices; indices and adjusted prices are refreshed in the background with EVE caching. An unavailable index or price is labelled instead of silently providing a complete estimate. Check the activity and facility settings before comparing plans.
 
-The displayed product sale values are gross estimates; do not interpret a material subtotal alone as net profit. Ordinary manufacturing labour, hauling and extra costs not represented by these fields are not automatically priced.
+The compact plan panel deducts seller fees for its net-revenue and profit estimates. Enter hauling and other costs explicitly; they are not automatically priced.
 
 ## Moon register and 30-day production
 

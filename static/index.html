@@ -34,6 +34,7 @@
   <script src="/costs.js" defer></script>
   <script src="/prices.js" defer></script>
   <script src="/economics.js" defer></script>
+  <script src="/trade.js" defer></script>
   <script src="/documentation.js" defer></script>
   <script src="/intel-map.js" defer></script>
   <script src="/intel.js" defer></script>
@@ -78,7 +79,7 @@
           <button data-settings-nav="notifications">Értesítések</button>
           <button data-settings-nav="intel">Intelbeállítások</button>
           <button data-settings-nav="appearance">Megjelenés és nyelv</button>
-          <button data-settings-nav="structures">Struktúrák és bónuszok</button>
+          <button data-settings-nav="market">Marketek és értékesítés</button><button data-settings-nav="structures">Struktúrák és bónuszok</button>
           <button data-settings-nav="connection">EVE-kapcsolat <span id="connection-dot" class="dot"></span></button>
           <button data-settings-nav="access">Adathozzáférések</button>
           <button data-settings-nav="moons">Holdak számítási beállításai</button>
@@ -112,6 +113,7 @@
     </section>
 
     <section class="content">
+      <div id="production-finance" hidden></div>
       <div class="page-heading"><div><div id="page-eyebrow" class="eyebrow">GYÁRTÁSI SORREND</div><h1 id="page-title">A hátralévő munkák</h1><p id="page-description">Az alapreakcióktól a kész termékig, a készlet és az elindított jobok levonásával.</p></div><div id="view-actions"></div></div>
       <div id="plan-status" class="banner" hidden></div>
       <div id="view-content" aria-live="polite"><div class="empty"><div class="empty-icon">◈</div><h2>Előkészítjük a műhelyt</h2><p>A receptadatbázis és a beállítások betöltése folyamatban.</p></div></div>
