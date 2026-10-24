@@ -1,6 +1,16 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Szállítási díjak": "Hauling rates",
+  "Import · alapanyagok (ISK/m³)": "Import · raw materials (ISK/m³)",
+  "Export · késztermék (ISK/m³)": "Export · finished product (ISK/m³)",
+  "Szállítási díjak mentése": "Save hauling rates",
+  "Szállítási díjak mentve.": "Hauling rates saved.",
+  "Import szállítás": "Import hauling",
+  "Export szállítás": "Export hauling",
+  "Az import díját az anyagárforrás, az exportét az eladási árforrás választja ki. Az import a még beszerzendő anyagok, az export az újonnan gyártandó késztermék csomagolt térfogatával számol. Meglévő készletet és blueprintet nem szállítunk újra. 0: nincs szállítási díj.": "Import rates follow the material price source; export rates follow the selling price source. Import uses packaged volumes of materials still to procure, while export uses newly planned finished output. Existing stock and blueprints are excluded. 0: no hauling fee.",
+  "Az alapanyag vagy késztermék térfogata hiányzik; a szállítási díj és a teljes költség nem számolható.": "A material or finished-product volume is missing; hauling and total cost cannot be calculated.",
+
   "Szállítási díj": "Hauling rate",
   "Szállítási díj (ISK/m³)": "Hauling rate (ISK/m³)",
   "A díj a terv még beszerzendő anyagainak csomagolt térfogatára vonatkozik. A meglévő készletet, a blueprintet és a késztermék elszállítását nem tartalmazza. 0: nincs szállítási díj.": "The rate applies to the packaged volume of materials still to procure. It excludes existing stock, blueprints and outbound finished products. 0: no hauling fee.",

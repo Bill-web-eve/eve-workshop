@@ -50,6 +50,29 @@ class TradeTests(unittest.TestCase):
         self.trade.save_hauling({'hauling_isk_per_m3':'0'})
         self.assertEqual(self.trade.settings()['location'],LOC)
 
+    def test_four_hauling_rates_are_independent_and_bad_updates_are_atomic(self):
+        self.settings('0')
+        rates={'jita':{'import':'100.12','export':'200'},'local':{'import':'0','export':'350.4321'}}
+        self.trade.save_hauling({'hauling_rates':rates})
+        saved=self.trade.settings()
+        self.assertEqual(saved['hauling_rates'],{'jita':{'import':'100.1200','export':'200.0000'},'local':{'import':'0.0000','export':'350.4321'}})
+        self.assertEqual(Trade(self.store,self.catalog,self.eve).settings(),saved)
+        for bad in [None,{}, {'jita':{'import':'1','export':'2'},'local':{'import':'3','export':'NaN'}}]:
+            with self.assertRaises(PlanningError):self.trade.save_hauling({'hauling_rates':bad})
+            self.assertEqual(self.trade.settings(),saved)
+        self.trade.save_hauling({'hauling_isk_per_m3':'25'})
+        updated=self.trade.settings()
+        self.assertEqual(updated['hauling_rates']['jita'],{'import':'25.0000','export':'200.0000'})
+        self.assertEqual(updated['hauling_rates']['local'],{'import':'25.0000','export':'350.4321'})
+        self.assertEqual(updated['location'],LOC)
+
+    def test_single_rate_profile_migrates_to_both_imports_with_zero_exports(self):
+        with self.store.db() as db:db.execute('INSERT INTO trade_settings VALUES(1,?)',('{"hauling_isk_per_m3":"150"}',))
+        rates=self.trade.settings()['hauling_rates']
+        self.assertEqual(rates,{'jita':{'import':'150','export':'0'},'local':{'import':'150','export':'0'}})
+        rates['local']['import']='99'
+        self.assertEqual(self.trade.settings()['hauling_rates']['local']['import'],'150')
+
     def test_old_downloaded_catalogue_gets_matching_packaged_volumes_without_mutation(self):
         old=Path(self.tmp.name)/'old.sqlite3';shutil.copy2(self.catalog.path,old)
         with sqlite3.connect(old) as db:

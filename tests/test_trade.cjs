@@ -100,9 +100,31 @@ test('missing reaction formulas remain priced separately from optional BPC estim
 });
 test('the hauling setting can be saved before market setup without changing selected hub or reader',async t=>{
  const {dom,w,run,d}=setup();t.after(()=>w.close());const calls=[];
- w.api=async(path,body)=>{calls.push([path,body]);return {settings:{hauling_isk_per_m3:body.hauling_isk_per_m3},status:{running:false},characters:[],scopes:[]};};
+ w.api=async(path,body)=>{calls.push([path,body]);return {settings:{hauling_rates:body.hauling_rates},status:{running:false},characters:[],scopes:[]};};
  run(`const panel=(title,sub,body)=>'<section><h2>'+title+'</h2>'+body+'</section>';tradeData={settings:{hauling_isk_per_m3:'0'},status:{running:false},characters:[],scopes:[]};renderTradeSettings(document.querySelector('main'));`);
- const form=d.querySelector('#hauling-settings');form.elements.hauling_isk_per_m3.value='250.1234';form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
- assert.equal(calls[0][0],'/api/trade/hauling');assert.deepEqual(Object.keys(calls[0][1]),['hauling_isk_per_m3']);assert.equal(calls[0][1].hauling_isk_per_m3,'250.1234');
- run(`EveI18n.setLanguage('en');EveI18n.translate(document.documentElement);`);assert.match(form.textContent,/Hauling rate/);assert(!/[áéíóöőúüű]/i.test(form.textContent));
+ const form=d.querySelector('#hauling-settings');form.elements.hauling_jita_import.value='250.1234';form.elements.hauling_jita_export.value='500';form.elements.hauling_local_import.value='0';form.elements.hauling_local_export.value='200';form.dispatchEvent(new w.Event('submit',{cancelable:true}));await tick();
+ assert.equal(calls[0][0],'/api/trade/hauling');assert.deepEqual(JSON.parse(JSON.stringify(calls[0][1])),{hauling_rates:{jita:{import:'250.1234',export:'500'},local:{import:'0',export:'200'}}});
+ run(`EveI18n.setLanguage('en');EveI18n.translate(document.documentElement);`);assert.match(form.textContent,/Import.*raw materials/);assert.match(form.textContent,/Export.*finished product/);assert(!/[áéíóöőúüű]/i.test(form.textContent));
+});
+
+test('import follows material market and export follows selling market independently, using only new packaged output',t=>{
+ const {dom,run}=setup();t.after(()=>dom.window.close());
+ run(`tradeData={settings:{hauling_rates:{jita:{import:'100',export:'400'},local:{import:'200',export:'800'}}}};const transport={...c,plan:{...c.plan,rows:[{id:1,volume:100}],shopping:[{id:2,buy:10,volume:.01}]}};`);
+ for(const material of ['jita','local'])for(const sale of ['jita','local']){
+  const result=run(`financeValues(transport,{...f,materials:'${material}:sell',sale:'${sale}:sell'},books,profile,{complete:true,cents:'10000'})`);
+  assert.equal(result.values.hauling_import,material==='jita'?1000n:2000n);
+  assert.equal(result.values.hauling_export,sale==='jita'?8000000n:16000000n);
+  assert.equal(result.values.hauling,result.values.hauling_import+result.values.hauling_export);
+  assert.equal(result.values.total,result.values.materials+5000n+10000n+1000n+result.values.hauling);
+  assert.equal(result.values.profit,result.values.net-result.values.total);
+ }
+ const empty=run(`financeValues({...transport,quantity:0},{...f,sale:'local:sell'},books,profile,{complete:true,cents:'10000'})`);
+ assert.equal(empty.values.hauling_export,0n);
+ const partial=run(`financeValues({...transport,plan:{...transport.plan,rows:[]} },f,books,profile,{complete:true,cents:'10000'})`);
+ assert.equal(partial.values.hauling_export,null);assert.equal(partial.values.total,null);
+ const rounded=run(`financeHauling({...transport.plan,rows:[{id:1,volume:50000}]},'400',3)`);
+ assert.equal(rounded.volume,15000000000000n);assert.equal(rounded.cents,6000000000n);
+ run(`financePrefs=f;document.querySelector('#production-finance').innerHTML=productionFinance(transport.plan,transport.materials);financePrefs=f;financeBooks=books;financeProfile=profile;financeContext.quantity=2;applyProductionFinance();EveI18n.setLanguage('en');EveI18n.translate(document.documentElement);`);
+ const d=dom.window.document;assert.match(d.querySelector('.finance-grid').textContent,/Import hauling/);assert.match(d.querySelector('.finance-grid').textContent,/Export hauling/);
+ assert.match(d.querySelector('[data-finance-hauling=import]').textContent,/200 ISK/);assert.match(d.querySelector('[data-finance-hauling=export]').textContent,/400 ISK/);
 });

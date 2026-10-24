@@ -103,7 +103,10 @@ class Trade:
 
     def settings(self):
         with self.store.db() as db:r=db.execute('SELECT data FROM trade_settings WHERE id=1').fetchone()
-        return {**DEFAULTS,**(json.loads(r[0]) if r else {})}
+        p={**DEFAULTS,**(json.loads(r[0]) if r else {})}
+        stored=p.get('hauling_rates',{})
+        p['hauling_rates']={source:{direction:stored.get(source,{}).get(direction,p['hauling_isk_per_m3'] if direction=='import' else '0') for direction in ['import','export']} for source in ['jita','local']}
+        return p
 
     def character(self,cid):
         cid=integer(cid,'Karakter',2**31-1,1)
@@ -135,11 +138,23 @@ class Trade:
 
     def save_hauling(self,data):
         if not isinstance(data,dict):raise PlanningError('Hibás szállítási beállítás.')
-        value=decimal(data.get('hauling_isk_per_m3'),'Szállítási díj',0,10**12)
-        if Decimal(value)!=Decimal(value).quantize(Decimal('.0001')):raise PlanningError('A szállítási díj legfeljebb 4 tizedesjegy lehet.')
-        value=format(Decimal(value).quantize(Decimal('.0001')),'f')
+        def rate(value):
+            value=decimal(value,'Szállítási díj',0,10**12)
+            if Decimal(value)!=Decimal(value).quantize(Decimal('.0001')):raise PlanningError('A szállítási díj legfeljebb 4 tizedesjegy lehet.')
+            return format(Decimal(value).quantize(Decimal('.0001')),'f')
+        rates=None;legacy=None
+        if 'hauling_rates' in data:
+            raw=data['hauling_rates']
+            if not isinstance(raw,dict) or any(not isinstance(raw.get(s),dict) for s in ['jita','local']):raise PlanningError('Hibás szállítási beállítás.')
+            rates={s:{d:rate(raw[s].get(d)) for d in ['import','export']} for s in ['jita','local']}
+        else:legacy=rate(data.get('hauling_isk_per_m3'))
         with self.lock:
-            p=self.settings();p['hauling_isk_per_m3']=value
+            p=self.settings()
+            if rates is not None:p['hauling_rates']=rates
+            else:
+                # Preserve the old single inbound rate for existing clients/profiles.
+                p['hauling_isk_per_m3']=legacy
+                for source in ['jita','local']:p['hauling_rates'][source]['import']=legacy
             with self.store.db() as db:db.execute('INSERT OR REPLACE INTO trade_settings VALUES(1,?)',(json.dumps(p),))
         return self.dashboard()
 
