@@ -70,7 +70,10 @@ class ServerTests(unittest.TestCase):
         status,data,_=self.request('/api/intel');self.assertEqual(status,200);self.assertFalse(data['preferences']['enabled']);self.assertEqual(data['reports'],[])
         self.assertEqual(self.request('/api/intel?radius=13')[0],400)
         status,data,_=self.request('/api/intel/systems?q=Jita');self.assertEqual(status,200);self.assertEqual(data[0]['name'],'Jita')
-        status,data,_=self.request('/api/intel/alerts');self.assertEqual(status,200);self.assertFalse(data['enabled']);self.assertEqual(data['items'],[])
+        # Chat monitoring starts disabled; the independent public kill feed is enabled.
+        status,data,_=self.request('/api/intel/alerts');self.assertEqual(status,200);self.assertTrue(data['enabled']);self.assertEqual(data['items'],[])
+        self.assertEqual(self.request('/api/intel/preferences',{'killfeed_enabled':False})[0],200)
+        self.assertFalse(self.request('/api/intel/alerts')[1]['enabled'])
         self.assertEqual(self.request('/api/intel/claim',{})[1]['items'],[])
         self.assertEqual(self.request('/intel.js')[0],200)
 

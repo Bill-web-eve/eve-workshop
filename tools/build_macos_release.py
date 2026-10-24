@@ -90,12 +90,17 @@ def build(config_file,work,output):
     if staging.exists():raise SystemExit('Használj új, üres build munkamappát.')
     config=public_config(config_file);stage_source(staging,config)
     version=runpy.run_path(str(staging/'muhely/__init__.py'))['__version__']
+    # Some development Python runtimes load an additional public CA policy file
+    # directly from ssl.py. Preserve it next to the frozen stdlib, if present.
+    import ssl
+    ssl_policy=Path(ssl.__file__).with_name('codex-rejected-cas.pem')
+    runtime_data=[(str(ssl_policy),'.')] if ssl_policy.is_file() else []
     spec=work/'EVE Muhely.spec'
     spec.write_text(f'''# Generated clean release, no Developer ID or notarization.
 import os
 os.environ['MACOSX_DEPLOYMENT_TARGET']='11.0'
 a=Analysis([{str(staging/'desktop.py')!r}],pathex=[{str(staging)!r}],
-    binaries=[],datas=[({str(staging/'static')!r},'static'),({str(staging/'data')!r},'data'),({str(staging/'licenses')!r},'licenses'),({str(staging/'Hasznalat.md')!r},'.'),({str(staging/'UserGuide.en.md')!r},'.')],
+    binaries=[],datas=[({str(staging/'static')!r},'static'),({str(staging/'data')!r},'data'),({str(staging/'licenses')!r},'licenses'),({str(staging/'Hasznalat.md')!r},'.'),({str(staging/'UserGuide.en.md')!r},'.')]+{runtime_data!r},
     hiddenimports=['cryptography.hazmat.bindings._rust','certifi'],
     excludes=['tkinter','unittest','PIL','numpy','pandas','pytest','IPython'],noarchive=False)
 pyz=PYZ(a.pure)

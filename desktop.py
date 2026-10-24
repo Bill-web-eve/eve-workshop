@@ -75,7 +75,9 @@ def main():
     if args.serve:
         app=App(folder,catalog,args.port)
         server=Server(app)
-        try:server.serve_forever()
+        try:
+            app.fleet.start()
+            server.serve_forever()
         finally:server.server_close()
         return
     url=f'http://127.0.0.1:{args.port}'

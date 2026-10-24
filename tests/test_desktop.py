@@ -11,6 +11,15 @@ from tools.build_macos_release import public_config,audit_bundle,install_window_
 
 
 class CleanReleaseTests(unittest.TestCase):
+    def test_native_backend_starts_fleet_workers_and_closes_service(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.object(desktop.sys,'argv',['desktop.py','--serve','--no-browser','--port','8766','--data-dir',folder]),patch('muhely.server.App') as app_type,patch('muhely.server.Server') as server_type:
+                desktop.main()
+            app=app_type.return_value;server=server_type.return_value
+            app.fleet.start.assert_called_once_with()
+            server.serve_forever.assert_called_once_with()
+            server.server_close.assert_called_once_with()
+
     def test_distributable_seeds_only_public_client_id_into_empty_store(self):
         with tempfile.TemporaryDirectory() as folder:
             defaults=Path(folder)/'defaults.json'

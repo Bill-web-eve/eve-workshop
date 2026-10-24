@@ -1,10 +1,10 @@
 # Kész csomagok közzététele
 
-A jelenlegi kiadás **1.2.0**, Mac Apple Silicon és Windows 11 x64 csomaggal, magyar–angol felülettel, mindkét platformon saját ablakos alkalmazással, intel- és bányászati napló funkciókkal, teljes kézikönyvvel, gyártásütemezővel, holdnaptárral, Jita-árazással, ipari díjakkal és PI-előrejelzéssel. A `v1.2.0/manifest.json` felsorolja a hat ellenőrzött mellékletet és SHA-256 összegüket.
+A jelenlegi kiadás **1.3.0**, Mac Apple Silicon és Windows 11 x64 csomaggal, magyar–angol felülettel és mindkét platformon saját ablakos alkalmazással. Újdonság a flottamenetek és harci oldalak áttekintése, valamint az élő, csoportosított régiós kill/intel jelzés. A korábbi gyártásütemező, holdnaptár, bányászati napló, Jita-árazás és PI-előrejelzés megmarad. A `v1.3.0/manifest.json` felsorolja a hat ellenőrzött mellékletet és SHA-256 összegüket.
 
 A helyi kiadási commit elkészítése után a GitHub Desktopban a **Push origin** indítja a feltöltést. A main ágra érkezett kiadási változás elindítja a **Mac es Windows csomagok kozzetetele** munkafolyamatot. Siker után a csomagok itt tölthetők le: https://github.com/Bill-web-eve/eve-workshop/releases.
 
-A folyamat először piszkozatot készít, ellenőrzi és feltölti a csomagokat, majd publikál. Megszakadt futás folytatható. Egy már publikált, módosítható kiadásból hiányzó mellékleteket is pótol, de eltérő meglévő fájlt nem ír felül és immutable kiadást nem módosít. Személyes tokenre nincs szükség: a munkafolyamat csak az adott repositoryhoz kap ideiglenes GitHub-tokent.
+A folyamat először valódi Windows WebView2-ablakokkal ellenőrzi a rögzített beépített futtatókörnyezetet. Csak ennek sikere után készít piszkozatot, ellenőrzi és feltölti a csomagokat, majd publikál. Megszakadt futás folytatható. Egy már publikált, módosítható kiadásból hiányzó mellékleteket is pótol, de eltérő meglévő fájlt nem ír felül és immutable kiadást nem módosít. Személyes tokenre nincs szükség: a munkafolyamat csak az adott repositoryhoz kap ideiglenes GitHub-tokent.
 
 Helyi ellenőrzés: `python3 tools/publish_github_release.py --all --check`. A helyi commit még nem jelent GitHub-közzétételt; a Push origin és a GitHub Actions sikeres futása szükséges.
 

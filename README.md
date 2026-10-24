@@ -4,7 +4,7 @@ Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple S
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.2.0**, **Windows 11 x64 1.2.0**, magyar és angol felülettel, Jita-árazással, ipari díjakkal és holdprofit-számítással.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.3.0**, **Windows 11 x64 1.3.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -19,6 +19,17 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Skill- és tanulási sor figyelése, PI-áttekintés időalapú termelési becsléssel, sötét mód, rendezhető és szűrhető táblázatok.
 - Jita buy/sell/split alapanyagárak, termékeladási érték, ESI-rendszerindex és beállítható ipari díjak.
 - Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
+
+## Az 1.3.0 kiadás újdonságai
+
+- Karakterenkénti kill- és lossnapló, flottamenetek, megfigyelt ESI-pozíciók és útvonalak, rendszerenkénti harci időablakok és ISK-összesítések.
+- Kettő–négy oldalra bontott harci jelentések: a résztvevők besorolása a harci kapcsolatok alapján történik, kézzel módosítható. A veszteségek hajótípusonként összegezhetők; a hajóikonok a killmailre vezetnek.
+- Élő zKillboard-adatfolyam mentett folytatási ponttal, csoportosított régiós killjelzésekkel és térképjelölőkkel. Az értesítések ISK-érték helyett a rendszert és a hajókat mutatják.
+- Külön kapcsolható intelértesítések, önálló térkép- és chatablak, kompakt jelentéskártyák és frissítés közben is használható régióválasztó.
+- Tervtől független keresés minden személyes és corporation item között; az In progress nézet személyes összesítése minden karakterre is kérhető.
+- Corporationönként kikapcsolható adatfigyelés és legalább 15 perces automatikus ESI-frissítési időköz; a kifejezett kézi frissítés és a külön engedélyezett pozíciókövetés kivétel.
+- Pontosabb PI-kitermelési időzítők, bolygónként elkülönített gyári készletbecslés és a holdnaptár hiányzó hozzáféréseinek érthetőbb jelzései.
+- Részletes magyar és angol dokumentáció; tiszta Mac- és Windows-csomag személyes adatok nélkül. A közzététel csak a Windows WebView2-futtatási próba sikeres befejezése után indul.
 
 ## Az 1.2.0 kiadás újdonságai
 
@@ -92,7 +103,7 @@ PI supply uses factory-local buffers and a route-constrained bipartite maximum f
 
 Saved-plan shortcuts replace the fixed sample products. They open the actual saved ID, quantity and ownership context. `/api/plans/shopping` previews all saved goals against one stock/WIP pool: active reservations retain priority, unreserved goals follow in creation order using remaining stock without persistent activation. It reuses the production allocation pass and aggregates positive purchase shortages by type with per-plan contributions. The all-plans view is independent of the current unsaved target, supports CSV/clipboard and invalidates after state reloads. Tests cover shared stock, active/inactive ordering, no mutation, completed Archon pruning, WIP, deletion and endpoint authentication.
 
-`desktop.py` is the frozen backend entry point. The Mac release wraps it in the native Cocoa/WKWebView shell; Windows opens the user's browser. Neither package installs Python or packages on the recipient's machine. `tools/build_macos_release.py` uses PyInstaller in an isolated development environment and an allowlisted source stage. Only `client_id` is allowed in `data/defaults.json`; no user database, vault, character or plan is copied. A fresh browser also starts with an empty product selection. Existing user data and an explicitly saved Client ID continue to override bundle defaults.
+`desktop.py` is the frozen Mac backend entry point, wrapped in the native Cocoa/WKWebView shell. Windows uses `windows_desktop.py` and native WinForms/WebView2 windows. Neither package installs Python or packages on the recipient's machine. `tools/build_macos_release.py` uses PyInstaller in an isolated development environment and an allowlisted source stage. Only `client_id` is allowed in `data/defaults.json`; no user database, vault, character or plan is copied. A fresh profile starts with an empty product selection. Existing user data and an explicitly saved Client ID continue to override bundle defaults.
 
 To rebuild an Apple Silicon distribution on a Mac, install `requirements.txt`, `pyinstaller==6.22.3` and `certifi==2026.7.22` into a dedicated Python environment, then run `python tools/build_macos_release.py --client-id-file PUBLIC_CLIENT_JSON --work-dir EMPTY_BUILD_DIR --output-dir RELEASE_DIR`. The public JSON only needs `client_id`; never pass an encrypted vault or user database. The current build uses Python 3.12.14 and cryptography 46.0.7, targets arm64/macOS 11+, and creates a verified DMG with installation instructions and a SHA-256 checksum. Developer ID and notarization are omitted; mandatory ad-hoc signing remains. No Gatekeeper setting or quarantine attribute is modified. The private, already-installed local app is not replaced by this release build.
 

@@ -1,0 +1,30 @@
+{
+  "tag": "v1.3.0",
+  "title": "EVE Workshop 1.3.0 \u2013 Fleet activity and live regional intel",
+  "assets": [
+    {
+      "name": "EVE_Muhely-1.3.0-Windows11-x64.sha256",
+      "sha256": "8d4364252f871a499e61c3926db9cce61685433a319ba46ab18d6247c0116353"
+    },
+    {
+      "name": "EVE_Muhely-1.3.0-Windows11-x64.zip",
+      "sha256": "716041576bfa4f56ba4533ecf999c5987c99bca48b1d1501f8c9e8837fc48059"
+    },
+    {
+      "name": "EVE_Muhely-1.3.0-macOS-AppleSilicon.dmg",
+      "sha256": "802728221f3b4a9dd92d7d4197d0acaa60592e6e0d7136319e7f8b42368cd613"
+    },
+    {
+      "name": "EVE_Muhely-1.3.0-macOS-AppleSilicon.sha256",
+      "sha256": "e4933e4a7fea4f923be31310c1c476cfb72b3be181d522d9966a3adf8bcdf66d"
+    },
+    {
+      "name": "EVE_Muhely-Telepites.txt",
+      "sha256": "dbe6b4676aaef3cb434c7b440a48c452c0c88dc6c7325d6aff072f46057dd6d0"
+    },
+    {
+      "name": "EVE_Muhely-Windows-Telepites.txt",
+      "sha256": "eb23c26808e40142e48a1137cfcdadb3f9ea7ec35d4af019494cd19d0a34f333"
+    }
+  ]
+}
