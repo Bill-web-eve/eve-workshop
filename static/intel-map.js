@@ -18,7 +18,8 @@ const EveIntelMap=(()=>{
   function callouts(nodes,{width:viewWidth=1200,height:viewHeight=720}={}){
     const cards=[],overlap=(a,b)=>Math.max(0,Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y));
     for(const node of [...nodes].filter(n=>n.contacts?.length||n.kill_groups?.length).sort((a,b)=>Math.max(b.reported_at||0,...(b.kill_groups||[]).map(g=>g.received))-Math.max(a.reported_at||0,...(a.kill_groups||[]).map(g=>g.received))||a.id-b.id)){
-      const width=190,height=Math.min(viewHeight-15,180,28+(node.contacts||[]).reduce((sum,r)=>sum+19+Math.max(1,r.pilots.length)*14+((r.ships||[]).length?22*Math.ceil(r.ships.length/2):0)+(r.pilots.length>1&&(r.ships||[]).length?12:0),0)+(node.kill_groups?.length?105:0));
+      const killTypes=new Set((node.kill_groups||[]).flatMap(g=>(g.ships||[]).map(s=>s.type_id||s.name))).size;
+      const width=190,height=Math.min(viewHeight-15,180,28+(node.contacts||[]).reduce((sum,r)=>sum+19+Math.max(1,r.pilots.length)*14+((r.ships||[]).length?22*Math.ceil(r.ships.length/2):0)+(r.pilots.length>1&&(r.ships||[]).length?12:0),0)+(node.kill_groups?.length?44+24*Math.max(1,killTypes):0));
       const offsets=[[20,-20],[-width-20,-20],[15,25],[15,-height-20],[-width-20,25],[-width-20,-height-20]];
       const candidates=offsets.map(([x,y])=>({node,x:Math.max(4,Math.min(viewWidth-10-width,node.lx+x)),y:Math.max(4,Math.min(viewHeight-10-height,node.ly+y)),width,height}));
       const cost=box=>cards.reduce((s,c)=>s+overlap(box,c)*3,0)+nodes.filter(n=>n.id!==node.id).reduce((s,n)=>s+overlap(box,{x:n.lx-8,y:n.ly-10,width:95,height:30}),0);
