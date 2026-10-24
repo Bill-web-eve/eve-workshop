@@ -1,5 +1,6 @@
 """Run the real WebView2 window against a disposable profile, never user data."""
 import argparse
+import faulthandler
 import json
 import os
 from pathlib import Path
@@ -75,6 +76,7 @@ def check(report_path=None):
     import certifi
     os.environ['SSL_CERT_FILE']=certifi.where()
     import webview
+    faulthandler.dump_traceback_later(55)
     from muhely.server import App,Server,ROOT
     from muhely.windows_window import WindowHost,webview_runtime_present
     if not webview_runtime_present():raise RuntimeError('WebView2 Runtime is missing')
@@ -82,6 +84,20 @@ def check(report_path=None):
         app=App(folder,ROOT/'data/catalog.sqlite3',0);server=Server(app)
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         host=WindowHost(webview,app.origin,folder);window=host.create_main();results={};finished=threading.Event();external=[]
+        window.events.closed+=finished.set
+        def confirm(title,message):
+            print(json.dumps({'close_confirmation':'accepted for disposable test profile'}),flush=True)
+            return True
+        window.create_confirmation_dialog=confirm
+        original_dispatch=host.dispatch
+        def traced_dispatch(target,source,body):
+            action=body.get('action') if isinstance(body,dict) else None
+            if action in {'quitCheck','quitFailed','stopped'}:
+                print(json.dumps({'close_action':action,'phase':'start','dirty':body.get('dirty'),'running':body.get('running')}),flush=True)
+            value=original_dispatch(target,source,body)
+            if action in {'quitCheck','quitFailed','stopped'}:print(json.dumps({'close_action':action,'phase':'done'}),flush=True)
+            return value
+        host.dispatch=traced_dispatch
         def dialog(kind,**kwargs):return (str(Path(folder)/('native-export.csv' if 'save_filename' in kwargs else '')),)
         window.create_file_dialog=dialog
         original_clipboard=[]
@@ -91,7 +107,8 @@ def check(report_path=None):
                 host._ui(window,lambda:Clipboard.SetDataObject(original_clipboard[0],True) if original_clipboard[0] is not None else Clipboard.Clear())
                 original_clipboard.clear()
         def result(body):
-            results.update(body.get('result',{}));finished.set()
+            print('Native bridge checks completed; checking overlay and window close.',flush=True)
+            results.update(body.get('result',{}))
             try:
                 if not results.get('error'):
                     assert (Path(folder)/'native-export.csv').read_text(encoding='utf-8-sig')=='Ferrofluid;25\n'
@@ -104,7 +121,11 @@ def check(report_path=None):
                     results.update(check_overlay(host,window,folder))
             except Exception as error:results['error']=str(error) or 'Native assertion failed'
             finally:
-                restore_clipboard();window.destroy()
+                restore_clipboard()
+                print('Sending the same Form.Close request as the main window close button.',flush=True)
+                # Window.destroy is the library's final-disposal API. Its extra
+                # JS-semaphore teardown must not run on a cancellable close.
+                host._ui(window,lambda:window.native.Close())
         host.self_test_callback=result
         script=r'''(async()=>{
           try{
@@ -136,6 +157,7 @@ def check(report_path=None):
           }catch(e){chrome.webview.postMessage({eveDesktop:1,id:900001,payload:{action:'selfTestResult',result:{error:String(e)}}});}
         })();'''
         def loaded():
+            print('Main WebView2 page loaded.',flush=True)
             from System.Windows.Forms import Clipboard
             original_clipboard.append(host._ui(window,Clipboard.GetDataObject))
             host._script(window,script)
@@ -152,6 +174,7 @@ def check(report_path=None):
             with patch('muhely.windows_window.webbrowser.open',side_effect=lambda url:external.append(url) or True):
                 webview.start(gui='edgechromium',debug=False,private_mode=False,storage_path=str(Path(folder)/'webview2'),user_agent='EVEWorkshopDesktop/Windows')
         finally:
+            faulthandler.cancel_dump_traceback_later()
             server.shutdown();server.server_close();thread.join(timeout=5)
         results['overlay_disposed']=host.overlay is not None and host.overlay.disposed
         if report_path:Path(report_path).write_text(json.dumps(results,indent=2))

@@ -21,6 +21,9 @@ def run_check(command,timeout):
     except subprocess.TimeoutExpired as error:
         raw=error.output or b''
         if isinstance(raw,bytes):raw=raw.decode('utf-8',errors='replace')
+        diagnostic=error.stderr or b''
+        if isinstance(diagnostic,bytes):diagnostic=diagnostic.decode('utf-8',errors='replace')
+        raw+='\n'+diagnostic
         detail=('Native Windows check timed out. '+raw[-5000:]).replace('%','%25').replace('\r','%0D').replace('\n','%0A')
         print('::error title=Native Windows check::'+detail,flush=True)
         raise SystemExit(1)

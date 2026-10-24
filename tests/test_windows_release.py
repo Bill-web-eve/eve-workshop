@@ -93,6 +93,15 @@ class WindowsSecurityTests(unittest.TestCase):
 
 
 class WindowsDistributionTests(unittest.TestCase):
+    def test_ci_timeout_annotation_includes_native_stderr_diagnostics(self):
+        import subprocess
+        from tools.windows_ci_smoke import run_check
+        failure=subprocess.TimeoutExpired(['synthetic-test'],120,output=b'last checkpoint',stderr=b'native close stack trace')
+        with patch('tools.windows_ci_smoke.subprocess.run',side_effect=failure),patch('builtins.print') as output,self.assertRaises(SystemExit):
+            run_check(['synthetic-test'],120)
+        annotation='\n'.join(str(c.args[0]) for c in output.call_args_list)
+        self.assertIn('last checkpoint',annotation);self.assertIn('native close stack trace',annotation)
+
     def test_windows_data_directory_is_per_user_and_override_remains_supported(self):
         with patch('muhely.store.sys.platform','win32'),patch.dict(os.environ,{'LOCALAPPDATA':'/tmp/user-local'},clear=True):
             self.assertEqual(default_data_dir(),Path('/tmp/user-local/EVE Muhely'))
