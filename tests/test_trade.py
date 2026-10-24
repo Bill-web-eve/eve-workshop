@@ -33,7 +33,7 @@ class TradeTests(unittest.TestCase):
         with self.assertRaises(PlanningError):rate(6,0)
     def test_local_configuration_is_validated_before_mutation(self):
         self.settings('2.5');old=self.trade.settings()
-        for data in [{'system_id':30000142,'reader_id':11,'location_id':LOC['id']},{'system_id':30004600,'reader_id':12},{'system_id':30004600,'reader_id':11,'structure_broker_fee':'.1'}]:
+        for data in [{'system_id':30000142,'reader_id':11,'location_id':LOC['id']},{'system_id':30004600,'reader_id':12},{'system_id':30004600,'reader_id':11,'structure_broker_fee':'-0.1'}]:
             with self.assertRaises(PlanningError):self.trade.save(data)
             self.assertEqual(old,self.trade.settings())
     def test_unconfigured_local_quotes_never_fall_back_to_jita(self):
@@ -80,6 +80,12 @@ class TradeTests(unittest.TestCase):
         self.settings('2.5');self.skills(4,5)
         result=self.trade.profile(11,'local');self.assertEqual(result['broker_fee'],'2.5');self.assertEqual(result['sales_tax'],'4.200')
         self.assertIsNone(result['corp_standing'])
+    def test_explicit_zero_structure_broker_fee_is_persisted_without_removing_sales_tax(self):
+        self.settings('0');self.skills()
+        trade=Trade(self.store,self.catalog,self.eve,lambda:self.now)
+        self.assertEqual(trade.settings()['structure_broker_fee'],'0')
+        result=trade.profile(11,'local')
+        self.assertEqual(result['broker_fee'],'0');self.assertEqual(result['sales_tax'],'3.375')
     def test_missing_seller_skills_or_structure_fee_stay_unknown(self):
         self.settings();result=self.trade.profile(11,'local')
         self.assertIsNone(result['sales_tax']);self.assertIsNone(result['broker_fee']);self.assertTrue(result['warnings'])

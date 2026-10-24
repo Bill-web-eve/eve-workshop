@@ -125,7 +125,7 @@ class Trade:
             if not cached or cached['data']['system_id']!=sid:raise PlanningError('Előbb keresd meg és válaszd ki az állomást ebben a rendszerben.')
             location=cached['data']
         fee=data.get('structure_broker_fee')
-        fee=None if fee in [None,''] else decimal(fee,'Teljes struktúra broker fee',.5,100)
+        fee=None if fee in [None,''] else decimal(fee,'Teljes struktúra broker fee',0,100)
         search=str(data.get('search','')).strip()
         if len(search)>120:raise PlanningError('Túl hosszú marketnév.')
         p.update(system_id=sid,reader_id=cid,location_id=location_id,location=location,search=search,structure_broker_fee=fee)

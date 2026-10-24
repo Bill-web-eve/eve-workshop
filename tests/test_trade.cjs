@@ -31,6 +31,14 @@ test('immediate selling skips broker fees; new orders apply the 100 ISK floor ex
  assert.equal(run(`financeFee(123456789n,'1.12345678')`),1386984n);
  assert.equal(run(`financeValues(c,{...f,sale_order:'instant'},books,{sales_tax:'3.375',broker_fee:null},{complete:true,cents:'0'}).values.broker_fee`),0n);
 });
+test('an explicit zero broker estimate stays zero while sales tax is retained',t=>{
+ const {dom,run}=setup();t.after(()=>dom.window.close());
+ const result=run(`financeValues(c,f,books,{...profile,broker_fee:'0'},{complete:true,cents:'10000'})`);
+ assert.equal(result.values.broker_fee,0n);assert.equal(result.values.sales_tax,675000n);
+ assert.equal(result.values.net,19325000n);assert.equal(result.values.profit,19269000n);
+ const small=run(`financeValues({...c,quantity:1},f,{...books,jita:{quotes:{1:{sell:'0.01'}}}},{...profile,broker_fee:'0.0001'},{complete:true,cents:'0'})`);
+ assert.equal(small.values.broker_fee,10000n);
+});
 test('the compact card prices only newly planned target output and exposes independent controls',t=>{
  const {dom,run,d}=setup();t.after(()=>dom.window.close());
  run(`financePrefs=f;document.querySelector('#production-finance').innerHTML=productionFinance(c.plan,c.materials);financePrefs=f;financeBooks=books;financeProfile=profile;applyProductionFinance();`);
