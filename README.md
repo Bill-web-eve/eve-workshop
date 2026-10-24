@@ -29,7 +29,7 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Tervtől független keresés minden személyes és corporation item között; az In progress nézet személyes összesítése minden karakterre is kérhető.
 - Corporationönként kikapcsolható adatfigyelés és legalább 15 perces automatikus ESI-frissítési időköz; a kifejezett kézi frissítés és a külön engedélyezett pozíciókövetés kivétel.
 - Pontosabb PI-kitermelési időzítők, bolygónként elkülönített gyári készletbecslés és a holdnaptár hiányzó hozzáféréseinek érthetőbb jelzései.
-- Részletes magyar és angol dokumentáció; tiszta Mac- és Windows-csomag személyes adatok nélkül. A közzététel csak a Windows WebView2-futtatási próba sikeres befejezése után indul.
+- Részletes magyar és angol dokumentáció; tiszta Mac- és Windows-csomag személyes adatok nélkül. A közzététel csak a teljes alkalmazásteszt és a Windows WebView2-futtatási próba sikeres befejezése után indul.
 
 ## Az 1.2.0 kiadás újdonságai
 
@@ -75,7 +75,7 @@ Local Hungarian/English EVE Online industry planner. Developer and build notes f
 
 ## Development
 
-- Python 3.9+; runtime dependency: `cryptography` (SSO token signatures and encryption).
+- Python 3.9+; runtime dependencies: `cryptography` (SSO token signatures and encryption) and `certifi` (HTTPS certificate bundle).
 - Run: `python3 run.py --no-browser` then open `http://127.0.0.1:8765`.
 - Test: `python3 -m unittest discover -s tests -v` (binds loopback ports).
 - UI tests: `npm ci --ignore-scripts` then `npm test`. Node and jsdom are developer-only dependencies; neither is needed to run the app.

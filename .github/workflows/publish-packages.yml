@@ -17,11 +17,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  application-check:
+    if: github.repository == 'Bill-web-eve/eve-workshop' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/test.yml
   windows-check:
     if: github.repository == 'Bill-web-eve/eve-workshop' && github.ref == 'refs/heads/main'
     uses: ./.github/workflows/windows-window.yml
   publish:
-    needs: windows-check
+    needs: [application-check, windows-check]
     if: github.repository == 'Bill-web-eve/eve-workshop' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
