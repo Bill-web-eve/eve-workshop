@@ -1,0 +1,30 @@
+{
+  "tag": "v1.4.1",
+  "title": "EVE Workshop 1.4.1 \u2013 Windows intel overlay",
+  "assets": [
+    {
+      "name": "EVE_Muhely-1.4.1-Windows11-x64.sha256",
+      "sha256": "d512e9747b6a80c5cc024337571406da11b797f85061b6c8952948d9476931e4"
+    },
+    {
+      "name": "EVE_Muhely-1.4.1-Windows11-x64.zip",
+      "sha256": "5666e11734fccd6e5f2e38446f81a310102cc8862d710846c864eab7ad571402"
+    },
+    {
+      "name": "EVE_Muhely-1.4.1-macOS-AppleSilicon.dmg",
+      "sha256": "d11cde7c8e9a71c4044605f7d85effbeed3c4934bae77fa706d2f856420b78b3"
+    },
+    {
+      "name": "EVE_Muhely-1.4.1-macOS-AppleSilicon.sha256",
+      "sha256": "4296a01a73357a6d9c8315f4801856825703f84874b39cbb2ebe6d5e9e92ff59"
+    },
+    {
+      "name": "EVE_Muhely-Telepites.txt",
+      "sha256": "3d2ca1c060ce368f032872b3bcb4fef7a1903274202fde6a753524e19b7f2fcc"
+    },
+    {
+      "name": "EVE_Muhely-Windows-Telepites.txt",
+      "sha256": "946660329053c83ca8da906b0128d816925da97592cdfb49e4e898db82c6007c"
+    }
+  ]
+}

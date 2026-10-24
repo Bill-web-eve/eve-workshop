@@ -93,3 +93,9 @@ runtime/
 !release-assets/v1.4.0/EVE_Muhely-1.4.0-macOS-AppleSilicon.sha256
 !release-assets/v1.4.0/EVE_Muhely-1.4.0-Windows11-x64.zip
 !release-assets/v1.4.0/EVE_Muhely-1.4.0-Windows11-x64.sha256
+
+# Reviewed 1.4.1 native Mac and Windows intel overlay release.
+!release-assets/v1.4.1/EVE_Muhely-1.4.1-macOS-AppleSilicon.dmg
+!release-assets/v1.4.1/EVE_Muhely-1.4.1-macOS-AppleSilicon.sha256
+!release-assets/v1.4.1/EVE_Muhely-1.4.1-Windows11-x64.zip
+!release-assets/v1.4.1/EVE_Muhely-1.4.1-Windows11-x64.sha256

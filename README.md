@@ -4,7 +4,7 @@ Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple S
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.4.0**, **Windows 11 x64 1.4.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.4.1**, **Windows 11 x64 1.4.1**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -21,6 +21,13 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Választható helyi station/struktúra market buy/sell/split árakkal, külön ESI-olvasóval; a privát piac gyorsítótára elkülönül Jitától és más olvasóktól.
 - Kompakt tervenkénti bekerülés/bevétel/profit, független anyag- és eladási árforrással, Accounting/standing alapú NPC-díjakkal, megadható struktúra broker fee-vel és egyéb költségekkel.
 - Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
+
+## Az 1.4.1 kiadás újdonságai
+
+- Windowson is elérhető az átlátszó intel overlay: keret nélküli, felül maradó ablak, amely nem veszi el a billentyűzet fókuszát és normál módban átengedi a kattintásokat.
+- Monitoronként menthető pozíció, húzható elhelyezési minta, 1–3600 másodperces megjelenítési idő, magyar–angol felület és sötét/világos téma.
+- Az intelértesítések kikapcsolása az overlayt is azonnal elrejti. A jelentések az eredeti időpontjuk alapján járnak le; egy frissítés nem hosszabbítja meg őket.
+- Valódi Windowsos ellenőrzés az overlay kirajzolására, fókuszkezelésére, kattintásátengedésére, lejáratára és bezárására. Az EVE keret nélküli ablakos módja támogatott; exkluzív teljes képernyős játék és a Windows biztonsági képernyői eltakarhatják az overlayt.
 
 ## Az 1.4.0 kiadás újdonságai
 
