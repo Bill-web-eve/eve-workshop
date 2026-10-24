@@ -44,10 +44,19 @@ def python_path(setup=False):
 
 
 def main():
+    global URL
     parser = argparse.ArgumentParser()
     parser.add_argument('--setup', action='store_true')
     parser.add_argument('--no-browser', action='store_true')
+    parser.add_argument('--shutdown',action='store_true',help=argparse.SUPPRESS)
+    parser.add_argument('--port',type=int,default=8765,help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if not 1024<=args.port<=65535:parser.error('Invalid local port')
+    URL=f'http://127.0.0.1:{args.port}'
+    if args.shutdown:
+        from desktop import stop_backend
+        if not stop_backend(URL):raise SystemExit('Could not stop the local EVE service')
+        return
     if sys.version_info < (3, 9):
         raise SystemExit('Python 3.9 vagy újabb szükséges: https://www.python.org/downloads/macos/')
     os.umask(0o077)
@@ -63,7 +72,7 @@ def main():
         if log.exists() and log.stat().st_size > 1024*1024:
             log.replace(DATA/'server.previous.log')
         with log.open('ab') as output:
-            subprocess.Popen([python, str(ROOT/'run.py'), '--no-browser', '--data-dir', str(DATA)],
+            subprocess.Popen([python, str(ROOT/'run.py'), '--no-browser', '--port',str(args.port), '--data-dir', str(DATA)],
                              cwd=ROOT, stdout=output, stderr=output, start_new_session=True)
         for _ in range(100):
             if ready():

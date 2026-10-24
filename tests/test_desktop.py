@@ -11,6 +11,12 @@ from tools.build_macos_release import public_config,audit_bundle,install_window_
 
 
 class CleanReleaseTests(unittest.TestCase):
+    def test_developer_launcher_can_stop_service_before_setup_or_profile_creation(self):
+        import launch
+        with patch.object(launch.sys,'argv',['launch.py','--shutdown','--port','18995']),patch('desktop.stop_backend',return_value=True) as stop,patch.object(launch,'python_path') as runtime:
+            launch.main()
+        stop.assert_called_once_with('http://127.0.0.1:18995');runtime.assert_not_called()
+
     def test_stop_refuses_other_origins_and_other_services(self):
         for origin in ['https://127.0.0.1:8765','http://remote.invalid:8765','http://127.0.0.1:8765/path','http://user@127.0.0.1:8765']:
             with self.assertRaises(ValueError):desktop.stop_backend(origin)
