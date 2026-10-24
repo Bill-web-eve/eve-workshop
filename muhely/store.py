@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import json
+import hashlib
 import os
 from pathlib import Path
 import sqlite3
@@ -42,6 +43,10 @@ def default_data_dir():
     if sys.platform == 'win32':
         return Path(os.environ.get('LOCALAPPDATA') or Path.home()/'AppData/Local')/'EVE Muhely'
     return Path.home() / '.local/share/eve-muhely'
+
+
+def moon_revision(records):
+    return hashlib.sha256(json.dumps(sorted(records,key=lambda r:r['moon_id']),sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 
 class Store:
@@ -321,6 +326,15 @@ class Store:
                 raise PlanningError('Ez a hold már szerepel a nyilvántartásban.')
             db.execute('INSERT INTO moons VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET moon_id=excluded.moon_id,data=excluded.data',
                        (value['id'],value['moon_id'],json.dumps(value)))
+
+    def import_moons(self, values, expected_revision):
+        from .planner import PlanningError
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            current=[json.loads(r['data']) for r in db.execute('SELECT data FROM moons')]
+            if moon_revision(current)!=expected_revision:raise PlanningError('A holdlista megváltozott; kérj új importelőnézetet.')
+            db.executemany('INSERT INTO moons VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET moon_id=excluded.moon_id,data=excluded.data',
+                ((r['id'],r['moon_id'],json.dumps(r)) for r in values))
 
     def remove_moon(self, value):
         with self.db() as db:db.execute('DELETE FROM moons WHERE id=?',(value,))

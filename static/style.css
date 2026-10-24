@@ -239,3 +239,7 @@ html[data-intel-window=map] .page-heading{display:none}html[data-intel-window=ma
 @media(max-width:650px){.finance-grid{grid-template-columns:1fr}.finance-grid>section+section{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:12px}.finance-grid>section:last-child{display:flex}.finance-total strong{font-size:17px}}
 
 .finance-control-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-width:0}
+
+#moon-import-form>label{display:flex;flex-direction:column;gap:6px;margin-top:14px}#moon-import-form textarea{width:100%;font-family:ui-monospace,monospace;font-size:12px;resize:vertical}#moon-import-form progress{width:110px;height:8px}
+
+.moon-register-toolbar{justify-content:flex-start;gap:8px}.moon-register-toolbar p{flex-basis:100%;max-width:none;font-size:12px}

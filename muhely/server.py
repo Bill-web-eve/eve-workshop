@@ -23,6 +23,7 @@ import webbrowser
 from . import __version__
 from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe, mining, assets, jobs as job_browser, fleet
 from .market import Market,validate_ids as market_ids
+from . import moon_transfer
 from .trade import Trade
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
@@ -635,7 +636,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -731,6 +732,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/moons/calendar.ics':
                 with self.app.catalog.lock:
                     return self.send(200, moon_calendar.export(self.app.store, self.app.catalog, query.get('lang', ['en'])[0]), 'text/calendar; charset=utf-8', headers={'Content-Disposition': 'attachment; filename="eve-moon-extractions.ics"'})
+            if path == '/api/moons/export':
+                with self.app.catalog.lock:return self.send(200,moon_transfer.export_register(self.app.store,self.app.catalog))
             if path == '/api/moons':
                 with self.app.catalog.lock:return self.send(200,moons.dashboard(self.app.store,self.app.catalog,self.app.eve.granted_scopes()))
             if path == '/api/moons/crystals':
@@ -815,6 +818,10 @@ class Handler(BaseHTTPRequestHandler):
                     raise PlanningError('Hibás kérés.')
                 moon_calendar.feed_token(self.app.store, action)
                 return self.send(200, moon_calendar.feed_status(self.app.store, self.app.origin))
+            elif path == '/api/moons/import/preview':
+                with self.app.catalog.lock:return self.send(200,moon_transfer.preview(self.app.store,self.app.catalog,data))
+            elif path == '/api/moons/import':
+                with self.app.catalog.lock:return self.send(200,moon_transfer.apply_import(self.app.store,self.app.catalog,data))
             elif path == '/api/moons/save':
                 with self.app.catalog.lock:
                     value=moons.validate_moon(data,self.app.catalog,self.app.store.moon_records())

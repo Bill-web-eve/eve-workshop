@@ -43,6 +43,13 @@ class WindowsWindowTests(unittest.TestCase):
         self.window.create_file_dialog.return_value=None
         self.assertEqual(self.host.dispatch(self.window,self.host.origin,body),{'saved':False})
 
+    def test_bulk_moon_json_uses_native_save_without_changing_encoding(self):
+        path=Path(self.tmp.name)/'moons.json';data=b'{"format":"eve-workshop-moons","version":1,"moons":[{"moon_id":1},{"moon_id":2}]}\n'
+        self.window.create_file_dialog.return_value=(str(path),)
+        body={'action':'save','filename':'eve-moons.json','base64':base64.b64encode(data).decode()}
+        self.assertEqual(self.host.dispatch(self.window,self.host.origin,body),{'saved':True})
+        self.assertEqual(path.read_bytes(),data)
+
     def test_save_rejects_paths_executables_and_bad_base64_before_showing_dialog(self):
         for patch_value in [{'filename':'../tokens.txt'},{'filename':'C:\\private.txt'},{'filename':'run.exe'},{'base64':'not base64'}]:
             body={'filename':'test.csv','base64':'YQ==',**patch_value}

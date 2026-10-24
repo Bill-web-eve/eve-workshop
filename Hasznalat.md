@@ -335,6 +335,10 @@ Az eladási adót és a broker fee-t a holdak **Számítási beállítások** la
 
 Nyisd le a **Moon management / Holdak és kitermelés** menüt. A **Holdnyilvántartás** alatt új holdat vihetsz fel, a meglévőket szerkesztheted vagy törölheted.
 
+**Tömeges export/import:** az **Összes hold exportja** a teljes nyilvántartást JSON-fájlba menti, a felvitt ércekkel, arányokkal, struktúrával, költségekkel és megjegyzésekkel, a nézetszűrőtől függetlenül. Karakteradatot és EVE-belépést nem exportál. A **Tömeges import / scan** alatt töltsd be a fájlt, vagy illeszd be a játék scantáblázatát; több hold is szerepelhet benne. Az EVE Quantity 0–1 közötti arány, amelyet százalékká alakítunk. A MoonID, SolarSystemID, PlanetID és Ore TypeID értékeit ellenőrizzük; az ID-khez nem illő neveket jelezzük.
+
+Válaszd ki az új scanholdak struktúráját és közös kezdő bérleti díját. Kérj **Import előnézete** ellenőrzést, majd a külön importgombbal ments. Alapból a már felvitt holdak kimaradnak. **Frissítés** esetén a scan csak az összetételt cseréli, a meglévő struktúra és költségek megmaradnak; JSON-import a fájl holdbeállításait alkalmazza. A kihagyott holdakat soha nem törli. Az import egy műveletben legfeljebb 1000 holdat és 1 MB szöveget fogad. Hibás sor vagy az előnézet óta megváltozott nyilvántartás esetén egyetlen holdat sem módosít.
+
 1. A rendszermezőbe gépelj nevet, és válassz a szűkülő találati listából. Az app a rendszerhez tartozó constellationt és alapadatokat ESI-ből rendeli hozzá és gyorsítótárazza.
 2. Válaszd ki a holdat és a fúrót: **Athanor** vagy **Metenox**. Holdanként legfeljebb négy különböző ércet választhatsz a listából; kevesebb érc is megadható. Minden érc mellé adj százalékos arányt.
 3. A százalékok összegét ellenőrizd. A 100% fölötti összetétel hibás, nem kerül a termelésbe. A 100% alatti adat részleges: csak a megadott ércek mennyiségét számítja, a hiányzó részt nem osztja szét. Az app nem javítja ki automatikusan a kézzel beírt arányokat.

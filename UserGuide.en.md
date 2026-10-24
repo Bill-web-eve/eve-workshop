@@ -352,6 +352,10 @@ The compact plan panel deducts seller fees for its net-revenue and profit estima
 
 Expand **Moon management** in the sidebar. **Moon register** lets you add, edit or delete moons.
 
+**Bulk export/import:** **Export all moons** saves the complete register as JSON, including entered ores, shares, drill types, costs and notes, independently of the view filter. Character data and EVE authorizations are excluded. Under **Bulk import / scan**, load the file or paste the in-game survey table; multiple moons are supported. EVE Quantity is a fraction from 0 to 1, converted to percentages. MoonID, SolarSystemID, PlanetID and Ore TypeID are validated; names that disagree with IDs are flagged.
+
+Choose the drill type and common initial rent for new scanned moons. Select **Preview import**, inspect the rows, then save with the separate import button. Existing moons are skipped by default. With **Update**, rescans replace composition while preserving existing drill settings and costs; JSON imports apply the moon settings in the file. Omitted moons are never deleted. Each import supports up to 1000 moons and 1 MB of text. Invalid rows or changes to the register since the preview prevent the entire import, with no partial writes.
+
 1. Start typing the system name and select a result. The constellation and basic system data are obtained from ESI and cached.
 2. Select the moon and drilling structure, **Athanor** or **Metenox**. Choose up to four distinct ore types from dropdowns and enter their percentages. Fewer than four ores are allowed.
 3. Check the percentage total. Totals above 100% are invalid and excluded from production. Below 100% is a partial composition: only declared ores are calculated, without distributing the undeclared remainder. Manual ratios are not silently corrected.

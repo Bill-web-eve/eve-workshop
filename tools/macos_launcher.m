@@ -228,11 +228,18 @@ static BOOL StartService(NSString **logPath) {
     NSAlert *alert=[NSAlert new];alert.messageText=@"EVE Műhely";alert.informativeText=message;
     [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response){done();}];
 }
+- (void)webView:(WKWebView *)web runOpenPanelWithParameters:(WKOpenPanelParameters *)parameters initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(NSArray<NSURL *> *))done {
+    if(web!=self.web || !frame.mainFrame || ![self localURL:frame.request.URL]){done(nil);return;}
+    NSOpenPanel *panel=NSOpenPanel.openPanel;panel.canChooseFiles=YES;panel.canChooseDirectories=NO;
+    panel.allowsMultipleSelection=parameters.allowsMultipleSelection;panel.canCreateDirectories=NO;
+    panel.allowedFileTypes=@[@"json",@"txt",@"tsv"];panel.allowsOtherFileTypes=NO;
+    [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response){done(response==NSModalResponseOK?panel.URLs:nil);}];
+}
 - (void)saveFile:(NSDictionary *)body reply:(void (^)(id, NSString *))reply {
     NSString *name=body[@"filename"],*encoded=body[@"base64"];
     if (![name isKindOfClass:NSString.class] || ![encoded isKindOfClass:NSString.class] || encoded.length>45*1024*1024) {reply(nil,@"Invalid file");return;}
     name=name.lastPathComponent;
-    if (![@[@"csv",@"ics",@"md"] containsObject:name.pathExtension.lowercaseString] || name.length>200) {reply(nil,@"Invalid file name");return;}
+    if (![@[@"csv",@"ics",@"md",@"json"] containsObject:name.pathExtension.lowercaseString] || name.length>200) {reply(nil,@"Invalid file name");return;}
     NSData *data=[[NSData alloc] initWithBase64EncodedString:encoded options:0];
     if (!data || data.length>32*1024*1024) {reply(nil,@"Invalid file data");return;}
     NSSavePanel *panel=NSSavePanel.savePanel;panel.nameFieldStringValue=name;panel.canCreateDirectories=YES;

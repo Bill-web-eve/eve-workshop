@@ -64,8 +64,11 @@ function renderMoonBody(){
   if(moonTab==='calendar')return renderMoonCalendar(target,moons);
   if(moonTab==='crystals')return renderCrystalPlanner(target,moons);
   if(moonTab==='register'){
-    target.innerHTML=`<div class="moon-toolbar"><p class="muted">A nyilvántartás közös ezen a gépen. A becsült termelés nem kerül automatikusan a gyártási készletbe.</p><button id="moon-add" class="button primary compact">＋ Hold felvétele</button></div><div id="moon-editor"></div>`;
+    target.innerHTML=`<div class="moon-toolbar moon-register-toolbar"><p class="muted">A nyilvántartás közös ezen a gépen. A becsült termelés nem kerül automatikusan a gyártási készletbe.</p><button id="moon-export" class="button compact">Összes hold exportja</button><button id="moon-import" class="button compact">Tömeges import / scan</button><button id="moon-add" class="button primary compact">＋ Hold felvétele</button></div><div id="moon-transfer"></div><div id="moon-editor"></div>`;
     target.innerHTML+=panel('Bérelt holdak',`${fmt(moons.length)} hold`,moons.length?moonTable(['Hold','Rendszer','Csillagkép','Struktúra','Ércek és arányok','Arányösszeg','Állapot','Megjegyzés','Művelet'],moons.map(m=>`<tr><td>${verbatim(m.name)}</td><td>${verbatim(m.system.name)}</td><td>${verbatim(m.system.constellation)}<small class="sub">${m.esi_checked?'ESI · '+esc(date(m.esi_checked)):'SDE · ESI-ellenőrzés szükséges'}</small></td><td>${esc(m.structure)}</td><td><span class="badge">${m.composition_source==='manual'?'Kézi összetétel':moonSource(m.composition_source)}</span> ${m.ores.map(o=>`${itemName(o.name)} ${moonPercent(o.percent)}`).join('<br>')}</td><td class="num" data-sort-value="${m.percent_total}">${moonPercent(m.percent_total)}</td><td><span class="badge ${m.status==='invalid'?'warn':''}">${moonStatus(m)}</span></td><td>${verbatim(m.notes)}</td><td><button data-edit-moon="${esc(m.id)}" class="text-button">Szerkesztés</button></td></tr>`),'register'):empty('Még nincs hold ebben a nézetben','A Hold felvétele gombbal válassz rendszert és holdat, majd add meg az érceket.'));
+    $('#moon-export').onclick=e=>void exportMoons(e.currentTarget);
+    $('#moon-import').onclick=()=>openMoonTransfer();
+    if(moonTransferDraft)renderMoonTransfer();
     $('#moon-add').onclick=()=>openMoonEditor();
     $$('[data-edit-moon]').forEach(b=>b.onclick=()=>openMoonEditor(d.moons.find(m=>m.id===b.dataset.editMoon)));
     return;
@@ -110,6 +113,7 @@ function renderMoonSettings(target){
   form.onsubmit=async e=>{e.preventDefault();try{const f=new FormData(form);await api('/api/moons/settings',{implant:Number(f.get('implant')),mining_recovery:moonNumber(f.get('mining_recovery')),crystal_variant:f.get('crystal_variant'),sales_tax:moonNumber(f.get('sales_tax')),broker_fee:moonNumber(f.get('broker_fee'))});delete dirty.moon_settings;await refreshMoons(true);toast('Holdbeállítások mentve.');}catch(e){error(e.message);}};
 }
 function openMoonEditor(record){
+  if(dirty.moon_import)return error('Előbb fejezd be vagy zárd be a holdimportot.');
   moonEditing=true;moonSelected=record?{id:record.system_id,name:record.system.name}:null;
   const target=$('#moon-editor');if(!target)return;
   const d=moonData,entries=record?.manual_ores||record?.ores||[];
