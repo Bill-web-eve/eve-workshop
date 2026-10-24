@@ -730,7 +730,7 @@ $('#new-plan').onclick=async()=>{
   if(Object.keys(dirty).length)return error('Az új terv előtt alkalmazd a beírt módosításokat.');
   activePlanId=null;updatePlanControls();await calculate();
 };
-$('#shutdown').onclick=async()=>{if(!confirmUI('Leállítod a helyi alkalmazást? A mentett adatok megmaradnak.'))return;try{await api('/api/shutdown',{});if(EveDesktop.active){await EveDesktop.quit();return;}document.body.innerHTML='<main><section class="content"><h1>A műhely leállt.</h1><p>Az indítóikonnal újra megnyithatod. Ezt a böngészőlapot bezárhatod.</p></section></main>';}catch(e){error(e.message);}};
+$('#shutdown').onclick=async()=>{if(!confirmUI('Leállítod a helyi alkalmazást? A mentett adatok megmaradnak.'))return;try{if(EveDesktop.active){await EveDesktop.quit();return;}await api('/api/shutdown',{});document.body.innerHTML='<main><section class="content"><h1>A műhely leállt.</h1><p>Az indítóikonnal újra megnyithatod. Ezt a böngészőlapot bezárhatod.</p></section></main>';}catch(e){error(e.message);}};
 $('#product-search').oninput=()=>{
   productId=null;activePlanId=null;updatePlanControls();clearTimeout(searchTimer);
   const q=$('#product-search').value;

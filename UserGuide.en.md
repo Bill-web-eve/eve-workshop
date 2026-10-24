@@ -638,3 +638,11 @@ Under **Settings → Intel settings**, **zKillboard kills in intel** controls th
 The app and **Fleet activity → Live zKillboard tracking** must be running. Kill data requires neither chat-log monitoring nor an additional ESI scope. **Intel notifications: off** suppresses both OS alerts and the transparent overlay while leaving map markers visible. OS delivery also requires the app’s master notification permission. Additional map/chat windows do not duplicate notifications.
 
 A kill is an observed loss, not confirmation of current hostile presence. A chat **clear/clr** message does not erase a kill marker. Delayed publications use their actual event time; events older than the intel lifetime do not trigger fresh alerts. Up to 24 hours / 20,000 compact local kill-intel records are kept. Events not published on zKillboard remain unavailable.
+
+## Page size, inventory locations and closing windows
+
+Use **Rows per page** to display 25, 50 or 100 rows. The saved preference applies across tables. Sorting and filtering cover all loaded rows, including other pages. Paging retains unapplied values entered in table rows.
+
+The full personal and corporation inventory **Status** filter offers the statuses present in that inventory. **Location / storage** displays the system, station or structure name; its ID remains in the cell tooltip and CSV export. Names resolve in the background and are cached. Private structures require structure-reading ESI permission and docking access for an authorized character. If a name is unavailable, the ID remains visible and the app explains the access requirement.
+
+The **main window close button**, system Quit command and **Quit application** all perform a complete shutdown: local service, intel/fleet monitoring, detached intel windows and overlay stop, and the local port is released. Closing during startup also stops the backend. Closing a detached map or chat window still closes only that window. Saved personal data is retained.

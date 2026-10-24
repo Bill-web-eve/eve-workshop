@@ -636,3 +636,11 @@ A **Beállítások → Intelbeállítások → zKillboard-killek az intelben** k
 A forráshoz futnia kell az appnak és a **Fleet activity → Live zKillboard tracking** funkciónak. Chatlog-olvasás vagy további ESI-engedély nem szükséges a killadatokhoz. Az **Intelértesítések** kapcsoló kikapcsolása az OS-értesítést és a képernyőn felugró jelzést is tiltja; a térképen a killek továbbra is látszanak. Az OS-értesítéshez az app fő értesítési engedélye is kell. Több megnyitott térkép-/chatablak nem küldi ki többször a jelzéseket.
 
 A kill megtörtént veszteség, nem igazolt jelenlegi ellenséges jelenlét. A chatből érkező **clear/clr** nem törli a killjelölést. A későn publikált kill tényleges időpontját figyelembe vesszük: az érvényességi ablaknál régebbi esemény nem vált ki friss riasztást. Az app legfeljebb 24 óra / 20 000 tömörített helyi killintelrekordot tart meg. A zKillboardon nem közzétett események itt sem látszanak.
+
+## Lapméret, készlethelyek és ablakbezárás
+
+A táblázatok **Sor oldalanként** mezőjével 25, 50 vagy 100 sor választható. A beállítás megmarad, és a többi táblázatra is érvényes. A rendezés és szűrés az összes betöltött soron működik, nem csak az aktuális oldalon. A lapozás nem dobja el a sorokban megadott, még nem alkalmazott értékeket.
+
+A teljes személyes és corporation készlet **Állapot** szűrője a készletben ténylegesen előforduló állapotokat kínálja fel. A **Hely / tárolási hely** oszlop a rendszer, állomás vagy struktúra nevét mutatja; az azonosító a cella súgójában és CSV-exportban megmarad. A névfeloldás háttérben történik, az ismert nevek gyorsítótárazódnak. Privát struktúrához struktúraolvasási ESI-jog és az adott karakter dokkolási hozzáférése szükséges. Ha a név nem hozzáférhető, az ID megmarad és az app jelzi az engedélyigényt.
+
+A **főablak bezárógombja**, a rendszer Quit parancsa és az **Alkalmazás leállítása** ugyanahhoz a teljes leállításhoz vezet. Leáll a helyi szolgáltatás és az intel-/flottafigyelés, felszabadul a helyi port, bezárulnak a külön intelablakok és az overlay. Indulás közbeni bezárás sem hagy háttérszolgáltatást futni. A külön térkép- vagy chatablak önálló bezárása továbbra is csak azt az ablakot zárja. A saját mentett adatok megmaradnak.

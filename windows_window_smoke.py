@@ -104,7 +104,7 @@ def check(report_path=None):
                     results.update(check_overlay(host,window,folder))
             except Exception as error:results['error']=str(error) or 'Native assertion failed'
             finally:
-                restore_clipboard();host._script(window,'void EveDesktop.shutdown()')
+                restore_clipboard();window.destroy()
         host.self_test_callback=result
         script=r'''(async()=>{
           try{

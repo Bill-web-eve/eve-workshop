@@ -206,6 +206,10 @@ class WindowHost:
             self._script(self.main,'void EveDesktop.shutdown()');return True
         if action=='quitFailed':self.quitting=False;return True
         if action=='stopped':
+            from desktop import stop_backend
+            if not stop_backend(self.origin):
+                self.quitting=False
+                raise ValueError('Could not stop the local service. Please try again.' if self.language=='en' else 'A helyi szolgáltatás nem állt le. Próbáld újra.')
             self.stopped=True
             if self.overlay is not None:self._ui(self.main,self.overlay.dispose)
             for child in list(self.children.values()):child.destroy()
@@ -268,16 +272,13 @@ class WindowHost:
         if self.stopped:return True
         if self.quitting:return False
         self.quitting=True
-        if not self.ready:
-            # Allow an initial page load to finish before querying dirty/task state.
-            def delayed():
-                for _ in range(200):
-                    if self.ready:break
-                    time.sleep(.1)
+        def close():
+            try:
                 if self.ready:self._script(self.main,'void EveDesktop.prepareQuit()')
-                else:self.quitting=False
-            threading.Thread(target=delayed,daemon=True).start()
-        else:threading.Thread(target=lambda:self._script(self.main,'void EveDesktop.prepareQuit()'),daemon=True).start()
+                else:self.dispatch(self.main,self.origin,{'action':'stopped'})
+            except Exception:
+                LOG.exception('Window close could not finish');self.quitting=False
+        threading.Thread(target=close,daemon=True).start()
         return False
 
     def create_main(self):

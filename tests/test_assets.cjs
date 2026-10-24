@@ -25,6 +25,27 @@ async function fixture(){
  await tick();await tick();run('navigate("inventory")');await tick();
  return {w,d,run,calls,personal,delay:p=>{assetsDelay=p;},fail:value=>{failAssets=value;}};
 }
+test('inventory status dropdown uses actual options; names and 25/50/100 paging work together',async t=>{
+ const {w,d,personal}=await fixture();t.after(()=>w.close());
+ personal.rows[140].location_name='C-N4OD - Fountain of Life';
+ d.querySelector('[data-inventory-mode=personal]').click();await tick();await tick();
+ let size=d.querySelector('[data-table-page-size]');assert.deepEqual([...size.options].map(o=>o.value),['25','50','100']);
+ size.value='25';size.dispatchEvent(new w.Event('change'));assert.equal(d.querySelectorAll('.all-assets-table tbody tr').length,25);
+ d.querySelector('#asset-next').click();assert(d.querySelector('.asset-pagination').textContent.includes('2 / 6'));
+ const filter=d.querySelector('[data-asset-status-filter]');assert.equal(filter.tagName,'SELECT');assert.deepEqual([...filter.options].map(o=>o.value),['','packaged','singleton']);
+ filter.value='singleton';filter.dispatchEvent(new w.Event('change'));assert.equal(d.querySelectorAll('.all-assets-table tbody tr').length,1);
+ assert(d.querySelector('.all-assets-table tbody tr').textContent.includes('C-N4OD - Fountain of Life'));
+ w.EveI18n.setLanguage('hu');assert.equal(d.querySelector('[data-asset-status-filter]').value,'singleton');assert.equal(d.querySelectorAll('.all-assets-table tbody tr').length,1);
+});
+test('background location names keep the focused status dropdown and update location cells in place',async t=>{
+ const {w,d,run,personal}=await fixture();t.after(()=>w.close());
+ d.querySelector('[data-inventory-mode=personal]').click();await tick();await tick();
+ d.querySelector('#asset-filters').click();const filter=d.querySelector('[data-asset-status-filter]');filter.focus();
+ personal.rows.forEach(row=>row.location_name='Resolved station');personal.locations_pending=false;
+ await run('refreshAssetLocationNames(assetData.key,assetRevision)');
+ assert.equal(d.querySelector('[data-asset-status-filter]'),filter);assert.equal(d.activeElement,filter);
+ assert.equal(d.querySelector('[data-asset-location-name]').textContent,'Resolved station');
+});
 test('full personal inventory works without a plan, searches all pages and copies plain item names',async t=>{
  const {w,d,run,calls}=await fixture();t.after(()=>w.close());
  assert(d.querySelector('[data-inventory-mode=personal]'));

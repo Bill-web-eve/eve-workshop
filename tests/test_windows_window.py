@@ -83,7 +83,7 @@ class WindowsWindowTests(unittest.TestCase):
             with self.subTest(body=body),self.assertRaises(ValueError):self.host.dispatch(self.window,self.host.origin,body)
 
     def test_overlay_is_lazy_and_all_native_calls_use_main_ui_thread(self):
-        with patch('muhely.windows_overlay.NativeOverlay') as factory,patch.object(self.host,'_ui',side_effect=lambda window,fn:fn()) as ui:
+        with patch('desktop.stop_backend',return_value=True),patch('muhely.windows_overlay.NativeOverlay') as factory,patch.object(self.host,'_ui',side_effect=lambda window,fn:fn()) as ui:
             self.assertIsNone(self.host.overlay)
             self.host.dispatch(self.window,self.host.origin,{'action':'intelOverlayStatus'})
             factory.assert_called_once_with(self.host.folder,'dark','hu')

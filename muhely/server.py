@@ -37,6 +37,7 @@ from .reservations import allocate_plans, except_owner
 from .store import Store, default_data_dir, DEFAULT_SETTINGS
 
 from .refresh_policy import RefreshPolicy
+from .asset_locations import AssetLocations
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -55,6 +56,7 @@ class App:
         self.cookie = secrets.token_urlsafe(32)
         self.csrf = secrets.token_urlsafe(32)
         self.instance = secrets.token_urlsafe(24)
+        self.stopping=False
         self.refresh_policy = RefreshPolicy(self.store)
         self.desktop_auth = {}
         self.desktop_auth_lock = threading.RLock()
@@ -63,6 +65,7 @@ class App:
         self.task = {'running': False, 'kind': None, 'message': '', 'finished': None, 'results': []}
         self.intel=intel.IntelMonitor(self.store,self.catalog,self.eve)
         self.fleet=fleet.Fleet(self.store,self.catalog,self.eve)
+        self.asset_locations=AssetLocations(self.store,self.eve)
 
     def desktop_auth_start(self, url):
         """One-use browser handoff; OAuth codes and tokens never enter the UI."""
@@ -93,6 +96,7 @@ class App:
 
     def start_task(self, kind, manual=True):
         with self.task_lock:
+            if self.stopping:raise PlanningError('Az alkalmazás leállítása folyamatban van.')
             if self.task['running']:
                 raise PlanningError('Egy frissítés már folyamatban van.')
             domains=self.refresh_domains(kind)
@@ -662,7 +666,8 @@ class Handler(BaseHTTPRequestHandler):
                 with self.app.catalog.lock:return self.send(200,job_browser.dashboard(self.app.store,self.app.catalog,cid))
             if path == '/api/assets':
                 cid=self.app.scope_id(query.get('corporation_id',[None])[0])
-                with self.app.catalog.lock:return self.send(200,assets.dashboard(self.app.store,self.app.catalog,cid))
+                with self.app.catalog.lock:data=assets.dashboard(self.app.store,self.app.catalog,cid)
+                return self.send(200,self.app.asset_locations.decorate(data,cid))
             if path == '/api/intel':
                 center=integer(int(query.get('center',['0'])[0]),'Rendszer',2**31-1,0) or None
                 radius=integer(int(query.get('radius',['5'])[0]),'Jump',12,1)
@@ -941,9 +946,21 @@ class Server(ThreadingHTTPServer):
     allow_reuse_address = True
 
     def server_close(self):
+        if getattr(self,'_workers_stopped',False):return super().server_close()
+        self._workers_stopped=True
+        self.app.asset_locations.stop()
         self.app.fleet.stop()
         self.app.intel.stop()
         super().server_close()
+
+    def shutdown(self):
+        # The shutdown button and native window close share the same complete
+        # teardown, including the listening socket, rather than only the loop.
+        self.app.stopping=True;self.app.fleet.closed=True;self.app.intel.closed=True
+        with self.app.asset_locations.lock:self.app.asset_locations.closed=True;self.app.asset_locations.pending.clear()
+        self.app.fleet.stop_event.set();self.app.intel.stop_event.set()
+        super().shutdown()
+        self.server_close()
 
     def __init__(self, app):
         self.app = app

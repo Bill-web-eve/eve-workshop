@@ -11,6 +11,15 @@ from tools.build_macos_release import public_config,audit_bundle,install_window_
 
 
 class CleanReleaseTests(unittest.TestCase):
+    def test_stop_refuses_other_origins_and_other_services(self):
+        for origin in ['https://127.0.0.1:8765','http://remote.invalid:8765','http://127.0.0.1:8765/path','http://user@127.0.0.1:8765']:
+            with self.assertRaises(ValueError):desktop.stop_backend(origin)
+        response=Mock();response.read.return_value=b'{"app":"unrelated"}'
+        opener=Mock();opener.open.return_value.__enter__=Mock(return_value=response);opener.open.return_value.__exit__=Mock(return_value=False)
+        with patch('desktop.urllib.request.build_opener',return_value=opener):
+            self.assertFalse(desktop.stop_backend('http://127.0.0.1:8765',timeout=.1))
+        opener.open.assert_called_once()
+
     def test_native_backend_starts_fleet_workers_and_closes_service(self):
         with tempfile.TemporaryDirectory() as folder:
             with patch.object(desktop.sys,'argv',['desktop.py','--serve','--no-browser','--port','8766','--data-dir',folder]),patch('muhely.server.App') as app_type,patch('muhely.server.Server') as server_type:

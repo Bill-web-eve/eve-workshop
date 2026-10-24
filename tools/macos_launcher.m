@@ -9,7 +9,7 @@
 @property NSWindow *window;
 @property WKWebView *web;
 @property NSURL *origin;
-@property BOOL ready, quitting, stopped, startupFailed;
+@property BOOL ready, quitting, stopped, startupFailed, starting, stopping, quitAfterStartup;
 @property NSString *language;
 @property NSMenuItem *settingsItem, *quitItem, *reloadItem, *editRoot, *viewRoot, *windowRoot, *minimizeItem, *zoomItem, *frontItem;
 @property NSMenu *editMenu;
@@ -25,10 +25,12 @@
 - (BOOL)openIntelWindow:(NSString *)kind options:(NSDictionary *)options;
 - (void)openExternalURL:(NSURL *)url;
 - (void)startBackend:(void (^)(BOOL))completion;
+- (void)stopServiceAndTerminate;
+- (void)completeStop:(NSNumber *)success;
 - (void)saveFile:(NSDictionary *)body reply:(void (^)(id, NSString *))reply;
 @end
 
-static BOOL StartService(NSString **logPath) {
+static BOOL RunBackend(NSString **logPath, NSArray<NSString *> *arguments) {
     umask(0077);
     NSString *folder = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/EVE Muhely"];
     NSFileManager *files = NSFileManager.defaultManager;
@@ -43,11 +45,11 @@ static BOOL StartService(NSString **logPath) {
     if ([files isExecutableFileAtPath:backend]) {
         // Public releases carry their own frozen Python service.
         task.executableURL = [NSURL fileURLWithPath:backend];
-        task.arguments = @[@"--no-browser"];
+        task.arguments = arguments;
     } else {
         // Developer installations retain their existing source/runtime launcher.
         task.executableURL = [NSURL fileURLWithPath:@"/bin/bash"];
-        task.arguments = @[[NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"eve_muhely/Inditas.command"], @"--no-browser"];
+        task.arguments = [@[[NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"eve_muhely/Inditas.command"]] arrayByAddingObjectsFromArray:arguments];
     }
     task.standardOutput = output; task.standardError = output;
     task.standardInput = NSFileHandle.fileHandleWithNullDevice;
@@ -57,6 +59,7 @@ static BOOL StartService(NSString **logPath) {
     [output closeFile];
     return ok && task.terminationStatus == 0;
 }
+static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no-browser"]);}
 
 @implementation EveWindow
 - (BOOL)managedWeb:(WKWebView *)web {return web==self.web || [self.intelViews.allValues containsObject:web];}
@@ -185,7 +188,10 @@ static BOOL StartService(NSString **logPath) {
     NSTextField *loading = [NSTextField labelWithString:@"EVE Műhely · Indítás / Starting…"];
     loading.textColor = NSColor.whiteColor; loading.frame = NSMakeRect(36,42,500,30); [self.window.contentView addSubview:loading];
     [self.window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES];
+    self.starting=YES;
     [self startBackend:^(BOOL ok){
+        self.starting=NO;
+        if(self.quitAfterStartup){self.quitAfterStartup=NO;[NSApp terminate:nil];return;}
         if (!ok) {
             self.startupFailed = YES;
             NSAlert *alert = [NSAlert new]; alert.messageText = @"Az EVE Műhely nem indult el / Startup failed";
@@ -294,19 +300,37 @@ static BOOL StartService(NSString **logPath) {
         }
         [self.web evaluateJavaScript:@"void EveDesktop.shutdown()" completionHandler:nil];
     } else if ([action isEqual:@"stopped"]) {
-        reply(@YES,nil);self.stopped=YES;
-        dispatch_async(dispatch_get_main_queue(),^{if(self.quitting)[NSApp replyToApplicationShouldTerminate:YES];else[NSApp terminate:nil];});
+        reply(@YES,nil);[self stopServiceAndTerminate];
     } else if ([action isEqual:@"quitFailed"]) {
         reply(@YES,nil);self.quitting=NO;[NSApp replyToApplicationShouldTerminate:NO];
         NSAlert *alert=[NSAlert new];alert.messageText=[self english]?@"Could not stop the local service. Try again.":@"A helyi szolgáltatás nem állt le. Próbáld újra.";[alert runModal];
     } else reply(nil,@"Unknown desktop action");
 }
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)app {
-    if(self.stopped || self.startupFailed)return NSTerminateNow;
-    if(!self.ready || self.quitting)return NSTerminateCancel;
+    if(self.stopped)return NSTerminateNow;
+    if(self.starting){self.quitAfterStartup=YES;return NSTerminateCancel;}
+    if(self.quitting)return NSTerminateCancel;
     self.quitting=YES;
-    [self.web evaluateJavaScript:@"void EveDesktop.prepareQuit()" completionHandler:^(id value,NSError *error){if(error){self.quitting=NO;[NSApp replyToApplicationShouldTerminate:NO];}}];
+    if(!self.ready){if(!self.starting)[self stopServiceAndTerminate];return NSTerminateLater;}
+    [self.web evaluateJavaScript:@"void EveDesktop.prepareQuit()" completionHandler:^(id value,NSError *error){if(error)[self stopServiceAndTerminate];}];
     return NSTerminateLater;
+}
+- (void)stopServiceAndTerminate {
+    if(self.stopping)return;self.stopping=YES;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0),^{
+        BOOL ok=RunBackend(NULL,@[@"--shutdown",@"--port",self.origin.port.stringValue?:@"8765"]);
+        // NSTerminateLater runs a modal run loop. A plain main-queue block can
+        // remain pending there, especially before a WKWebView has been created.
+        [self performSelectorOnMainThread:@selector(completeStop:) withObject:@(ok) waitUntilDone:NO modes:@[NSDefaultRunLoopMode,NSModalPanelRunLoopMode,NSEventTrackingRunLoopMode]];
+    });
+}
+- (void)completeStop:(NSNumber *)success {
+    self.stopping=NO;
+    if(!success.boolValue){BOOL pending=self.quitting;self.quitting=NO;if(pending)[NSApp replyToApplicationShouldTerminate:NO];NSAlert *alert=[NSAlert new];alert.messageText=[self english]?@"Could not stop the local service. Try again.":@"A helyi szolgáltatás nem állt le. Próbáld újra.";[alert runModal];return;}
+    self.stopped=YES;[self.notificationMonitor invalidate];[self.intelMonitor invalidate];[self.intelOverlay.timer invalidate];[self.intelOverlay.panel orderOut:nil];
+    for(NSWindow *window in [self.intelWindows.allValues copy])[window close];
+    [self.web stopLoading];
+    if(self.quitting)[NSApp replyToApplicationShouldTerminate:YES];else[NSApp terminate:nil];
 }
 - (BOOL)windowShouldClose:(NSWindow *)window {if(window!=self.window)return YES;[NSApp terminate:nil];return NO;}
 - (void)windowWillClose:(NSNotification *)note {

@@ -1,5 +1,5 @@
 'use strict';
-let scheduleResult=null,scheduleRequest=null,scheduleRevision=0,schedulePage=0,scheduleSelected=null,scheduleCharacter=null,scheduleTablePages={reaction:0,manufacturing:0},scheduleOptions={owned_only:true,transfer_blueprints:false,characters:null,start:'',supply_at:'',min_job_hours:12};
+let scheduleResult=null,scheduleRequest=null,scheduleRevision=0,schedulePage=0,scheduleSelected=null,scheduleCharacter=null,scheduleOptions={owned_only:true,transfer_blueprints:false,characters:null,start:'',supply_at:'',min_job_hours:12};
 try{Object.assign(scheduleOptions,JSON.parse(localStorage.getItem('eve-muhely-schedule-options')||'{}'));}catch{}
 if(typeof scheduleOptions.min_job_hours!=='number'||!Number.isFinite(scheduleOptions.min_job_hours)||scheduleOptions.min_job_hours<0||scheduleOptions.min_job_hours>720)scheduleOptions.min_job_hours=12;
 if(!Array.isArray(scheduleOptions.characters))scheduleOptions.characters=null;
@@ -21,7 +21,7 @@ function readScheduleOptions(){
 function renderSchedule(content){
   setHead('PÁRHUZAMOS GYÁRTÁS','Gyártásütemező','Karakterenkénti gyártási és reakciós slotok, aktív skillek, anyagérkezés és egyedi blueprintek alapján.');
   $('#plan-status').hidden=true;
-  if(scheduleResult?.key!==scheduleKey()){scheduleResult=null;schedulePage=0;scheduleSelected=null;scheduleCharacter=null;scheduleWindow=0;scheduleTablePages={reaction:0,manufacturing:0};}
+  if(scheduleResult?.key!==scheduleKey()){scheduleResult=null;schedulePage=0;scheduleSelected=null;scheduleCharacter=null;scheduleWindow=0;}
   const chars=state.production_characters||[];
   content.innerHTML=`<div class="schedule-setup"><div id="schedule-plan-slot"></div><form id="schedule-form" class="panel panel-body"><div class="schedule-options"><label class="schedule-flag"><input type="checkbox" name="owned_only" ${scheduleOptions.owned_only?'checked':''}> Csak a meglévő BPO/BPC készlettel</label><label class="schedule-flag"><input type="checkbox" name="transfer_blueprints" ${scheduleOptions.transfer_blueprints?'checked':''} ${corporationId?'disabled':''}> Személyes blueprintek átadhatók a karakterek között</label><label>Kezdés · üresen most<input type="datetime-local" name="start" value="${esc(scheduleOptions.start||'')}"></label><label>Beszerzendő anyagok és új blueprintek érkezése<input type="datetime-local" name="supply_at" value="${esc(scheduleOptions.supply_at||'')}"></label><label>Minimum jobhossz (óra)<input type="number" name="min_job_hours" min="0" max="720" step="any" required value="${scheduleOptions.min_job_hours}"></label></div><h3>Bevonható karakterek</h3><div class="schedule-characters">${chars.map(c=>`<label><input type="checkbox" data-schedule-character="${c.id}" ${scheduleOptions.characters===null||scheduleOptions.characters.includes(c.id)?'checked':''}> ${verbatim(c.name)}${!c.available?' · <span>Nincs skilladat</span>':''}</label>`).join('')||'<p>Még nincs hozzáadott karakter.</p>'}</div><details class="schedule-help"><summary>Ütemezési tudnivalók</summary><p class="footnote">A minimum a Run/job felosztást is növelheti. A hiányzó mennyiség vagy a blueprint korlátja miatt rövidebb job megmaradhat; nem gyártunk többletet. A jobok közé nem kerül várakozás. 0: nincs minimum.</p><p class="footnote">A dátumok helyi időben értendők. Üres anyagérkezés: a kezdés ideje. A személyes és corp készlet elkülönül; corp tervhez csak annak tagkaraktereit használjuk. A tanulási hely nem korlátozza az industry slotokat.</p></details><button class="button primary" type="submit" ${!productId||scheduleRequest?'disabled':''}>${scheduleRequest?'Ütemezés készül…':'Ütemterv kiszámítása'}</button></form></div><div id="schedule-result"></div>`;
   const selector=$('.plan-selector');if(selector)$('#schedule-plan-slot').replaceWith(selector);
@@ -32,7 +32,7 @@ function renderSchedule(content){
       characters:opts.characters,owned_only:opts.owned_only,transfer_blueprints:opts.transfer_blueprints,min_job_hours:opts.min_job_hours};
     for(const field of ['start','supply_at'])if(opts[field])body[field]=new Date(opts[field]).getTime()/1000;
     scheduleRequest=api('/api/schedule',body);render();
-    try{const data=await scheduleRequest;if(key===scheduleKey()){scheduleResult={key,data};schedulePage=0;scheduleSelected=null;scheduleCharacter=null;scheduleWindow=0;scheduleTablePages={reaction:0,manufacturing:0};}}
+    try{const data=await scheduleRequest;if(key===scheduleKey()){scheduleResult={key,data};schedulePage=0;scheduleSelected=null;scheduleCharacter=null;scheduleWindow=0;}}
     catch(e){error(e.message);}finally{scheduleRequest=null;if(view==='schedule')render();}
   };
   if(scheduleResult)renderScheduleResult($('#schedule-result'),scheduleResult.data);
@@ -49,19 +49,14 @@ function renderScheduleResult(target,data){
   target.innerHTML+=panel('Ütemezés anyaghiánya','Az ütemezett jobfelosztás szerint újraszámolva',`<div class="panel-body"><button class="button compact" id="schedule-copy-materials">Multibuy másolása</button></div>`+table(['Anyag','Beszerzendő'],materials.map(m=>`<tr><td>${itemName(m.name)}</td><td class="num">${fmt(m.buy)}</td></tr>`)));
   bindScheduleGraph(target,data);
   updateRunningJobMarkers(data,target);
-  target.querySelectorAll('[data-schedule-table-page]').forEach(button=>button.onclick=()=>{
-    scheduleTablePages[button.dataset.activity]+=Number(button.dataset.scheduleTablePage);renderScheduleResult(target,data);
-  });
   $('#schedule-copy-materials').onclick=async()=>{try{await navigator.clipboard.writeText(EveMultibuy.text(materials));toast('Multibuy lista másolva.');}catch{error('A másolás nem sikerült.');}};
   $('#schedule-csv').onclick=()=>csv(data.jobs.map(j=>[j.name,j.character_name,j.activity,j.slot,j.runs,j.output,new Date(j.start*1000).toISOString(),new Date(j.end*1000).toISOString(),j.blueprint_item_id||'',j.procure_blueprint,j.me,j.te]),['Termék','Karakter','Művelet','Slot','Run','Kimenet','Kezdés UTC','Befejezés UTC','Blueprint Item ID','Beszerzendő blueprint','ME','TE'],'utemterv');
 }
 
 function scheduleActivityTable(data,activity){
-  const jobs=data.jobs.filter(j=>j.activity===activity),pages=Math.max(1,Math.ceil(jobs.length/100));
-  const page=scheduleTablePages[activity]=Math.min(scheduleTablePages[activity],pages-1);
+  const jobs=data.jobs.filter(j=>j.activity===activity);
   const title=activity==='reaction'?'Reakciók ütemterve':'Gyártás ütemterve';
-  const controls=`<div class="panel-body schedule-paging"><button class="button compact" data-schedule-table-page="-1" data-activity="${activity}" ${page===0?'disabled':''}>←</button><span>${page+1} / ${pages}</span><button class="button compact" data-schedule-table-page="1" data-activity="${activity}" ${page+1===pages?'disabled':''}>→</button><span>100 job / oldal</span></div>`;
-  return panel(title,'Külön slotkeret · a másik tevékenységgel párhuzamosan futhat',controls+table(['Job','Termék','Karakter','Slot','Run','Kimenet','Anyagok rendelkezésre állnak','Kezdés','Befejezés','Blueprint Item ID','Blueprint forrás','ME / TE'],jobs.slice(page*100,(page+1)*100).map(j=>`<tr><td><button class="text-button" data-schedule-select="${j.id}">#${j.id}</button></td><td>${itemName(j.name)}</td><td>${verbatim(j.character_name)}</td><td>${j.slot}</td><td>${fmt(j.runs)}</td><td>${fmt(j.output)}</td><td data-sort-value="${j.materials_ready}">${scheduleTime(j.materials_ready)}</td><td data-sort-value="${j.start}">${scheduleTime(j.start)}</td><td data-sort-value="${j.end}">${scheduleTime(j.end)}${j.below_minimum?'<div class="batch-note">Minimum alatti · maradék / BP-korlát</div>':''}</td><td>${j.blueprint_item_id??'–'}</td><td><span>${j.procure_blueprint?'Beszerzendő / másolandó':j.transfer_required?'Átadás szükséges':'Meglévő'}</span> · <span data-i18n-skip>${j.blueprint_kind}</span></td><td>${j.me} / ${j.te}</td></tr>`),'schedule-'+activity));
+  return panel(title,'Külön slotkeret · a másik tevékenységgel párhuzamosan futhat',table(['Job','Termék','Karakter','Slot','Run','Kimenet','Anyagok rendelkezésre állnak','Kezdés','Befejezés','Blueprint Item ID','Blueprint forrás','ME / TE'],jobs.map(j=>`<tr><td><button class="text-button" data-schedule-select="${j.id}">#${j.id}</button></td><td>${itemName(j.name)}</td><td>${verbatim(j.character_name)}</td><td>${j.slot}</td><td>${fmt(j.runs)}</td><td>${fmt(j.output)}</td><td data-sort-value="${j.materials_ready}">${scheduleTime(j.materials_ready)}</td><td data-sort-value="${j.start}">${scheduleTime(j.start)}</td><td data-sort-value="${j.end}">${scheduleTime(j.end)}${j.below_minimum?'<div class="batch-note">Minimum alatti · maradék / BP-korlát</div>':''}</td><td>${j.blueprint_item_id??'–'}</td><td><span>${j.procure_blueprint?'Beszerzendő / másolandó':j.transfer_required?'Átadás szükséges':'Meglévő'}</span> · <span data-i18n-skip>${j.blueprint_kind}</span></td><td>${j.me} / ${j.te}</td></tr>`),'schedule-'+activity));
 }
 function runningJobState(job,now=Date.now()/1000){
   if(now>=job.end)return {label:'Várhatóan elkészült',style:'ready',progress:100};

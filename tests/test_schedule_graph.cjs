@@ -20,15 +20,16 @@ async function setup(data,preference){
  dom.window.fixture=data;
  if(preference!==undefined)dom.window.localStorage.setItem('eve-muhely-schedule-timeline',preference);
  run(`const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),verbatim=v=>'<span data-i18n-skip>'+esc(v)+'</span>',itemName=verbatim,fmt=String,date=String,hours=String;
- const panel=(title,sub,body)=>'<section><h2>'+title+'</h2><small>'+sub+'</small>'+body+'</section>',table=(h,r,cls='')=>'<table class="'+cls+'"><thead><tr>'+h.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+r.join('')+'</tbody></table>';`);
- for(const f of ['i18n-en.js','i18n.js','graph.js','schedule-graph.js','schedule.js'])run(fs.readFileSync(__dirname+'/../static/'+f,'utf8'));
+ const panel=(title,sub,body)=>'<section><h2>'+title+'</h2><small>'+sub+'</small>'+body+'</section>',table=(h,r,cls='')=>EveTables.markup(h,r,cls,cls||JSON.stringify(h));`);
+ for(const f of ['i18n-en.js','i18n.js','tables.js','graph.js','schedule-graph.js','schedule.js'])run(fs.readFileSync(__dirname+'/../static/'+f,'utf8'));
  await new Promise(r=>setImmediate(r));run(`renderScheduleResult($('main'),fixture);`);await new Promise(r=>setImmediate(r));
  return {dom,d:dom.window.document,run};
 }
-test('separate activity tables, keyboard selection, material details and translation work',async()=>{
+test('separate activity tables, keyboard selection, material details and translation work',async t=>{
  const data=fixture();data.blueprint_shortages=[{name:'Example Blueprint',category:'BPC-run',copies:1,runs:2,copy_runs:2}];data.jobs[2].materials=[{id:1,name:'Raw <ore>',quantity:1,allocations:[{source:'job',job_id:1,quantity:1,available_at:1200}]}];
  const {dom,d}=await setup(data);
- assert.equal(d.querySelectorAll('table.schedule-reaction tbody tr').length,1);assert.equal(d.querySelectorAll('table.schedule-manufacturing tbody tr').length,2);
+ t.after(()=>dom.window.close());
+ assert.equal(d.querySelectorAll('table.schedule-reaction tbody tr:not([hidden])').length,1);assert.equal(d.querySelectorAll('table.schedule-manufacturing tbody tr:not([hidden])').length,2);
  assert(d.body.textContent.includes('Example Blueprint'));assert.equal(d.querySelector('script'),null);assert(d.querySelector('.schedule-lane').textContent.includes('Pilot <one>'));
  d.querySelector('g[data-schedule-select="3"]').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
  assert.equal(d.querySelectorAll('.schedule-link,marker,.schedule-flow').length,0);assert(!d.body.textContent.includes('Sz'+'ámítási feltételek'));assert(!d.body.textContent.includes('Full production dependency chain'));assert.match(d.querySelector('#schedule-job-detail').textContent,/Raw <ore>/);
@@ -40,21 +41,22 @@ test('separate activity tables, keyboard selection, material details and transla
  assert.equal(texts.filter(s=>/[áéíóöőúüű]/i.test(s)).join('\n'),'');
  dom.window.EveI18n.setLanguage('hu');await new Promise(r=>setImmediate(r));assert(d.body.textContent.includes('Reakciók ütemterve'));dom.window.close();
 });
-test('off-page dependency selection opens its graph page without mixing activity pagination',async()=>{
+test('off-page dependency selection opens its graph page without mixing activity pagination',async t=>{
  const data=fixture();data.jobs=Array.from({length:101},(_,i)=>j(i+1,'reaction',1000+i,1001+i));
  data.jobs.push({...j(102,'manufacturing',1300,1400),character_id:2,character_name:'Pilot two'});
  data.jobs[100].materials=[{id:1,name:'Material',quantity:1,allocations:[{source:'job',job_id:102,quantity:1,available_at:1001}]}];
  const {dom,d}=await setup(data);
- const choose=id=>{const field=d.querySelector('#schedule-character-filter');field.value=String(id);field.dispatchEvent(new dom.window.Event('change',{bubbles:true}));};
+ t.after(()=>dom.window.close());
+ const choose=id=>{const field=d.querySelector('#schedule-character-filter');field.value=String(id);field.dispatchEvent(new dom.window.Event('change',{bubbles:true}));d.querySelectorAll('table[data-table-key]').forEach(table=>dom.window.EveTables.enhance(table));};
  assert.equal(d.querySelector('#schedule-character-filter').options.length,3);choose(2);assert.equal(d.querySelectorAll('.schedule-job').length,1);assert(d.querySelector('g[data-schedule-select="102"]'));assert(d.querySelector('#schedule-graph-next').disabled);
- choose(1);assert.equal(d.querySelectorAll('.schedule-job').length,100);assert.equal(d.querySelectorAll('table.schedule-manufacturing tbody tr').length,1);
+ choose(1);assert.equal(d.querySelectorAll('.schedule-job').length,100);assert.equal(d.querySelectorAll('table.schedule-manufacturing tbody tr:not([hidden])').length,1);
  d.querySelector('#schedule-graph-next').click();assert(d.querySelector('g[data-schedule-select="101"]'));
  d.querySelector('g[data-schedule-select="101"]').dispatchEvent(new dom.window.MouseEvent('click',{bubbles:true}));assert(d.querySelector('#schedule-job-detail button[data-schedule-select="102"]'));
  d.querySelector('#schedule-job-detail button[data-schedule-select="102"]').click();assert(d.querySelector('g[data-schedule-select="102"].selected'));
  assert.equal(d.querySelector('#schedule-character-filter').value,'2');assert.equal(d.querySelectorAll('.schedule-job').length,1);
  choose('');assert.equal(d.querySelector('#schedule-character-filter').value,'');
- assert.equal(d.querySelectorAll('table.schedule-reaction tbody tr').length,100);
- d.querySelector('[data-schedule-table-page="1"][data-activity="reaction"]').click();assert.equal(d.querySelectorAll('table.schedule-reaction tbody tr').length,1);assert.equal(d.querySelectorAll('.schedule-job').length,100);
+ assert.equal(d.querySelectorAll('table.schedule-reaction tbody tr:not([hidden])').length,100);
+ d.querySelector('table.schedule-reaction').closest('.table-block').querySelector('[data-table-next]').click();assert.equal(d.querySelectorAll('table.schedule-reaction tbody tr:not([hidden])').length,1);assert.equal(d.querySelectorAll('.schedule-job').length,100);
  dom.window.EveI18n.setLanguage('en');await new Promise(r=>setImmediate(r));assert.equal(d.querySelector('#schedule-character-filter option[value=""]').textContent,'All characters');assert.equal(d.querySelector('#schedule-character-filter option[value="2"]').textContent,'Pilot two');dom.window.close();
 });
 
@@ -77,16 +79,17 @@ test('time filtering precedes pagination and keeps the same axis across characte
  assert.equal(g.total_jobs,150);assert.equal(g.pages,2);assert.equal(g.nodes.length,50);assert.equal(g.nodes[0].id,251);
  assert.equal(pilot.total_jobs,75);assert(pilot.nodes.every(j=>j.character_id===2));assert.equal(pilot.start,g.start);assert.equal(pilot.end,g.end);
 });
-test('day controls navigate, select distant jobs, validate input and persist the display preference',async()=>{
+test('day controls navigate, select distant jobs, validate input and persist the display preference',async t=>{
  const day=graph.DAY,data=fixture(),start=data.start;
  data.partial_finish=start+12*day;data.jobs=[j(1,'reaction',start+3600,start+7200),j(2,'manufacturing',start+day+3600,start+day+7200),j(3,'reaction',start+3*day,start+5*day),{...j(4,'manufacturing',start+11*day,start+12*day),character_id:2,character_name:'Pilot two'}];
  const {dom,d,run}=await setup(data),change=value=>{const field=d.querySelector('#schedule-timeline-days');field.value=value;field.dispatchEvent(new dom.window.Event('input',{bubbles:true}));field.dispatchEvent(new dom.window.Event('change',{bubbles:true}));};
+ t.after(()=>dom.window.close());
  assert.equal(d.querySelector('#schedule-timeline-days').value,'7');assert.equal(d.querySelectorAll('.schedule-job').length,3);assert(!d.querySelector('g[data-schedule-select="4"]'));
  change('1');assert.equal(d.querySelectorAll('.schedule-job').length,1);assert(d.querySelector('#schedule-window-prev').disabled);
  const wholeJob=JSON.stringify(data.jobs);assert.equal(JSON.parse(dom.window.localStorage.getItem('eve-muhely-schedule-timeline')).days,1);
  d.querySelector('#schedule-window-next').click();assert(d.querySelector('g[data-schedule-select="2"]'));d.querySelector('#schedule-window-next').click();assert.equal(d.querySelectorAll('.schedule-job').length,0);assert(d.body.textContent.includes('Ebben az időszakban nincs ütemezett job.'));
  d.querySelector('table.schedule-manufacturing button[data-schedule-select="4"]').click();assert(d.querySelector('g[data-schedule-select="4"].selected'));assert(d.querySelector('#schedule-window-next').disabled);assert.equal(run('scheduleWindow'),11);
- assert.equal(d.querySelectorAll('table.schedule-manufacturing tbody tr').length,2);assert.equal(JSON.stringify(data.jobs),wholeJob);
+ assert.equal(d.querySelectorAll('table.schedule-manufacturing tbody tr:not([hidden])').length,2);assert.equal(JSON.stringify(data.jobs),wholeJob);
  change('0');assert(!d.querySelector('#schedule-timeline-days').validity.valid);assert.equal(run('scheduleTimelineDays'),1);change('1.5');assert(!d.querySelector('#schedule-timeline-days').validity.valid);assert.equal(run('scheduleTimelineDays'),1);
  change('3');assert.equal(run('scheduleTimelineDays'),3);assert(d.querySelector('#schedule-timeline-days').validity.valid);
  d.querySelector('#schedule-timeline-full').click();assert.equal(d.querySelector('#schedule-timeline-days').value,'');assert.equal(d.querySelectorAll('.schedule-job').length,4);assert(d.querySelector('#schedule-window-prev').disabled&&d.querySelector('#schedule-window-next').disabled);assert.equal(JSON.parse(dom.window.localStorage.getItem('eve-muhely-schedule-timeline')).days,null);
@@ -95,23 +98,25 @@ test('day controls navigate, select distant jobs, validate input and persist the
  dom.window.close();
 });
 
-test('timeline span reloads independently and ignores malformed saved preferences',async()=>{
+test('timeline span reloads independently and ignores malformed saved preferences',async t=>{
  for(const [saved,expected] of [['{"days":3}',3],['{"days":null}',null],['{"days":0}',7],['null',7],['broken',7]]){
   const {dom,d,run}=await setup(fixture(),saved);
+ t.after(()=>dom.window.close());
   assert.equal(run('scheduleTimelineDays'),expected);assert.equal(d.querySelector('#schedule-timeline-days').value,expected===null?'':String(expected));dom.window.close();
  }
 });
 
-test('actual EVE jobs have separate lanes and IDs; planned start times do not imply running',async()=>{
+test('actual EVE jobs have separate lanes and IDs; planned start times do not imply running',async t=>{
  const now=Date.now()/1000,data=fixture();data.start=now;data.calculated_at=now;data.partial_finish=now+500;
  data.jobs=[j(1,'manufacturing',now,now+500)];
  data.running_jobs=[{...j('eve:1','manufacturing',now-100,now+100),existing:true,eve_job_id:1,observed_at:now-10,stale:false}];
  const pure=graph.build(data);assert.equal(pure.lanes.length,2);assert.notEqual(pure.nodes[0].y,pure.nodes[1].y);assert.equal(pure.nodes[0].x,pure.left);
  const {dom,d,run}=await setup(data);
+ t.after(()=>dom.window.close());
  assert.equal(d.querySelectorAll('.schedule-job.existing').length,1);assert(!d.querySelector('g[data-schedule-select="1"]').classList.contains('existing'));
  d.querySelector('g[data-schedule-select="eve:1"]').dispatchEvent(new dom.window.MouseEvent('click',{bubbles:true}));
  assert(d.querySelector('g[data-schedule-select="eve:1"].selected'));assert(d.querySelector('#schedule-job-detail').textContent.includes('Folyamatban az EVE-ben'));assert.equal(Math.floor(d.querySelector('progress').value),50);
- assert.equal(d.querySelectorAll('table.schedule-manufacturing tbody tr').length,1);assert.equal(data.jobs.length,1);
+ assert.equal(d.querySelectorAll('table.schedule-manufacturing tbody tr:not([hidden])').length,1);assert.equal(data.jobs.length,1);
  dom.window.fixture.running_jobs[0].end=now-1;run('updateRunningJobMarkers(fixture,document.querySelector("main"))');
  assert(d.querySelector('.schedule-job.existing-ready'));assert(d.querySelector('#schedule-job-detail').textContent.includes('Várhatóan elkészült'));
  dom.window.fixture.running_jobs[0].end=now+100;dom.window.fixture.running_jobs[0].stale=true;run('updateRunningJobMarkers(fixture,document.querySelector("main"))');assert(d.querySelector('.schedule-job.existing-stale'));

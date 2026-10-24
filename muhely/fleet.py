@@ -236,6 +236,7 @@ class Fleet:
     def actors(self):
         p=preferences(self.store);return [c for c in self.store.characters() if p['character_ids'] is None or c['id'] in p['character_ids']]
     def start(self):
+        if getattr(self,'closed',False):return
         if self.thread and self.thread.is_alive():return
         self.stop_event.clear();self.thread=threading.Thread(target=self._work,daemon=True,name='EVE-fleet-tracking');self.thread.start();self.live.start()
     def stop(self):

@@ -40,6 +40,12 @@ test('a rejected shutdown does not silently quit the native window',async t=>{
  w.fetch=async path=>({ok:path!=='/api/shutdown',json:async()=>({csrf:'test'})});
  await w.EveDesktop.shutdown();assert(messages.some(m=>m.action==='quitFailed'));assert(!messages.some(m=>m.action==='stopped'));
 });
+test('Quit application uses the complete shutdown and repeated clicks share one request',async t=>{
+ const {w,messages}=fixture();t.after(()=>w.close());let posts=0;
+ w.fetch=async(path)=>{if(path==='/api/shutdown')posts++;return {ok:true,json:async()=>({csrf:'current'})};};
+ await Promise.all([w.EveDesktop.quit(),w.EveDesktop.shutdown()]);
+ assert.equal(posts,1);assert.equal(messages.filter(m=>m.action==='stopped').length,1);
+});
 
 test('desktop windows are limited to map/chat and include only public view options',async t=>{
  const {w,messages}=fixture();t.after(()=>w.close());await w.EveDesktop.openIntelWindow('map',{character_id:123,region:10000001});const call=messages.find(m=>m.action==='openIntelWindow');assert(call);assert.equal(call.kind,'map');

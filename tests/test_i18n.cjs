@@ -96,8 +96,8 @@ test('moon filter removes selections that disappeared from refreshed rows',async
  const dom=await page(),w=dom.window,d=w.document;vm.runInContext(fs.readFileSync(path.join(root,'tables.js'),'utf8'),dom.getInternalVMContext());
  const host=d.createElement('div');d.body.append(host);
  const markup=name=>w.EveTables.markup(['Hold'],['<tr><td><span data-i18n-skip>'+name+'</span></td></tr>'],'','refreshed-moons',{selectColumns:[0]});
- host.innerHTML=markup('Moon 1');await tick();let select=host.querySelector('select');select.value='Moon 1';select.dispatchEvent(new w.Event('change'));
- host.innerHTML=markup('Moon 2');await tick();select=host.querySelector('select');assert.equal(select.value,'');assert.deepEqual([...select.options].map(o=>o.value),['','Moon 2']);dom.window.close();
+ host.innerHTML=markup('Moon 1');await tick();let select=host.querySelector('[data-table-filter]');select.value='Moon 1';select.dispatchEvent(new w.Event('change'));
+ host.innerHTML=markup('Moon 2');await tick();select=host.querySelector('[data-table-filter]');assert.equal(select.value,'');assert.deepEqual([...select.options].map(o=>o.value),['','Moon 2']);dom.window.close();
 });
 test('PI forecast and manual fuel controls translate while keeping entered prices intact',async()=>{
  const dom=await page('<label>Fuel Block típusa<select><option data-i18n-skip>Hydrogen Fuel Block</option></select></label><label>Kézi Fuel Block egységár (ISK)<input value="12 345,6789" placeholder="Üresen: Jita-ár"></label><h3>Időalapú termelési becslés</h3><p>Készletből még: 2 óra</p><p>Becsült termék a következő 24 órában</p>');

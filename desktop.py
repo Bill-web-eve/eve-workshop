@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import urllib.error
 import webbrowser
 
 
@@ -35,6 +36,45 @@ def background_options():
     return {'start_new_session':True}
 
 
+def stop_backend(origin,timeout=15):
+    """Stop our exact local service and wait for its listening socket to close."""
+    import http.cookiejar
+    import socket
+    import urllib.parse
+    parsed=urllib.parse.urlsplit(origin)
+    if parsed.scheme!='http' or parsed.hostname!='127.0.0.1' or not parsed.port or parsed.path or parsed.query or parsed.username or parsed.password:
+        raise ValueError('Invalid local service origin')
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self,*args,**kwargs):return None
+    opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect(),urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+    try:
+        with opener.open(origin+'/health',timeout=2) as response:info=json.load(response)
+    except urllib.error.URLError as error:
+        if isinstance(error.reason,ConnectionRefusedError):return True
+        info=None
+    except (OSError,ValueError):info=None
+    if info is not None and (not isinstance(info,dict) or info.get('app')!='eve-muhely'):return False
+    try:
+        if info is None:raise OSError('Service is already closing')
+        opener.open(origin+'/',timeout=2).close()
+        with opener.open(origin+'/api/state',timeout=3) as response:state=json.load(response)
+        csrf=state.get('csrf')
+        if not isinstance(csrf,str) or not csrf:return False
+        request=urllib.request.Request(origin+'/api/shutdown',data=b'{}',headers={'Content-Type':'application/json','Origin':origin,'X-CSRF-Token':csrf})
+        opener.open(request,timeout=5).close()
+    except (OSError,ValueError):
+        # A shutdown already requested by the UI may be closing the socket now.
+        pass
+    deadline=time.monotonic()+timeout
+    while time.monotonic()<deadline:
+        try:
+            with socket.create_connection(('127.0.0.1',parsed.port),timeout=.3):pass
+        except ConnectionRefusedError:return True
+        except OSError:pass
+        time.sleep(.1)
+    return False
+
+
 def main():
     parser=argparse.ArgumentParser(description='EVE Műhely')
     parser.add_argument('--serve',action='store_true',help=argparse.SUPPRESS)
@@ -42,8 +82,12 @@ def main():
     parser.add_argument('--port',type=int,default=8765)
     parser.add_argument('--data-dir',type=Path)
     parser.add_argument('--self-test',action='store_true',help=argparse.SUPPRESS)
+    parser.add_argument('--shutdown',action='store_true',help=argparse.SUPPRESS)
     args=parser.parse_args()
     if not 1024<=args.port<=65535:parser.error('A port 1024 és 65535 közé essen.')
+    if args.shutdown:
+        if not stop_backend(f'http://127.0.0.1:{args.port}'):raise SystemExit('Could not stop the local EVE service')
+        return
     # Ship a trust store so HTTPS works on Macs without a Python installation.
     import certifi
     os.environ.setdefault('SSL_CERT_FILE',certifi.where())
