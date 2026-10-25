@@ -159,6 +159,16 @@ class Store:
                        quantity=excluded.quantity,reserve_active=excluded.reserve_active,reserved_at=excluded.reserved_at,
                        manufacturer_id=excluded.manufacturer_id''', {'corporation_id':None,'manufacturer_id':None,**plan})
 
+    def save_reservation_order(self,corporation_id,expected,changes):
+        from .reservations import revision
+        from .planner import PlanningError
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            current=[{**dict(row),'reserve_active':bool(row['reserve_active'])} for row in db.execute(
+                'SELECT id,name,product_id,quantity,created,reserve_active,reserved_at,corporation_id,manufacturer_id FROM plans')]
+            if revision(current,corporation_id)!=expected:raise PlanningError('A foglalások megváltoztak. Frissítsd a listát, majd próbáld újra.')
+            db.executemany('UPDATE plans SET reserved_at=? WHERE id=?',[(p['reserved_at'],p['id']) for p in changes if p.get('corporation_id')==corporation_id and p['reserve_active']])
+
     def remove_plan(self, plan_id):
         with self.db() as db:
             db.execute('DELETE FROM plans WHERE id=?', (plan_id,))

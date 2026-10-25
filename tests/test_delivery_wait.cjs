@@ -222,3 +222,18 @@ test('provisional delivery plans remain visible and save/scheduling stay disable
  run('navigate("schedule")');d.querySelector('#calculate').click();await tick();await tick();
  assert.equal(run('plan.preview_only'),false);assert.equal(d.querySelector('.delivery-preview'),null);assert.equal(d.querySelector('#save-plan').disabled,false);assert.equal(d.querySelector('#schedule-form button[type=submit]').disabled,false);
 });
+
+test('Reservations is a separate menu without a production target selector and Saved plans links to it',async t=>{
+ const {w,d,run}=await setup(null);t.after(()=>w.close());
+ d.querySelector('[data-view=reservations]').click();await tick();assert.equal(run('view'),'reservations');assert.equal(d.querySelector('#page-title').textContent,'Reservations');assert(d.querySelector('.plan-selector').hidden);assert(d.querySelector('#reservation-order-save'));
+ run('navigate("saved")');await tick();assert.equal(d.querySelector('[data-toggle-reservation]'),null);d.querySelector('[data-manage-reservation]').click();await tick();assert.equal(run('view'),'reservations');assert(d.querySelector('#reservation-detail'));
+});
+
+test('editing an inactive plan keeps reservations off, including while other inventory is awaiting refresh',async t=>{
+ const {w,d,run,setResult,calls,fixture}=await setup(null);t.after(()=>w.close());fixture.plans[0].reserve_active=false;
+ const result={product_id:22428,name:'Redeemer',quantity:3,activity:'manufacturing',summary:{items:0,jobs:0,runs:0,seconds:0},queue:[],rows:[],shopping:[],blueprint_shortages:[],stale_characters:[],calculated_at:1000,preview_only:true,inventory_wait:pending(),reservation_summary:{active_count:1,other_plan_count:1,own:null,provisional:true},saved_plan:{...fixture.plans[0]}};
+ setResult(result);const original=w.fetch;let saved=null;
+ w.fetch=async(url,options)=>{if(url==='/api/plans/save'){saved=JSON.parse(options.body);return {ok:true,json:async()=>({ok:true,id:fixture.plans[0].id,allocation:null})};}return original(url,options);};
+ d.querySelector('#calculate').click();await tick();await tick();assert.equal(d.querySelector('#save-plan').disabled,false);assert.match(d.querySelector('#save-plan').textContent,/Update plan without reservations/);
+ await d.querySelector('#save-plan').onclick();await tick();assert(saved);assert.equal(saved.id,fixture.plans[0].id);assert.equal(fixture.plans[0].reserve_active,false);assert(!calls.some(p=>p==='/api/plans/reservation'));
+});

@@ -33,7 +33,7 @@ async function setProductionScope(id){
   error('');
   try{
     await reloadState();if(generation!==planGeneration)return;
-    if(productId&&!['saved','jobs'].includes(view))await calculate(false);
+    if(productId&&!['saved','reservations','jobs'].includes(view))await calculate(false);
     else{
       localStorage.setItem('eve-muhely-last-plan',JSON.stringify({id:productId,name:productName,quantity:targetQuantity(),saved_plan_id:null,corporation_id:corporationId,manufacturer_id:manufacturerId,activity:productActivity}));
       render();
@@ -200,10 +200,11 @@ function updatePlanControls() {
   const target=$('#product-search');
   if(productId&&productName&&target.value===productName){target.dataset.copyItem=productName;target.title='Kattintás: terméknév másolása';}
   else{delete target.dataset.copyItem;target.removeAttribute('title');}
-  $('#save-plan').textContent=activePlanId?'↻ Terv és foglalás frissítése':'＋ Terv mentése és foglalás';
+  const inactiveSaved=activePlanId&&state.plans.some(p=>p.id===activePlanId&&!p.reserve_active);
+  $('#save-plan').textContent=inactiveSaved?'↻ Terv frissítése foglalás nélkül':activePlanId?'↻ Terv és foglalás frissítése':'＋ Terv mentése és foglalás';
   $('#save-plan').title='Mentés ide: '+(corporationId?'Corp · '+state.scope_label:'Személyes');
-  $('#save-plan').disabled=!!plan?.preview_only;
-  if(plan?.preview_only)$('#save-plan').title=EveI18n.t('A foglalás véglegesítése friss készletadatra vár.');
+  $('#save-plan').disabled=!!plan?.preview_only&&!inactiveSaved;
+  if(plan?.preview_only&&!inactiveSaved)$('#save-plan').title=EveI18n.t('A foglalás véglegesítése friss készletadatra vár.');
   $('#new-plan').hidden=!activePlanId;
 }
 function scheduleTaskPoll() {
@@ -281,6 +282,7 @@ function navigate(next) {
   if(next==='connection')return openSettingsTab('connection');
   if(Object.keys(dirty).length && !confirmUI('Vannak még nem alkalmazott módosítások. Elhagyod ezt az oldalt?')) return false;
   if(view==='settings'&&settingsTab==='accounts')accountDraft=null;
+  if(view==='reservations'&&next!=='reservations')resetReservationDraft();
   if(view==='moons'){moonEditing=false;moonSystemGeneration++;moonSearchGeneration++;clearTimeout(moonSearchTimer);}
   view=next; dirty={};
   if(next==='moons')setMoonMenu(true);
@@ -289,9 +291,9 @@ function navigate(next) {
   syncMoonNavigation();
   clearTimeout(skillTimer);
   clearTimeout(piTimer);
-  if(['contracts','fleet','mining','intel','skills','pi','notifications'].includes(next))error('');
+  if(['reservations','contracts','fleet','mining','intel','skills','pi','notifications'].includes(next))error('');
   $$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
-  const names={contracts:'Szerződések',fleet:'Flottatevékenység',mining:'Bányászati napló',intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
+  const names={reservations:'Foglalások',contracts:'Szerződések',fleet:'Flottatevékenység',mining:'Bányászati napló',intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
   $('#breadcrumb').textContent='Műhely / '+names[view]; render();return true;
 }
 function render() {
@@ -307,7 +309,7 @@ function render() {
   const content=$('#view-content'); actions();
   const finance=$('#production-finance');if(finance)finance.hidden=true;
   document.body.classList.toggle('manual-view',view==='documentation');
-  $('.plan-selector').hidden=['contracts','fleet','jobs','mining','intel','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures')||(view==='inventory'&&inventoryMode!=='plan');
+  $('.plan-selector').hidden=['reservations','contracts','fleet','jobs','mining','intel','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures')||(view==='inventory'&&inventoryMode!=='plan');
   $('#plan-status').hidden=view==='jobs'||!plan?.stale_characters.length;
   if(view==='contracts'){ $('#plan-status').hidden=true;return renderContracts(content); }
   if(view==='fleet'){ $('#plan-status').hidden=true;return renderFleet(content); }
@@ -321,6 +323,7 @@ function render() {
   if(view==='corporations')return renderCorporations(content);
   if(view==='settings') return renderSettings(content);
   if(view==='connection') return renderConnection(content);
+  if(view==='reservations')return renderReservations(content);
   if(view==='saved') return renderSaved(content);
   if(view==='schedule')return renderSchedule(content);
   if(view==='jobs')return renderJobs(content);
@@ -365,7 +368,7 @@ function renderReservationContext(content) {
   if(plan.preview_only)message+='<div class="warning-text">Az itt látható kiosztás csak előnézet, nem új foglalás.</div>';
   if(saved?.preview_changed&&!plan.preview_only)message+='<div class="warning-text">Módosított mennyiség vagy gyártó karakter előnézete. A Terv és foglalás frissítése gombbal érvényesítheted.'+(count?' A későbbi tervek kiosztása is változhat.':'')+'</div>';
   content.insertAdjacentHTML('afterbegin',`<div class="banner reservation-context"><div>${message}</div><button class="button compact" id="show-saved-plans">Foglalások megtekintése</button></div>`);
-  $('#show-saved-plans').onclick=()=>navigate('saved');
+  $('#show-saved-plans').onclick=()=>navigate('reservations');
 }
 function productionTime(row){
   const p=row.producer;if(!p)return '–';
@@ -648,30 +651,18 @@ function renderConnection(content) {
 function renderSaved(content) {
   const plans=scopedPlans(),scopes=[{id:null,name:'Személyes'},...state.corporations.map(c=>({id:c.id,name:'Corp · '+c.name}))];
   const category=corporationId?'Corp · '+state.scope_label:'Személyes';
-  setHead('MENTETT TERVEK','Tervek és készletfoglalások','Csak a kiválasztott kategória tervei láthatók. A mentés és a készletfoglalás is ehhez a gyártási körhöz tartozik.');
+  setHead('MENTETT TERVEK','Mentett tervek','Csak a kiválasztott kategória tervei láthatók. A mentés és a készletfoglalás is ehhez a gyártási körhöz tartozik.');
   content.innerHTML=`<div class="saved-categories" role="group" aria-label="Mentett tervek kategóriái">${scopes.map(s=>`<button type="button" class="button compact${s.id===corporationId?' selected':''}" data-saved-scope="${s.id??''}" aria-pressed="${s.id===corporationId}">${esc(s.name)} <span class="badge">${state.plans.filter(p=>(p.corporation_id??null)===s.id).length}</span></button>`).join('')}</div><p class="saved-category-note">Mentés helye: <strong>${esc(category)}</strong> · ${plans.length} mentett terv</p>`;
   content.innerHTML+=state.delivery_wait?deliveryWaitMarkup(state.delivery_wait):state.reservation_error?`<div class="banner error">${esc(state.reservation_error)}</div>`:'';
-  content.innerHTML+=plans.length?`<div class="saved-list">${plans.map(p=>`<div class="saved-plan-card"><div class="saved-plan"><div><strong>${planLabel(p)}</strong><div class="reservation-badges"><span class="badge">${p.corporation_id?'Corp: '+esc(p.scope_label):'Személyes gyártás'}</span></div>${p.allocation_error?`<div class="warning-text">${esc(p.allocation_error)}</div>`:''}<small>${itemName(p.product_name)} · ${fmt(p.quantity)} db · ${date(p.created)}</small><div class="saved-producer">Gyártó: ${p.manufacturer_id?verbatim(state.characters.find(c=>c.id===p.manufacturer_id)?.name||String(p.manufacturer_id)):esc('még nincs kiválasztva')}</div><div class="reservation-badges"><span class="badge ${p.reserve_active?'good':''}">${p.reserve_active?'Foglalás aktív':'Nincs aktív foglalás'}</span>${p.allocation?`<span class="badge">${p.allocation.priority}. elsőbbség</span><span class="badge">${fmt(p.allocation.reserved_types)} terméktípus foglalva</span>`:''}</div>${p.allocation?`<small>Hátralévő gyártás: ${fmt(p.allocation.summary.items)} tétel · Beszerzési hiány: ${fmt(p.allocation.summary.shopping_items)} tétel</small>`:''}</div><div class="saved-actions"><button class="button compact" data-load-plan="${esc(p.id)}" aria-label="${esc(p.name)} – Terv megnyitása">Terv megnyitása</button><button class="button compact" data-toggle-reservation="${esc(p.id)}" aria-label="${esc(p.name)} – ${p.reserve_active?'Foglalás feloldása':'Foglalás bekapcsolása'}">${p.reserve_active?'Foglalás feloldása':'Foglalás bekapcsolása'}</button>${p.reserve_active?`<button class="text-button" data-reservation-detail="${esc(p.id)}" aria-label="${esc(p.name)} – Lefoglalt tételek">Lefoglalt tételek</button>`:''}<button class="text-button danger" data-remove-plan="${esc(p.id)}" aria-label="${esc(p.name)} – Terv törlése">Törlés</button></div></div></div>`).join('')}</div>`:empty('Ebben a kategóriában még nincs mentett terv','Válassz terméket, majd kattints a Terv mentése és foglalás gombra. A terv ide kerül: '+category+'.');
-  content.innerHTML+='<p class="footnote">A terv a hozzá felhasznált meglévő készletet és várható jobkimenetet foglalja le; a még hiányzó anyag beszerzendő marad. A kész komponens alapanyagait nem foglalja külön. Beérkező anyagokból és a közös beállítások változásakor újraszámolódik a kiosztás. Feloldás vagy tervtörlés után a mennyiségek más tervekhez felhasználhatók. A korábbi verzióban mentett tervekhez a Foglalás bekapcsolása gombbal indítható a foglalás.</p><div id="reservation-detail"></div>';
+  content.innerHTML+=plans.length?`<div class="saved-list">${plans.map(p=>`<div class="saved-plan-card"><div class="saved-plan"><div><strong>${planLabel(p)}</strong><div class="reservation-badges"><span class="badge">${p.corporation_id?'Corp: '+esc(p.scope_label):'Személyes gyártás'}</span></div>${p.allocation_error?`<div class="warning-text">${esc(p.allocation_error)}</div>`:''}<small>${itemName(p.product_name)} · ${fmt(p.quantity)} db · ${date(p.created)}</small><div class="saved-producer">Gyártó: ${p.manufacturer_id?verbatim(state.characters.find(c=>c.id===p.manufacturer_id)?.name||String(p.manufacturer_id)):esc('még nincs kiválasztva')}</div><div class="reservation-badges"><span class="badge ${p.reserve_active?'good':''}">${p.reserve_active?'Foglalás aktív':'Nincs aktív foglalás'}</span>${p.allocation?`<span class="badge">${p.allocation.priority}. elsőbbség</span><span class="badge">${fmt(p.allocation.reserved_types)} terméktípus foglalva</span>`:''}</div>${p.allocation?`<small>Hátralévő gyártás: ${fmt(p.allocation.summary.items)} tétel · Beszerzési hiány: ${fmt(p.allocation.summary.shopping_items)} tétel</small>`:''}</div><div class="saved-actions"><button class="button compact" data-load-plan="${esc(p.id)}" aria-label="${esc(p.name)} – Terv megnyitása">Terv megnyitása</button><button class="button compact" data-manage-reservation="${esc(p.id)}">Foglalás kezelése</button><button class="text-button danger" data-remove-plan="${esc(p.id)}" aria-label="${esc(p.name)} – Terv törlése">Törlés</button></div></div></div>`).join('')}</div>`:empty('Ebben a kategóriában még nincs mentett terv','Válassz terméket, majd kattints a Terv mentése és foglalás gombra. A terv ide kerül: '+category+'.');
+  content.innerHTML+='<p class="footnote">A foglalások kapcsolói, elsőbbségi sorrendje és tételrészletei a külön Foglalások menüpontban találhatók. A foglalás kikapcsolása nem törli a tervet.</p>';
   $$('[data-saved-scope]').forEach(el=>el.onclick=()=>setProductionScope(Number(el.dataset.savedScope)||null));
   $$('[data-load-plan]').forEach(el=>el.onclick=()=>openSavedPlan(el.dataset.loadPlan));
-  $$('[data-toggle-reservation]').forEach(el=>el.onclick=async()=>{
-    el.disabled=true;
-    try {
-      const saved=state.plans.find(p=>p.id===el.dataset.toggleReservation);
-      await api('/api/plans/reservation',{id:saved.id,active:!saved.reserve_active});
-      await calculate();toast(saved.reserve_active?'A foglalás feloldva.':'A foglalás bekapcsolva.');
-    }catch(e){error(e.message);el.disabled=false;}
-  });
-  $$('[data-reservation-detail]').forEach(el=>el.onclick=()=>{
-    reservationDetailId=el.dataset.reservationDetail;renderReservationDetails();
-    $('#reservation-detail').scrollIntoView({block:'nearest',behavior:'smooth'});
-  });
+  $$('[data-manage-reservation]').forEach(el=>el.onclick=()=>{reservationDetailId=el.dataset.manageReservation;navigate('reservations');});
   $$('[data-remove-plan]').forEach(el=>el.onclick=async()=>{
     if(!confirmUI('Törlöd ezt a mentett tervet? A foglalása is felszabadul.'))return;
     try{await api('/api/plans/remove',{id:el.dataset.removePlan});if(activePlanId===el.dataset.removePlan)activePlanId=null;await calculate();toast('A terv törölve, a foglalása felszabadult.');}catch(e){error(e.message);}
   });
-  renderReservationDetails();
 }
 function renderReservationDetails() {
   const target=$('#reservation-detail'), saved=state.plans.find(p=>p.id===reservationDetailId);
@@ -735,13 +726,13 @@ $('#save-plan').onclick=async()=>{
     if(Object.keys(dirty).length)throw new Error('A terv mentése előtt alkalmazd a beírt módosításokat.');
     if(!productId)throw new Error('Előbb válassz terméket a találatok közül.');
     const next=await calculate();if(!next)return;
-    if(next.preview_only)throw new Error('A foglalás véglegesítése friss készletadatra vár.');
+    if(next.preview_only&&next.saved_plan?.reserve_active!==false)throw new Error('A foglalás véglegesítése friss készletadatra vár.');
     const saved=await api('/api/plans/save',{id:next.saved_plan?.id||null,product_id:next.product_id,quantity:next.quantity,name:next.saved_plan?.name||next.name,corporation_id:next.corporation_id,manufacturer_id:next.manufacturer_id});
     if(typeof financeContext!=='undefined'&&financeContext&&!financeContext.plan_id&&financeContext.plan.product_id===next.product_id&&financePrefs)await api('/api/trade/plan',{...financePrefs,plan_id:saved.id});
     if(productId===next.product_id&&corporationId===next.corporation_id&&manufacturerId===next.manufacturer_id&&targetQuantity()===next.quantity)activePlanId=saved.id;
-    await calculate();toast('A terv mentve, a készletfoglalás aktív.');
+    await calculate();toast(next.saved_plan?.reserve_active===false?'A terv mentve, a foglalása kikapcsolva maradt.':'A terv mentve, a készletfoglalás aktív.');
   }catch(e){error(e.message);}
-  finally{button.disabled=!!plan?.preview_only;}
+  finally{button.disabled=!!plan?.preview_only&&plan.saved_plan?.reserve_active!==false;}
 };
 $('#new-plan').onclick=async()=>{
   if(Object.keys(dirty).length)return error('Az új terv előtt alkalmazd a beírt módosításokat.');

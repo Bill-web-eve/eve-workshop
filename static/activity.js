@@ -7,6 +7,7 @@ globalThis.EveActivity=(()=>{
   const detailText=value=>Array.isArray(value)?value.map(p=>p.raw?p.text:t(p.text,...(p.args||[]))).join(' · '):t(value);
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const labels={
+    '/api/plans/reservations/order':'Foglalási sorrend mentése','/api/plans/reservation':'Foglalás módosítása',
     '/api/contracts':'Szerződések betöltése','/api/contracts/details':'Szerződés részleteinek betöltése','/api/contracts/sync':'Szerződések frissítése','/api/trade':'Marketadatok lekérése','/api/trade/discover':'Helyi market keresése','/api/trade/settings':'Marketbeállítások mentése','/api/trade/plan':'Terv költségbeállításainak mentése','/api/trade/seller':'Eladó díjainak ellenőrzése','/api/trade/seller/refresh':'Eladó skillek és standingek frissítése',
     '/api/fleet/sides':'Harci oldalak mentése','/api/fleet':'Flottaadatok betöltése…','/api/fleet/refresh':'Killmailek frissítése','/api/assets':'Teljes EVE-készlet betöltése',
     '/api/mining':'Bányászati naplók összesítése','/api/mining/sync':'Bányászati naplók frissítése',

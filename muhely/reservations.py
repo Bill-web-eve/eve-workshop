@@ -1,5 +1,6 @@
 """Rebuild plan allocations against one stock snapshot, in reservation order."""
 from collections import defaultdict
+import hashlib,json,math,time
 
 from .planner import PlanningError,AssetSnapshotPending
 
@@ -8,8 +9,7 @@ def allocate_plans(plans, calculate, calculate_saved=None):
     totals = defaultdict(lambda: {'stock': 0, 'wip': 0})
     by_plan = {}
     pending = []
-    active = sorted((p for p in plans if p['reserve_active']),
-                    key=lambda p: (p['reserved_at'] or p['created'], p['created'], p['id']))
+    active = ordered_active(plans)
     for priority, saved in enumerate(active, 1):
         try:
             plan = calculate_saved(saved,totals) if calculate_saved else calculate(saved['product_id'], saved['quantity'], totals)
@@ -17,7 +17,7 @@ def allocate_plans(plans, calculate, calculate_saved=None):
             raise AssetSnapshotPending(error.info['items'],error.info['retry_at'],saved['name']) from None
         except PlanningError as error:
             raise PlanningError(f"A(z) {saved['name']} mentett terv foglalása nem számolható: {error} "
-                                'A Mentett tervek oldalon feloldhatod a foglalását.') from None
+                                'A Foglalások oldalon kikapcsolhatod a foglalását.') from None
         if plan.get('inventory_wait'):
             pending.append({**plan['inventory_wait'],'plan_name':saved['name']})
         items = []
@@ -65,3 +65,31 @@ def pending_info(waits):
             key=(item.get('character_id'),item['id'])
             if key not in items or item['completed_at']>items[key]['completed_at']:items[key]=item
     return {'items':list(items.values()),'retry_at':min(w['retry_at'] for w in waits),'plan_name':None}
+
+
+def ordered_active(plans):
+    return sorted((p for p in plans if p['reserve_active']),
+                  key=lambda p:(p['reserved_at'] or p['created'],p['created'],p['id']))
+
+
+def revision(plans,corporation_id=None):
+    fields=('id','product_id','quantity','created','reserve_active','reserved_at','corporation_id','manufacturer_id')
+    rows=[{k:p.get(k) for k in fields} for p in plans if p.get('corporation_id')==corporation_id]
+    rows.sort(key=lambda p:p['id'])
+    return hashlib.sha256(json.dumps(rows,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+
+
+def reorder(plans,ids,corporation_id,expected):
+    if expected!=revision(plans,corporation_id):raise PlanningError('A foglalások megváltoztak. Frissítsd a listát, majd próbáld újra.')
+    pool=[p for p in plans if p.get('corporation_id')==corporation_id];active=ordered_active(pool)
+    if not isinstance(ids,list) or len(ids)>10000 or any(not isinstance(i,str) for i in ids) or len(set(ids))!=len(ids) or set(ids)!={p['id'] for p in active}:
+        raise PlanningError('Az aktív foglalások teljes, ismétlés nélküli sorrendjét add meg a kiválasztott gyártási körből.')
+    # Reuse the existing priority time slots. Make ties strictly ordered while
+    # keeping every slot at or before now, so newly activated plans append.
+    slots=sorted(float(p['reserved_at'] or p['created']) for p in active)
+    if any(not math.isfinite(value) for value in slots):raise PlanningError('Hibás foglalási elsőbbség.')
+    limit=time.time()
+    for i in range(len(slots)-1,-1,-1):
+        slots[i]=min(slots[i],limit);limit=math.nextafter(slots[i],-math.inf)
+    values=dict(zip(ids,slots))
+    return [{**p,'reserved_at':values[p['id']]} if p['id'] in values else p for p in plans]

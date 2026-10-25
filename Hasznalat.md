@@ -216,7 +216,7 @@ A kiválasztott vagy megnyitott mentett tervhez a bal oldali **Gyártási gráf*
 3. A saját mentett tervet a **Mentett tervek → Terv megnyitása** gombbal nyisd meg. Ekkor a neki lefoglalt mennyiségek felhasználhatók. A fejléc egyértelműen mutatja, hogy mentett tervet vagy új célt nézel; az oldal újratöltése is megőrzi ezt.
 4. A mennyiség módosítása előnézet. A **Terv és foglalás frissítése** gomb ugyanazt a mentést frissíti, új példány létrehozása nélkül. A korábban aktívvá tett tervek elsőbbséget kapnak; egy ilyen terv mennyiségének növelése csökkentheti a későbbi tervekhez jutó készletet.
 5. A **Lefoglalt tételek** listában termékenként külön látszik a készletből és a folyamatban lévő jobokból foglalt darabszám. A **Készlet** oldalon a **Más tervek foglalása** és **Saját terv foglalása** oszlopok teszik követhetővé a levonást.
-6. **Foglalás feloldása** után az anyagok azonnal más célhoz használhatók; a terv megmarad. Törléskor a foglalás is megszűnik. A **Foglalás bekapcsolása** újra aktiválja a tervet, az akkor már aktív tervek mögötti elsőbbséggel. A korábbi programváltozatban mentett tervek megmaradnak, és ezzel a gombbal aktiválhatók.
+6. A külön **Foglalások** menüben a kapcsolóval kikapcsolhatod a foglalást: az anyagok más célhoz használhatók, a terv megmarad. Törléskor a foglalás is megszűnik. Visszakapcsoláskor a terv az aktív foglalások végére kerül; a fel/le nyilakkal és a **Sorrend mentése** gombbal módosíthatod az elsőbbségét.
 
 A foglalás minden számításkor az aktuális közös készletforrás, karakter- és helyszűrés, ME/TE és jobméret alapján újraszámolódik. Csak a rendelkezésre álló mennyiséget foglalja: a még hiányzó anyag beszerzési vagy gyártási igény marad. Ha elkészül egy komponens, a terv azt a komponenst foglalja, és a hozzá korábban szükséges alapanyagokat felszabadítja. A kész célterméket is védi, amíg fel nem oldod a tervet; lezárt gyártásnál ezért oldd fel a foglalást.
 
@@ -677,3 +677,14 @@ Az első sikeres teljes beolvasás alapállapot, nem küld régi értesítéseke
 Eltérő ESI-készlet- és jobpillanatkép esetén a gyártási terv, gráf és anyaghiány **Előzetes terv** jelzéssel továbbra is megnyitható; az összes mentett terv beszerzési összesítése is elérhető előnézetben. A számítás a ténylegesen letöltött készlettel, aktív jobokkal és a foglalások azonos elsőbbségével számol. Az átvett, de készletben még nem igazolt kimenetet nem adjuk hozzá, ezért a hiány, a gyártási mennyiség és a költség túlbecsült lehet. Ez nem végleges gyártási utasítás.
 
 Az előnézet nem változtatja meg a mentett terveket vagy foglalásokat. Új foglalás, aktív foglalás módosítása és végleges ütemezés továbbra is csak ellenőrzött készletből készül; ezt a szerver is kikényszeríti. Az app a jelzett lejárat után az automatikus frissítési szabályt betartva próbál újra. Amikor megfelelő készletpillanatkép érkezik, a következő számítás automatikusan visszatér a normál nézethez. Az ESI-jobok nem tartalmaznak mentettterv-azonosítót: az anyagnév önmagában nem bizonyítja, hogy egy job melyik tervhez készült.
+
+
+## Foglalások külön kezelése
+
+A bal oldali **Foglalások** menüpontban a mentett tervek készlet-, jobkimenet- és BPC-run-foglalásai kezelhetők. A Személyes és az egyes corporationök külön készletet és elsőbbségi sorrendet használnak. A felületen nem szükséges kiválasztott gyártási cél.
+
+A kapcsoló kikapcsolása csak a foglalást oldja fel, a terv megmarad. A kikapcsolt terv későbbi szerkesztése és mentése sem kapcsolja vissza magától a foglalást. Visszakapcsoláskor a terv a sorrend végére kerül.
+
+Az aktív tervek ↑ és ↓ gombjaival állítható az elsőbbség. Ez még csak tervezet; a **Sorrend mentése** menti, a **Módosítások visszavonása** eldobja. A lista tetején álló terv részesül először a közös készletből, aktív jobkimenetből és BPC-runokból. A részletek mindig a már mentett sorrend szerinti kiosztást mutatják. Másik ablakban módosított, elavult sorrendet nem mentünk; frissítés és újrarendezés szükséges.
+
+Mentés előtt a szerver az új sorrend szerint ellenőrzi és újraszámolja az egész érintett készletet, majd egyszerre menti az elsőbbségeket. Sikertelen ellenőrzés esetén az addigi sorrend és a többi terv változatlan marad. ESI-készletvárakozáskor a foglalás kikapcsolható, de bekapcsolása és az új sorrend mentése friss adatra vár. A Mentett tervek oldalon a **Foglalás kezelése** gomb ide vezet.

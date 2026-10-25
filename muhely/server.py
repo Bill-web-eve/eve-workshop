@@ -33,7 +33,7 @@ from .skills import dashboard as skill_dashboard
 from .production import profiles as production_profiles
 from .pi import dashboard as pi_dashboard
 from .planner import Planner, PlanningError, AssetSnapshotPending, integer, decimal_number, live_inventory
-from .reservations import allocate_plans, except_owner, pending_info
+from .reservations import allocate_plans, except_owner, pending_info, ordered_active, revision as reservation_revision, reorder as reorder_reservations
 from .store import Store, default_data_dir, DEFAULT_SETTINGS
 
 from .refresh_policy import RefreshPolicy
@@ -508,24 +508,35 @@ class App:
             saved = {'id': old['id'] if old else str(uuid.uuid4()),
                      'name': str(data.get('name') or self.catalog.name(product))[:120].strip(),
                      'product_id': product, 'quantity': quantity,'manufacturer_id':manufacturer_id,
-                     'created': old['created'] if old else now, 'reserve_active': True,'corporation_id':corporation_id,
-                     'reserved_at': old['reserved_at'] if old and old['reserve_active'] else now}
+                     'created': old['created'] if old else now, 'reserve_active': old['reserve_active'] if old else True,'corporation_id':corporation_id,
+                     'reserved_at': (old['reserved_at'] if old and old['reserve_active'] else now) if not old or old['reserve_active'] else None}
             proposed = [p for p in plans if p['id'] != saved['id']]+[saved]
-            allocation = self._allocate(proposed, self._context(corporation_id))
+            allocation = self._allocate(proposed, self._context(corporation_id)) if saved['reserve_active'] else None
             self.store.save_plan(saved)
-            return {'ok': True, 'id': saved['id'], 'allocation': allocation['by_plan'][saved['id']]}
+            return {'ok': True, 'id': saved['id'], 'allocation': allocation['by_plan'][saved['id']] if allocation else None}
 
-    def set_reservation(self, plan_id, active):
+    def set_reservation(self, plan_id, active, expected=None):
         if not isinstance(active, bool):
             raise PlanningError('A foglalás állapota igaz vagy hamis lehet.')
         with self.planning_lock, self.catalog.lock:
             plans = self.store.plans()
             old = self._saved(plans, plan_id)
+            if expected is not None and expected!=reservation_revision(plans,old.get('corporation_id')):raise PlanningError('A foglalások megváltoztak. Frissítsd a listát, majd próbáld újra.')
             saved = {**old, 'reserve_active': active,
                      'reserved_at': (old['reserved_at'] if old['reserve_active'] else time.time()) if active else None}
             if active:
                 self._allocate([p for p in plans if p['id'] != plan_id]+[saved], self._context(old.get('corporation_id')))
             self.store.save_plan(saved)
+
+    def reorder_reservations(self,data):
+        if not isinstance(data,dict) or set(data)!={'corporation_id','ids','revision'}:raise PlanningError('Hibás foglalási sorrend.')
+        with self.planning_lock,self.catalog.lock:
+            cid=self.scope_id(data['corporation_id']);plans=self.store.plans()
+            proposed=reorder_reservations(plans,data['ids'],cid,data['revision'])
+            if [p['id'] for p in ordered_active([p for p in plans if p.get('corporation_id')==cid])]!=data['ids']:
+                self._allocate(proposed,self._context(cid))
+                self.store.save_reservation_order(cid,data['revision'],proposed)
+            return {'ok':True,'revision':reservation_revision(self.store.plans(),cid)}
 
     def remove_plan(self, plan_id):
         with self.planning_lock:
@@ -556,6 +567,8 @@ class App:
             saved['product_name'] = self.catalog.name(saved['product_id'])
             saved['scope_label']=self.scope_label(saved.get('corporation_id'))
             saved['allocation'] = allocation['by_plan'].get(saved['id'])
+        for cid in dict.fromkeys(p.get('corporation_id') for p in plans):
+            for rank,p in enumerate(ordered_active([p for p in plans if p.get('corporation_id')==cid]),1):p['reservation_priority']=rank
         chars = self.store.characters()
         for char in chars:
             char['data_times'] = {kind: (self.store.snapshot(char['id'], kind) or {}).get('fetched') for kind in ['assets', 'blueprints', 'jobs']}
@@ -564,7 +577,7 @@ class App:
                 'corporations':corporation_dashboard(self.store)['corporations'],'corporation_scopes':CORPORATION_SCOPES,
                 'industry_facilities':{a:{'system_id':settings[a].get('system_id'),'system_name':self.catalog.moon_systems.get(settings[a].get('system_id'),{}).get('name')} for a in ['manufacturing','reaction']},
                 'production_characters':[{k:p[k] for k in ['id','name','available','as_of']} for p in production_profiles(self.store,settings,corporation_id)],
-                'characters': chars, 'plans': plans, 'reservation_error': reservation_error,'delivery_wait':delivery_wait,
+                'characters': chars, 'plans': plans, 'reservation_revision':reservation_revision(plans,corporation_id), 'reservation_error': reservation_error,'delivery_wait':delivery_wait,
                 'inventory': self.store.mapping('inventory',corporation_id), 'parameters': self.store.mapping('parameters',corporation_id),
                 'locations': locations, 'jobs': [j for j in jobs if j.get('status') in ['active', 'paused', 'ready']],
                 'blueprint_count': len(bps), 'stale_characters': stale, 'sde': self.catalog.meta,
@@ -667,7 +680,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -962,7 +975,9 @@ class Handler(BaseHTTPRequestHandler):
             elif path == '/api/plans/save':
                 return self.send(200, self.app.save_plan(data))
             elif path == '/api/plans/reservation':
-                self.app.set_reservation(str(data.get('id', '')), data.get('active'))
+                self.app.set_reservation(str(data.get('id', '')), data.get('active'),data.get('revision'))
+            elif path == '/api/plans/reservations/order':
+                return self.send(200,self.app.reorder_reservations(data))
             elif path == '/api/plans/remove':
                 self.app.remove_plan(str(data.get('id', '')))
             elif path == '/api/shutdown':

@@ -215,7 +215,7 @@ The production view separately shows how much of the target is covered by finish
 3. Open an existing plan from **Saved plans → Open plan** or its shortcut. It can use its own reservation. The status banner identifies a saved plan versus a new target, and a reload preserves that selection.
 4. Editing quantity or producer previews a change. **Update plan and reservation** updates the same saved record. Earlier active reservations have priority; increasing one can reduce resources available to later plans.
 5. **Reserved items** shows stock and active-job output separately. Inventory lists **Other plans' reservations** and **Own plan reservation**. BPC holds also show instance Item IDs and reserved runs.
-6. **Release reservation** makes resources available elsewhere while keeping the plan. Deleting a plan also releases its hold. Reactivating a hold puts it after currently active reservations.
+6. In the separate **Reservations** menu, switch a reservation off to make resources available elsewhere while keeping the plan. Deleting a plan also releases its hold. Switching it on puts it after currently active reservations; use the up/down arrows and **Save order** to change its priority.
 
 Reservations are recalculated from the current stock source, character/location filters, blueprint parameters and job sizes. Only available quantities are reserved; missing quantities remain manufacturing or purchasing requirements. When a component becomes available, the plan reserves that component and releases the raw materials previously needed to make it. Finished target products remain protected until you release the completed plan.
 
@@ -679,3 +679,14 @@ The first complete import establishes a baseline without sending historical aler
 When ESI inventory and job snapshots disagree, the production plan, graph and material shortfall remain available as a **Provisional plan**. The combined shopping summary also supports previews. Calculations use downloaded stock, active jobs and the same reservation priority. Delivered output that has not appeared in a confirmed inventory snapshot is not credited, so shortfalls, production quantities and costs may be overestimated. These are not final production instructions.
 
 Previews never change saved plans or reservations. New or updated reservations and final schedules still require verified inventory; the server enforces this independently of the UI. The app retries after the displayed expiry while respecting automatic refresh limits. Once an appropriate inventory snapshot arrives, the next calculation automatically returns to normal mode. ESI jobs contain no saved-plan identifier: an item name alone cannot establish which plan a job was intended for.
+
+
+## Managing reservations separately
+
+Use **Reservations** in the sidebar to manage inventory, active-job output and BPC-run allocations. Personal production and each corporation have separate inventory pools and priority orders. No selected production target is required.
+
+Switching a reservation off releases the allocation while retaining the saved plan. Editing or saving that inactive plan does not reactivate its reservation. Reactivating appends the plan to the end of its pool’s priority order.
+
+Use ↑ and ↓ beside active plans to draft a new priority order. **Save order** applies it; **Discard changes** cancels it. Plans at the top receive shared inventory, active-job output and BPC runs first. Allocated item details always reflect the saved order. A stale order changed in another window cannot overwrite the current list: refresh and reorder it again.
+
+Before saving, the server validates the entire affected pool against the proposed order, then saves all priorities atomically. Failed validation preserves the previous order and other plans. During ESI inventory waits, reservations can be switched off; activation and order saving require fresh inventory. **Manage reservation** on Saved plans opens this view.
