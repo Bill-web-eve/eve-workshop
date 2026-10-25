@@ -144,6 +144,20 @@ class TradeTests(unittest.TestCase):
         for patch in [{'materials':'bad'},{'seller_id':99},{'other_isk':'NaN'},{'blueprints_isk':-1}]:
             with self.assertRaises(PlanningError):self.trade.save_finance({'plan_id':'a',**patch})
         self.assertEqual(self.trade.finance('a')['materials'],'local:sell')
+    def test_hauling_switch_is_plan_specific_persists_and_defaults_on_for_existing_plans(self):
+        for pid in ['a','b']:self.store.save_plan({'id':pid,'name':pid,'product_id':590,'quantity':1,'created':1000,'reserve_active':False,'reserved_at':None})
+        with self.store.db() as db:db.execute('INSERT INTO trade_plans VALUES(?,?)',('plan:a','{"materials":"jita:buy"}'))
+        self.assertTrue(self.trade.finance('a')['hauling_enabled']);self.assertTrue(self.trade.finance('b')['hauling_enabled'])
+        self.trade.save_hauling({'hauling_rates':{'jita':{'import':'500','export':'650'},'local':{'import':'100','export':'200'}}});rates=self.trade.settings()['hauling_rates']
+        self.trade.save_finance({'plan_id':'a','hauling_enabled':False})
+        again=Trade(self.store,self.catalog,self.eve)
+        self.assertFalse(again.finance('a')['hauling_enabled']);self.assertTrue(again.finance('b')['hauling_enabled']);self.assertTrue(again.finance()['hauling_enabled'])
+        self.trade.save_finance({'plan_id':'a','other_isk':'50'});self.assertFalse(self.trade.finance('a')['hauling_enabled'])
+        for value in ['false',0,1,None,{}]:
+            with self.assertRaises(PlanningError):self.trade.save_finance({'plan_id':'a','hauling_enabled':value})
+            self.assertFalse(self.trade.finance('a')['hauling_enabled'])
+        self.trade.save_finance({'plan_id':'a','hauling_enabled':True});self.assertEqual(self.trade.settings()['hauling_rates'],rates)
+
     def test_discovery_checks_system_and_does_not_auto_select_an_unregistered_hub(self):
         self.trade.public=Mock(return_value={'stations':[]})
         self.trade.location=Mock(side_effect=lambda lid,*args:LOC if lid==LOC['id'] else {**LOC,'id':lid,'system_id':30000142})

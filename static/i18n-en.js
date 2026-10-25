@@ -1,6 +1,9 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Szállítási költség beszámítása": "Include hauling cost",
+  "A szállítási kapcsoló be vagy ki értéket vár.": "The hauling switch must be on or off.",
+
 "A tanulás és a PI a karakterek személyes adata; ezeket a Személyes fülön találod. Itt corp jobok, szerződések és a corporationhöz rendelt holdak látszanak.": "Training and PI belong to individual characters and appear on the Personal tab. This tab contains corporation jobs, contracts and moons assigned to corporations.",
 
   "Elutasítva": "Rejected",

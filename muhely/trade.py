@@ -18,7 +18,7 @@ from .refresh_policy import RefreshPolicy,AUTO_SECONDS
 ACCOUNTING=16622
 BROKER_RELATIONS=3446
 DEFAULTS={'system_id':None,'reader_id':None,'location_id':None,'location':None,'search':'' ,'structure_broker_fee':None,'hauling_isk_per_m3':'0'}
-FINANCE={'materials':'jita:sell','sale':'jita:sell','seller_id':None,'sale_order':'auto','other_isk':'0','blueprints_isk':None}
+FINANCE={'materials':'jita:sell','sale':'jita:sell','seller_id':None,'sale_order':'auto','hauling_enabled':True,'other_isk':'0','blueprints_isk':None}
 
 def decimal(value,name,minimum=0,maximum=100):
     if isinstance(value,bool):raise PlanningError(name+': szám szükséges.')
@@ -263,6 +263,9 @@ class Trade:
             p[field]=value
         seller=data.get('seller_id',p['seller_id']);p['seller_id']=self.character(seller) if seller else None
         if data.get('sale_order',p['sale_order']) not in ['auto','instant','order']:raise PlanningError('Ismeretlen eladási mód.')
+        hauling=data.get('hauling_enabled',p['hauling_enabled'])
+        if type(hauling) is not bool:raise PlanningError('A szállítási kapcsoló be vagy ki értéket vár.')
+        p['hauling_enabled']=hauling
         p['sale_order']=data.get('sale_order',p['sale_order']);p['other_isk']=decimal(data.get('other_isk',p['other_isk']),'Egyéb költség',0,10**18)
         blueprints=data.get('blueprints_isk',p['blueprints_isk'])
         p['blueprints_isk']=None if blueprints in [None,''] else decimal(blueprints,'Blueprintköltség',0,10**18)

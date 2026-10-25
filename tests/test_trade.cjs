@@ -130,3 +130,52 @@ test('import follows material market and export follows selling market independe
  const d=dom.window.document;assert.match(d.querySelector('.finance-grid').textContent,/Import hauling/);assert.match(d.querySelector('.finance-grid').textContent,/Export hauling/);
  assert.match(d.querySelector('[data-finance-hauling=import]').textContent,/200 ISK/);assert.match(d.querySelector('[data-finance-hauling=export]').textContent,/400 ISK/);
 });
+
+test('high-precision ESI standing fees calculate the screenshot revenue and profit instead of reporting unknown',async t=>{
+ const {dom,run,d}=setup();t.after(()=>dom.window.close());
+ assert.equal(run("financeFee(82400000000n,'1.31781059532')"),1085875931n);
+ // Round only the monetary result: a tiny percentage on a large order must survive.
+ assert.equal(run("financeFee(1000000000000000000n,'0.0000000000001')"),1000n);
+ assert.equal(run("financeFee(500n,'0.1')"),1n);
+ for(const value of ['','NaN','-1','100.0000000000001','1e-10','1'.repeat(129)])assert.equal(run('financeFee(100n,'+JSON.stringify(value)+')'),null);
+ run(`tradeData={settings:{hauling_rates:{jita:{import:'500',export:'650'},local:{import:'0',export:'0'}}}};
+ const screenshot={materials:[{id:2,name:'Materials',quantity:1}],quantity:50,plan:{product_id:1,quantity:50,queue:[{id:1,manufactured:50,activity:'manufacturing',parameters:{kind:'BPC'}}],rows:[{id:1,volume:2500}],shopping:[{id:2,buy:1,volume:313.2}],blueprint_shortages:[]}};
+ const preciseProfile={...profile,broker_fee:'1.31781059532'};
+ const screenshotPrefs={...f,materials:'jita:sell',sale:'jita:sell',sale_order:'order',other_isk:'0',blueprints_isk:null};
+ const screenshotBooks={jita:{quotes:{1:{sell:'16480000',stale:true},2:{sell:'573799495.60'}}}};
+ const screenshotJobs={complete:true,cents:'22097347269'};
+ const precise=financeValues(screenshot,screenshotPrefs,screenshotBooks,preciseProfile,screenshotJobs);
+ document.querySelector('#production-finance').innerHTML=productionFinance(screenshot.plan,screenshot.materials);
+ financeContext.quantity=50;financePrefs=screenshotPrefs;financeBooks=screenshotBooks;financeProfile=preciseProfile;
+ economicPanels.set('plan-materials',{key:'screenshot'});jobCostKey='screenshot';jobCostData=screenshotJobs;applyProductionFinance();
+ EveI18n.setLanguage('en');EveI18n.translate(document.documentElement);`);
+ await tick();const out=run('precise.values');assert.equal(out.gross,82400000000n);assert.equal(out.sales_tax,2781000000n);assert.equal(out.broker_fee,1085875931n);assert.equal(out.net,78533124069n);assert.equal(out.total,87617956829n);assert.equal(out.profit,-9084832760n);
+ assert.equal(d.querySelector('[data-finance-value=broker_fee]').textContent,'10 858 759,31 ISK');
+ assert.equal(d.querySelector('[data-finance-value=net]').textContent,'785 331 240,69 ISK');
+ assert(!d.querySelector('[data-finance-warning]').textContent.includes('Broker fee is unknown'));
+ assert(d.querySelector('[data-finance-warning]').textContent.includes('Some market quotes are from an older snapshot'));
+});
+
+test('hauling switch excludes both directions, preserves rates and missing volumes only block when enabled',t=>{
+ const {w,run}=setup();t.after(()=>w.close());
+ run(`tradeData={settings:{hauling_rates:{jita:{import:'500',export:'650'},local:{import:'100',export:'200'}}}};const transport={...c,plan:{...c.plan,rows:[{id:1,volume:2500}],shopping:[{id:2,buy:10,volume:.01}]}};`);
+ const before=run('JSON.stringify(tradeData.settings.hauling_rates)');
+ const on=run('financeValues(transport,f,books,profile,{complete:true,cents:"10000"})');
+ const off=run('financeValues(transport,{...f,hauling_enabled:false},books,profile,{complete:true,cents:"10000"})');
+ assert.equal(on.values.hauling_import,1000n);assert.equal(on.values.hauling_export,325000000n);
+ assert.equal(off.values.hauling_import,0n);assert.equal(off.values.hauling_export,0n);assert.equal(off.values.total,on.values.total-on.values.hauling);assert.equal(off.values.profit,on.values.profit+on.values.hauling);
+ assert.equal(run('JSON.stringify(tradeData.settings.hauling_rates)'),before);
+ const missing=run('financeValues({...transport,plan:{...transport.plan,rows:[],shopping:[{id:2,buy:10}]}},{...f,hauling_enabled:false},books,profile,{complete:true,cents:"10000"})');assert.notEqual(missing.values.profit,null);
+ assert.equal(run('financeValues({...transport,plan:{...transport.plan,rows:[],shopping:[{id:2,buy:10}]}},f,books,profile,{complete:true,cents:"10000"}).values.profit'),null);
+});
+
+test('hauling checkbox restores the saved state, updates totals immediately and saves only this plan',async t=>{
+ const {w,run,d}=setup();t.after(()=>w.close());const calls=[];
+ w.api=async(path,body)=>{calls.push({path,body});if(path.startsWith('/api/trade/plan'))return {...run('f'),hauling_enabled:false};if(path==='/api/trade')return {settings:{hauling_rates:{jita:{import:'500',export:'650'},local:{import:'100',export:'200'}}},status:{running:false}};if(path.startsWith('/api/trade/seller?'))return run('profile');return {...run('books.jita'),errors:{},retry_after:{},running:false};};
+ run(`activePlanId='plan-hauling';document.querySelector('#production-finance').innerHTML=productionFinance({...c.plan,rows:[{id:1,volume:2500}],shopping:[{id:2,buy:1,volume:313.2}]},c.materials);bindProductionFinance();`);
+ await tick();await tick();await tick();
+ const checkbox=d.querySelector('[data-finance-field=hauling_enabled]');assert.equal(checkbox.checked,false);assert.match(d.querySelector('[data-finance-hauling=import]').textContent,/Kikapcsolva/);
+ checkbox.checked=true;checkbox.dispatchEvent(new w.Event('change'));assert.equal(run('financePrefs.hauling_enabled'),true);assert.notEqual(d.querySelector('[data-finance-value=hauling_export]').textContent,'0,00 ISK');
+ await new Promise(r=>setTimeout(r,350));const saved=calls.find(c=>c.path==='/api/trade/plan'&&c.body);assert.equal(saved.body.plan_id,'plan-hauling');assert.equal(saved.body.hauling_enabled,true);assert(!calls.some(c=>c.path==='/api/trade/hauling'));
+ w.EveI18n.setLanguage('en');await tick();assert.match(checkbox.closest('label').textContent,/Include hauling cost/);assert.equal(checkbox.checked,true);
+});
