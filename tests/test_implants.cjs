@@ -38,3 +38,17 @@ test('disabled implant alerts do not claim, missing-price estimates say at least
  await w.pollImplantAlerts();assert.equal(calls.length,0);assert(w.implantValue({partial:true,value:'10',threshold:'5'}).startsWith('Legalább'));
  for(const label of ['Implantfigyelés','Kidokkolás drága implantokkal','Implantfigyelés engedélyezése','Értékhatár (ISK)'])assert(w.EveEnglish[label]);
 });
+
+test('full notification settings keep implant save, authorization and refresh handlers with or without moon ownership rows',async t=>{
+ for(const hasMoons of [false,true]){
+  const {w,run,calls,opened}=setup();t.after(()=>w.close());let refreshed=0;
+  w.refreshNotifications=async()=>{refreshed++;};
+  run(`let view='settings',settingsTab='notifications';notificationPermission='authorized';notificationData={preferences:{os_enabled:true,auto_refresh:true,personal:true,corporations:true,moon_days:3,categories:{skills:true,implants:true},moon_owners:{}},corporations:[],moons:${hasMoons?'[{id:"moon1",name:"Test I - Moon 1"}]':'[]'},implants:{scopes:['esi-location.read_location.v1','esi-clones.read_implants.v1'],characters:[{id:11,name:'Steve test',enabled:false,threshold:'1000000000',authorized:true}]}};renderNotificationSettings(document.querySelector('main'));`);
+  const form=w.$('#implant-preferences');assert.equal(typeof form.onsubmit,'function');assert.equal(typeof form.oninput,'function');
+  w.$('[data-implant-enabled="11"]').click();assert.equal(w.dirty.implant_preferences,true);
+  await form.onsubmit({preventDefault(){}});
+  const saved=calls.find(c=>c.url==='/api/implants/preferences');assert.equal(saved.body.characters[0].enabled,true);assert.equal(saved.body.characters[0].threshold,'1000000000');assert(!w.dirty.implant_preferences);
+  await w.$('[data-implant-authorize="11"]').onclick();assert.equal(opened.length,1);assert.equal(calls.at(-1).body.feature,'implants');
+  w.$('#implant-status-refresh').click();assert.equal(refreshed,2);
+ }
+});
