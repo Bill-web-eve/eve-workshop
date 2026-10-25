@@ -33,7 +33,7 @@ from .skills import dashboard as skill_dashboard
 from .production import profiles as production_profiles
 from .pi import dashboard as pi_dashboard
 from .planner import Planner, PlanningError, AssetSnapshotPending, integer, decimal_number, live_inventory
-from .reservations import allocate_plans, except_owner
+from .reservations import allocate_plans, except_owner, pending_info
 from .store import Store, default_data_dir, DEFAULT_SETTINGS
 
 from .refresh_policy import RefreshPolicy
@@ -335,7 +335,7 @@ class App:
                     corporation_id=corporation_id,inventory=self.store.mapping('inventory',corporation_id),
                     parameters=self.store.mapping('parameters',corporation_id))
 
-    def _calculate(self, product_id, quantity, context, reservations=None, own=None, manufacturer_id=None):
+    def _calculate(self, product_id, quantity, context, reservations=None, own=None, manufacturer_id=None,allow_pending=False):
         settings = context['settings']
         plan = self.planner.calculate(product_id, quantity, settings, context['inventory'], context['parameters'],
                                       context['stock'], context['wip'], context['blueprints'], context['jobs'],
@@ -364,16 +364,17 @@ class App:
         if waiting:
             items=list(waiting.values())
             retry_at=min((item['assets_expires'] for item in items if item['assets_expires']),default=time.time()+60)
-            raise AssetSnapshotPending(items,retry_at)
+            if not allow_pending:raise AssetSnapshotPending(items,retry_at)
+            plan['inventory_wait']={'items':items,'retry_at':retry_at,'plan_name':None}
         plan.update(source=settings['source'], stale_characters=context['stale'], calculated_at=time.time(),
                     corporation_id=context.get('corporation_id'),scope_label=self.scope_label(context.get('corporation_id')))
         return plan
 
-    def _allocate(self, plans, context):
+    def _allocate(self, plans, context, allow_pending=False):
         same_pool=[p for p in plans if p.get('corporation_id')==context.get('corporation_id')]
-        return allocate_plans(same_pool, lambda product, quantity, held: self._calculate(product, quantity, context, held),
+        return allocate_plans(same_pool, lambda product, quantity, held: self._calculate(product, quantity, context, held,allow_pending=allow_pending),
             calculate_saved=lambda saved,held:self._calculate(saved['product_id'],saved['quantity'],context,held,
-                                                            manufacturer_id=saved.get('manufacturer_id')))
+                                                            manufacturer_id=saved.get('manufacturer_id'),allow_pending=allow_pending))
 
     def manufacturer(self,value,corporation_id=None,allow_missing=None):
         if value is None or value in ['', 'auto']:return None
@@ -394,7 +395,7 @@ class App:
             raise PlanningError('Ez a mentett terv már nem található. Nyiss meg másik tervet vagy kezdj újat.')
         return found
 
-    def plan(self, product_id, quantity, saved_plan_id=None, corporation_id=None, manufacturer_id='saved'):
+    def plan(self, product_id, quantity, saved_plan_id=None, corporation_id=None, manufacturer_id='saved',allow_preview=False):
         with self.planning_lock, self.catalog.lock:
             context = self._context(corporation_id)
             plans = self.store.plans()
@@ -407,13 +408,24 @@ class App:
             # Editing a saved quantity previews the same priority allocation that
             # saving it will commit. No persistent reservation changes on GET.
             preview = [{**p, 'quantity': quantity} if p['id'] == saved_plan_id else p for p in plans]
-            allocation = self._allocate(preview, context)
-            other, own = except_owner(allocation, saved_plan_id)
-            plan = self._calculate(product_id, quantity, context, other, own,manufacturer_id)
+            try:
+                allocation = self._allocate(preview, context)
+                other, own = except_owner(allocation, saved_plan_id)
+                plan = self._calculate(product_id, quantity, context, other, own,manufacturer_id)
+            except AssetSnapshotPending:
+                if not allow_preview:raise
+                # Read-only preview: keep the exact same cached assets/WIP and
+                # reservation priority. Never invent delivered output or write
+                # provisional holds. All saving/scheduling paths remain strict.
+                allocation = self._allocate(preview, context,allow_pending=True)
+                other, own = except_owner(allocation, saved_plan_id)
+                plan = self._calculate(product_id, quantity, context, other, own,manufacturer_id,allow_pending=True)
+                waits=allocation['pending']+([plan['inventory_wait']] if plan.get('inventory_wait') else [])
+                plan.update(preview_only=True,inventory_wait=pending_info(waits))
             plan['saved_plan'] = ({**saved, 'preview_changed': quantity != saved['quantity'] or (manufacturer_id or 0)!=(saved.get('manufacturer_id') or 0)} if saved else None)
             plan['reservation_summary'] = {'active_count': allocation['active_count'],
                 'other_plan_count': allocation['active_count']-int(bool(saved and saved['reserve_active'])),
-                'own': allocation['by_plan'].get(saved_plan_id)}
+                'own': allocation['by_plan'].get(saved_plan_id),'provisional':bool(plan.get('preview_only'))}
             return plan
 
     def schedule(self,data):
@@ -431,7 +443,7 @@ class App:
             def calculate(current):return self._calculate(product,quantity,current,other,own,None)
             return scheduler.build(context,self.store,self.catalog,calculate,data)
 
-    def shopping_summary(self):
+    def shopping_summary(self,allow_preview=False):
         """Preview every saved goal against one pool; no persistent holds change."""
         with self.planning_lock, self.catalog.lock:
             plans=self.store.plans()
@@ -445,8 +457,13 @@ class App:
             inactive=sorted((p for p in plans if not p['reserve_active']),key=lambda p:(p['created'],p['id']))
             priority={p['id']:last+i+1 for i,p in enumerate(inactive)}
             virtual=[{**p,'reserve_active':True,'reserved_at':priority[p['id']]} if not p['reserve_active'] else p for p in plans]
-            allocation={'by_plan':{}}
-            for context in contexts.values():allocation['by_plan'].update(self._allocate(virtual,context)['by_plan'])
+            allocation={'by_plan':{}};waits=[]
+            for context in contexts.values():
+                try:part=self._allocate(virtual,context)
+                except AssetSnapshotPending:
+                    if not allow_preview:raise
+                    part=self._allocate(virtual,context,allow_pending=True);waits.extend(part['pending'])
+                allocation['by_plan'].update(part['by_plan'])
             rows={};included=[];formulas=set()
             for saved in sorted(plans,key=lambda p:(self.scope_label(p.get('corporation_id')),allocation['by_plan'][p['id']]['priority'])):
                 result=allocation['by_plan'][saved['id']]
@@ -470,7 +487,8 @@ class App:
             for row in rows.values():row['is_blueprint']=row['id'] in blueprint_ids
             return {'rows':sorted(rows.values(),key=lambda r:(r['category'],r['name'].casefold())),
                     'plans':included,'source':self.store.settings()['source'],'separate_pools':len(contexts)>1 or any(contexts),
-                    'stale_characters':list(dict.fromkeys(n for c in contexts.values() for n in c['stale'])),'calculated_at':time.time()}
+                    'stale_characters':list(dict.fromkeys(n for c in contexts.values() for n in c['stale'])),'calculated_at':time.time(),
+                    **({'preview_only':True,'inventory_wait':pending_info(waits)} if waits else {})}
 
     def save_plan(self, data):
         with self.planning_lock, self.catalog.lock:
@@ -768,10 +786,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/search':
                 return self.send(200, self.app.catalog.search(query.get('q', [''])[0][:200], query.get('all', ['0'])[0] == '1'))
             if path == '/api/plans/shopping':
-                return self.send(200,self.app.shopping_summary())
+                return self.send(200,self.app.shopping_summary(allow_preview=query.get('preview',['0'])[0]=='1'))
             if path == '/api/plan':
                 return self.send(200, self.app.plan(int(query.get('product_id', ['0'])[0]), int(query.get('quantity', ['1'])[0]),
-                                                   query.get('saved_plan_id', [None])[0],query.get('corporation_id',[None])[0],query.get('manufacturer_id',['saved'])[0]))
+                                                   query.get('saved_plan_id', [None])[0],query.get('corporation_id',[None])[0],query.get('manufacturer_id',['saved'])[0],allow_preview=query.get('preview',['0'])[0]=='1'))
             return self.send(404, {'error': 'Nincs ilyen oldal.'})
         except (PlanningError, EsiError, ValueError) as error:
             message = str(error) if isinstance(error, (PlanningError, EsiError)) else 'Hibás kérés.'

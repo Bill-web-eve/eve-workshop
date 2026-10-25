@@ -313,6 +313,52 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(row['on_hand'],4000);self.assertEqual(row['wip_total'],0)
         self.assertIsNone(self.request('/api/state')[1]['delivery_wait'])
 
+    def test_pending_delivery_allows_previews_for_all_personal_plans_but_never_commits_holds(self):
+        from datetime import datetime,timezone
+        now=time.time();self.seed_archon_stock();self.request('/api/settings',{'source':'eve'})
+        ids={}
+        for product,quantity in [(92822,1),(12038,50),(12034,50)]:
+            code,value,_=self.request('/api/plans/save',{'product_id':product,'quantity':quantity})
+            self.assertEqual(code,200);ids[product]=value['id']
+        before=self.app.store.plans();parts={k:self.app.store.snapshot(123,k) for k in ['assets','blueprints','jobs']}
+        parts['assets']['fetched']=now-300;parts['assets']['expires']=now+3600
+        parts['assets']['data'].append({'item_id':2,'type_id':16678,'quantity':25,'location_id':6001})
+        recipe=self.app.catalog.recipes[16678]
+        parts['jobs']['data']=[{'job_id':19,'product_type_id':16678,'blueprint_type_id':recipe['bp_id'],'activity_id':9,'status':'delivered','runs':10,'output_location_id':6001,'completed_date':datetime.fromtimestamp(now-60,timezone.utc).isoformat()}]
+        self.app.store.save_snapshots(123,parts)
+        for product,quantity in [(92822,1),(12038,50),(12034,50),(590,10)]:
+            path=f'/api/plan?product_id={product}&quantity={quantity}'+('&saved_plan_id='+ids[product] if product in ids else '')
+            self.assertEqual(self.request(path)[0],400)
+            code,preview,_=self.request(path+'&preview=1');self.assertEqual(code,200)
+            self.assertTrue(preview['preview_only']);self.assertTrue(preview['reservation_summary']['provisional']);self.assertTrue(preview['queue'])
+            self.assertEqual(preview['inventory_wait']['retry_at'],now+3600)
+            row=next((r for r in preview['rows'] if r['id']==16678),None)
+            if row:self.assertEqual((row['on_hand'],row['wip_total']),(25,0))
+        self.assertEqual(self.request('/api/plans/shopping')[0],400)
+        code,summary,_=self.request('/api/plans/shopping?preview=1');self.assertEqual(code,200);self.assertTrue(summary['preview_only']);self.assertTrue(summary['rows'])
+        # A client cannot bypass strict saving/activation/scheduling with flags.
+        for data in [{'product_id':590,'quantity':10,'preview_only':True},{'id':ids[12038],'product_id':12038,'quantity':51,'preview_only':True}]:self.assertEqual(self.request('/api/plans/save',data)[0],400)
+        self.assertEqual(self.request('/api/plans/reservation',{'id':ids[12038],'active':True,'preview_only':True})[0],400)
+        self.assertEqual(self.request('/api/schedule',{'product_id':12038,'quantity':50,'saved_plan_id':ids[12038],'preview_only':True})[0],400)
+        self.assertEqual(self.app.store.plans(),before)
+        parts['assets']['fetched']=now;parts['assets']['data'][-1]['quantity']=10025;self.app.store.save_snapshots(123,parts)
+        code,final,_=self.request('/api/plan?product_id=12038&quantity=50&saved_plan_id='+ids[12038]+'&preview=1')
+        self.assertEqual(code,200);self.assertFalse(final.get('preview_only',False));self.assertFalse(final['reservation_summary']['provisional'])
+        row=next(r for r in final['rows'] if r['id']==16678);self.assertEqual((row['on_hand'],row['wip_total']),(10025,0))
+        self.assertEqual(self.app.store.plans(),before)
+
+    def test_personal_pending_previews_do_not_contaminate_corporation_plans(self):
+        from datetime import datetime,timezone
+        now=time.time();self.seed_archon_stock();self.request('/api/settings',{'source':'eve'})
+        code,value,_=self.request('/api/plans/save',{'product_id':92822,'quantity':1});self.assertEqual(code,200)
+        parts={k:self.app.store.snapshot(123,k) for k in ['assets','blueprints','jobs']};parts['assets']['fetched']=now-300
+        tid=16678;recipe=self.app.catalog.recipes[tid]
+        parts['jobs']['data']=[{'job_id':19,'product_type_id':tid,'blueprint_type_id':recipe['bp_id'],'activity_id':9,'status':'delivered','runs':10,'output_location_id':6001,'completed_date':datetime.fromtimestamp(now-60,timezone.utc).isoformat()}]
+        self.app.store.save_snapshots(123,parts);self.app.store.character_corporation(123,99,'Other Corp')
+        self.app.store.save_corporation_snapshots(99,123,{k:{'data':[],'fetched':now,'expires':now+3600} for k in ['assets','blueprints','jobs']})
+        code,preview,_=self.request('/api/plan?product_id=590&quantity=1&preview=1');self.assertEqual(code,200);self.assertTrue(preview['preview_only'])
+        code,corp,_=self.request('/api/plan?product_id=590&quantity=1&corporation_id=99&preview=1');self.assertEqual(code,200);self.assertFalse(corp.get('preview_only',False));self.assertEqual(corp['corporation_id'],99)
+
     def test_delivery_guard_ignores_covered_outputs_and_incompatible_job_recipes(self):
         from datetime import datetime,timezone
         now=time.time();self.app.store.add_character(123,'Pilot')

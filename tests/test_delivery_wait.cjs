@@ -197,3 +197,28 @@ test('contract notifications open the correct owner and history, and an instant 
  d.querySelector('#contract-sync').click();await tick();await tick();assert.equal(calls.filter(p=>p.startsWith('/api/plan?')).length,plansBefore);assert.equal(run('view'),'contracts');assert.equal(d.querySelector('.plan-selector').hidden,true);
  assert(!/[áéíóöőúüű]/i.test(d.querySelector('#view-content').textContent));
 });
+
+test('provisional delivery plans remain visible and save/scheduling stay disabled until fresh inventory arrives',async t=>{
+ const {w,d,run,setResult,calls}=await setup(null);t.after(()=>w.close());
+ const result={product_id:22428,name:'Redeemer',quantity:3,activity:'manufacturing',summary:{items:0,jobs:0,runs:0,seconds:0},queue:[],rows:[],shopping:[],blueprint_shortages:[],stale_characters:[],calculated_at:1000,preview_only:true,inventory_wait:pending(),reservation_summary:{active_count:1,other_plan_count:0,own:null,provisional:true},saved_plan:null};
+ setResult(result);const originalFetch=w.fetch;
+ w.fetch=async(url,options)=>{
+  if(url.startsWith('/api/trade/plan'))return {ok:true,json:async()=>({materials:'jita:sell',sale:'jita:sell',seller_id:null,sale_order:'auto',other_isk:'0',blueprints_isk:null,hauling_enabled:true})};
+  if(url==='/api/trade')return {ok:true,json:async()=>({settings:{},status:{running:false},characters:[],scopes:[]})};
+  if(url.startsWith('/api/prices'))return {ok:true,json:async()=>({quotes:{},errors:{},retry_after:{},running:false})};
+  if(url==='/api/industry/estimate')return {ok:true,json:async()=>({complete:true,cents:'0',missing:0,rows:[]})};
+  if(url==='/api/industry')return {ok:true,json:async()=>({running:false,errors:{},resources:{systems:{checked:1000,stale:false},prices:{checked:1000,stale:false}}})};
+  return originalFetch(url,options);
+ };
+ d.querySelector('#calculate').click();await tick();await tick();
+ assert.equal(new URL(calls.find(u=>u.startsWith('/api/plan?')),w.location.href).searchParams.get('preview'),'1');
+ assert.equal(run('plan.preview_only'),true);assert.equal(d.querySelector('#global-error').hidden,true);assert(d.querySelector('.delivery-preview'));
+ assert.match(d.querySelector('#calculation-feedback').textContent,/Provisional plan calculated/);
+ assert(d.querySelector('#save-plan').disabled);assert(d.querySelector('#schedule-form button[type=submit]').disabled);
+ run('navigate("queue")');await tick();await tick();assert(d.querySelector('.delivery-preview'));assert.equal(d.querySelector('#global-error').hidden,true,d.querySelector('#global-error').textContent);assert(!/[áéíóöőúüű]/i.test(d.querySelector('.delivery-preview').textContent));
+ const before=calls.filter(u=>u==='/api/plans/save').length;
+ await d.querySelector('#save-plan').onclick();await tick();assert.equal(calls.filter(u=>u==='/api/plans/save').length,before);assert(d.querySelector('#save-plan').disabled);
+ setResult({...result,preview_only:false,inventory_wait:undefined,reservation_summary:{...result.reservation_summary,provisional:false}});
+ run('navigate("schedule")');d.querySelector('#calculate').click();await tick();await tick();
+ assert.equal(run('plan.preview_only'),false);assert.equal(d.querySelector('.delivery-preview'),null);assert.equal(d.querySelector('#save-plan').disabled,false);assert.equal(d.querySelector('#schedule-form button[type=submit]').disabled,false);
+});

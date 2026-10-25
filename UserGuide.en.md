@@ -672,3 +672,10 @@ ESI returns contracts from the past 30 days and those still in progress. Downloa
 Click a title for contract terms, offered/requested items and locally observed status history. Old item lists are retained only if they were previously opened and successfully downloaded. Unresolved locations retain their IDs; structure names may require additional access.
 
 The first complete import establishes a baseline without sending historical alerts. Later, newly observed open contracts directly assigned to a character or corporation and acceptance of your issued contracts generate one-time notifications. Enable **Settings → Notifications → Contracts** and the relevant personal/corporation scope. Alerts appear on separate personal/corporation tabs and open the corresponding contract view. ESI has no immediate event push: changes are detected on the next successful check.
+
+
+### Planning while delivered-job inventory is updating
+
+When ESI inventory and job snapshots disagree, the production plan, graph and material shortfall remain available as a **Provisional plan**. The combined shopping summary also supports previews. Calculations use downloaded stock, active jobs and the same reservation priority. Delivered output that has not appeared in a confirmed inventory snapshot is not credited, so shortfalls, production quantities and costs may be overestimated. These are not final production instructions.
+
+Previews never change saved plans or reservations. New or updated reservations and final schedules still require verified inventory; the server enforces this independently of the UI. The app retries after the displayed expiry while respecting automatic refresh limits. Once an appropriate inventory snapshot arrives, the next calculation automatically returns to normal mode. ESI jobs contain no saved-plan identifier: an item name alone cannot establish which plan a job was intended for.

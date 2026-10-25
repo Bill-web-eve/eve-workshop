@@ -7,6 +7,7 @@ from .planner import PlanningError,AssetSnapshotPending
 def allocate_plans(plans, calculate, calculate_saved=None):
     totals = defaultdict(lambda: {'stock': 0, 'wip': 0})
     by_plan = {}
+    pending = []
     active = sorted((p for p in plans if p['reserve_active']),
                     key=lambda p: (p['reserved_at'] or p['created'], p['created'], p['id']))
     for priority, saved in enumerate(active, 1):
@@ -17,6 +18,8 @@ def allocate_plans(plans, calculate, calculate_saved=None):
         except PlanningError as error:
             raise PlanningError(f"A(z) {saved['name']} mentett terv foglalása nem számolható: {error} "
                                 'A Mentett tervek oldalon feloldhatod a foglalását.') from None
+        if plan.get('inventory_wait'):
+            pending.append({**plan['inventory_wait'],'plan_name':saved['name']})
         items = []
         for row in plan['rows']:
             stock = row['used_stock']
@@ -34,7 +37,7 @@ def allocate_plans(plans, calculate, calculate_saved=None):
                                'blueprint_usage':blueprint_usage,
                                'reserved_types': len(items)+len({u['id'] for u in blueprint_usage}), 'summary': plan['summary'],
                                'shopping': [{key: row[key] for key in ['id','name','category','required','used_stock','used_wip','buy','unit','copy_runs','note'] if key in row} for row in plan['shopping']]}
-    return {'totals': dict(totals), 'by_plan': by_plan, 'active_count': len(active)}
+    return {'totals': dict(totals), 'by_plan': by_plan, 'active_count': len(active), 'pending':pending}
 
 
 def except_owner(allocation, plan_id):
@@ -53,3 +56,12 @@ def except_owner(allocation, plan_id):
         if amounts['stock'] or amounts['wip'] or any(amounts.get('blueprint_runs',{}).values()):
             other[tid] = amounts
     return other, own_items
+
+
+def pending_info(waits):
+    items={}
+    for wait in waits:
+        for item in wait['items']:
+            key=(item.get('character_id'),item['id'])
+            if key not in items or item['completed_at']>items[key]['completed_at']:items[key]=item
+    return {'items':list(items.values()),'retry_at':min(w['retry_at'] for w in waits),'plan_name':None}

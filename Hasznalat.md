@@ -670,3 +670,10 @@ Az ESI legfeljebb az elmúlt 30 nap szerződéseit és a még folyamatban lévő
 A címre kattintva megnyílnak a feltételek, a felajánlott/kért tételek és a helyben megfigyelt állapotelőzmények. A régi szerződések tétellistáját csak akkor őrizzük meg, ha azt korábban megnyitottad és sikerült letölteni. Ismeretlen helynévnél az ID marad látható; a névfeloldás jogosultságtól is függhet.
 
 Az első sikeres teljes beolvasás alapállapot, nem küld régi értesítéseket. Ezután új, közvetlenül karakternek vagy corporationnek címzett, még nyitott szerződésről és saját kiadott szerződés elfogadásáról küld egyszeri értesítést. A **Beállítások → Értesítések → Szerződések** kategória és a megfelelő személyes/corp kör legyen engedélyezve. Az értesítések személyes és corporation füleken is megjelennek; kattintásuk a megfelelő szerződésnézetet nyitja meg. Az ESI nem küld azonnali eseményt: a változás a következő sikeres ellenőrzéskor észlelhető.
+
+
+### Tervezés átvett job utáni készletvárakozáskor
+
+Eltérő ESI-készlet- és jobpillanatkép esetén a gyártási terv, gráf és anyaghiány **Előzetes terv** jelzéssel továbbra is megnyitható; az összes mentett terv beszerzési összesítése is elérhető előnézetben. A számítás a ténylegesen letöltött készlettel, aktív jobokkal és a foglalások azonos elsőbbségével számol. Az átvett, de készletben még nem igazolt kimenetet nem adjuk hozzá, ezért a hiány, a gyártási mennyiség és a költség túlbecsült lehet. Ez nem végleges gyártási utasítás.
+
+Az előnézet nem változtatja meg a mentett terveket vagy foglalásokat. Új foglalás, aktív foglalás módosítása és végleges ütemezés továbbra is csak ellenőrzött készletből készül; ezt a szerver is kikényszeríti. Az app a jelzett lejárat után az automatikus frissítési szabályt betartva próbál újra. Amikor megfelelő készletpillanatkép érkezik, a következő számítás automatikusan visszatér a normál nézethez. Az ESI-jobok nem tartalmaznak mentettterv-azonosítót: az anyagnév önmagában nem bizonyítja, hogy egy job melyik tervhez készült.

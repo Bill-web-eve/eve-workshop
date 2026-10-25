@@ -1,6 +1,17 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+  "Érintett anyagok: {0}.": "Affected materials: {0}.",
+
+"Előzetes terv elkészült; a végleges foglalás friss készletadatra vár.": "Provisional plan calculated; final reservations await fresh inventory data.",
+"A foglalás véglegesítése friss készletadatra vár.": "Finalizing reservations requires fresh inventory data.",
+"Előzetes terv · EVE-készletfrissítésre vár": "Provisional plan · awaiting EVE inventory update",
+"A számítás a jelenlegi gyorsítótárazott készletből készült. Az átvett job kimenetét nem adtuk hozzá. A hiány és a gyártandó mennyiség ezért túlbecsült lehet.": "This calculation uses the current cached inventory. Delivered job output has not been added. Shortfalls and production quantities may therefore be overestimated.",
+"A meglévő foglalások változatlanok. Új vagy módosított foglalást és végleges ütemezést csak friss készletadatból készítünk.": "Existing reservations are unchanged. New or updated reservations and final schedules require fresh inventory data.",
+"Érintett anyagok:": "Affected materials:",
+"Az itt látható kiosztás csak előnézet, nem új foglalás.": "The allocation shown here is a preview, not a new reservation.",
+"Előzetes költségbecslés; a friss készletadat módosíthatja a hiányt és a gyártási költséget.": "Provisional cost estimate; fresh inventory may change shortfalls and production costs.",
+
   "Szállítási költség beszámítása": "Include hauling cost",
   "A szállítási kapcsoló be vagy ki értéket vár.": "The hauling switch must be on or off.",
 

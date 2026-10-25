@@ -159,6 +159,10 @@ function deliveryWaitMarkup(wait){
   const retry=wait.retry_at;
   return `<div class="banner delivery-wait"><strong>Készletfrissítésre várunk${wait.plan_name?' · '+esc(wait.plan_name):''}</strong><p>A jobok már át vannak véve, de az EVE még az átvétel előtti készletet adja vissza.</p><p><strong>Legkorábbi frissítési próbálkozás: ${esc(deliveryRetryTimestamp(retry))}.</strong><br>${esc(deliveryRetryStatus(wait))}</p><p>Ha ez az ablak előtérben marad, a lejárat után automatikusan újra próbáljuk.</p>${table(['Anyag','Karakter','Készletpillanatkép','Job átvétele'],wait.items.map(i=>`<tr><td>${itemName(i.name)}</td><td>${esc(i.character_name||i.character_id||'–')}</td><td data-sort-value="${i.assets_as_of??''}">${esc(deliveryTimestamp(i.assets_as_of))}</td><td data-sort-value="${i.completed_at??''}">${esc(deliveryTimestamp(i.completed_at))}</td></tr>`))}<p>A mentett tervek és foglalások megmaradnak. Az átvett kimenetet nem adjuk hozzá még egyszer a készlethez. Az időpont a CCP által jelzett lejárat; nem garantálja, hogy rögtön új adat érkezik.</p></div>`;
 }
+function deliveryPreviewMarkup(wait){
+  const names=[...new Set(wait.items.map(i=>i.name))].sort().map(verbatim).join(', ');
+  return `<div class="banner warn delivery-preview"><strong>Előzetes terv · EVE-készletfrissítésre vár</strong><p>A számítás a jelenlegi gyorsítótárazott készletből készült. Az átvett job kimenetét nem adtuk hozzá. A hiány és a gyártandó mennyiség ezért túlbecsült lehet.</p><p>A meglévő foglalások változatlanok. Új vagy módosított foglalást és végleges ütemezést csak friss készletadatból készítünk.</p><p>Érintett anyagok: ${names}.<br>Legkorábbi frissítési próbálkozás: ${esc(deliveryRetryTimestamp(wait.retry_at))}.</p></div>`;
+}
 function renderDeliveryWait(content){
   setHead('EVE-KÉSZLET','Az átvett jobok készletadata még frissül','A számítást az új EVE-készlet megérkezése után folytatjuk.');
   $('#plan-status').hidden=true;actions('<button id="delivery-refresh" class="button compact">EVE-adatok ellenőrzése</button>');
@@ -198,6 +202,8 @@ function updatePlanControls() {
   else{delete target.dataset.copyItem;target.removeAttribute('title');}
   $('#save-plan').textContent=activePlanId?'↻ Terv és foglalás frissítése':'＋ Terv mentése és foglalás';
   $('#save-plan').title='Mentés ide: '+(corporationId?'Corp · '+state.scope_label:'Személyes');
+  $('#save-plan').disabled=!!plan?.preview_only;
+  if(plan?.preview_only)$('#save-plan').title=EveI18n.t('A foglalás véglegesítése friss készletadatra vár.');
   $('#new-plan').hidden=!activePlanId;
 }
 function scheduleTaskPoll() {
@@ -237,9 +243,10 @@ async function calculate(refreshState=true,announce=false) {
     if(generation!==planGeneration)return;
     if(activePlanId && !state.plans.some(p=>p.id===activePlanId&&p.product_id===targetId))activePlanId=null;
     const owner=activePlanId;
-    const next=await api(scoped(`/api/plan?product_id=${encodeURIComponent(targetId)}&quantity=${encodeURIComponent(quantity)}${owner?'&saved_plan_id='+encodeURIComponent(owner):''}&manufacturer_id=${encodeURIComponent(manufacturerValue())}`));
+    const next=await api(scoped(`/api/plan?product_id=${encodeURIComponent(targetId)}&quantity=${encodeURIComponent(quantity)}${owner?'&saved_plan_id='+encodeURIComponent(owner):''}&manufacturer_id=${encodeURIComponent(manufacturerValue())}&preview=1`));
     if(generation!==planGeneration) return;
     plan=next;productActivity=next.activity; dirty={};
+    deliveryWait=next.inventory_wait||null;scheduleDeliveryCheck();
     updatePlanControls();
     localStorage.setItem('eve-muhely-last-plan',JSON.stringify({id:targetId,name:targetName,quantity,saved_plan_id:owner,corporation_id:corporationId,manufacturer_id:manufacturerId,activity:productActivity}));
     $('#calculated-at').textContent='Számítás: '+date(plan.calculated_at);
@@ -251,7 +258,7 @@ async function calculate(refreshState=true,announce=false) {
     render();
     if(announce) {
       const target=next.rows?.find(r=>r.id===next.product_id);
-      feedback.textContent=next.summary.items===0 && target
+      feedback.textContent=next.preview_only?'Előzetes terv elkészült; a végleges foglalás friss készletadatra vár.':next.summary.items===0 && target
         ?`A terv elkészült. Nincs hátralévő gyártás: ${fmt(target.used_stock)} db becsomagolt késztermék és ${fmt(target.used_wip)} db folyamatban lévő kimenet fedezi a célt.`
         :`A terv elkészült. Hátralévő gyártandó tételek: ${fmt(next.summary.items)}.`;
     }
@@ -336,6 +343,7 @@ function render() {
   if(view==='inventory') renderInventory(content);
   if(view==='blueprints') renderBlueprints(content);
   if(!(view==='shopping'&&shoppingMode==='all'))renderReservationContext(content);
+  if(plan.preview_only)content.insertAdjacentHTML('afterbegin',deliveryPreviewMarkup(plan.inventory_wait));
   if(corporationId&&!(view==='shopping'&&shoppingMode==='all'))content.insertAdjacentHTML('afterbegin',scopeBanner());
   if(state.settings.source==='manual' && state.characters.length) {
     content.insertAdjacentHTML('afterbegin','<div class="banner warn stock-source-notice"><div><strong>A terv kézi készlettel számol.</strong><br>A letöltött személyes EVE-készletet és a jobok kimenetét jelenleg nem vonja le.</div><button class="button compact" id="enable-eve-stock">Személyes EVE-készlet használata</button></div>');
@@ -354,7 +362,8 @@ function renderReservationContext(content) {
   let message=saved?`<strong>Mentett terv: ${planLabel(saved)} · ${fmt(plan.quantity)} db</strong><br>${saved.reserve_active?'A saját foglalását felhasználhatja.':'Ennek a tervnek a foglalása fel van oldva.'}`:
     '<strong>Új, még nem mentett terv</strong>';
   if(count)message+=`<div>${fmt(count)} másik aktív terv foglalását levontuk az elérhető készletből és jobkimenetekből.</div>`;
-  if(saved?.preview_changed)message+='<div class="warning-text">Módosított mennyiség vagy gyártó karakter előnézete. A Terv és foglalás frissítése gombbal érvényesítheted.'+(count?' A későbbi tervek kiosztása is változhat.':'')+'</div>';
+  if(plan.preview_only)message+='<div class="warning-text">Az itt látható kiosztás csak előnézet, nem új foglalás.</div>';
+  if(saved?.preview_changed&&!plan.preview_only)message+='<div class="warning-text">Módosított mennyiség vagy gyártó karakter előnézete. A Terv és foglalás frissítése gombbal érvényesítheted.'+(count?' A későbbi tervek kiosztása is változhat.':'')+'</div>';
   content.insertAdjacentHTML('afterbegin',`<div class="banner reservation-context"><div>${message}</div><button class="button compact" id="show-saved-plans">Foglalások megtekintése</button></div>`);
   $('#show-saved-plans').onclick=()=>navigate('saved');
 }
@@ -496,7 +505,7 @@ function bindShoppingTabs(){
 }
 async function refreshAllShopping(){
   if(shoppingRequest)return;
-  const revision=shoppingRevision;shoppingRequest=api('/api/plans/shopping');
+  const revision=shoppingRevision;shoppingRequest=api('/api/plans/shopping?preview=1');
   try{const result=await shoppingRequest;if(revision===shoppingRevision)shoppingData=result;}
   catch(e){if(revision===shoppingRevision){shoppingData={error:e.message,delivery_wait:e.delivery_wait};if(e.delivery_wait){deliveryWait=e.delivery_wait;scheduleDeliveryCheck();}}}
   finally{shoppingRequest=null;if(view==='shopping'&&shoppingMode==='all')render();}
@@ -509,6 +518,7 @@ function renderAllShopping(content){
   content.innerHTML=shoppingTabs();bindShoppingTabs();
   if(!shoppingData){content.innerHTML+=empty('Az összes terv számítása','A közös készletet és a foglalások elsőbbségét ellenőrizzük…');bindShoppingTabs();void refreshAllShopping();return;}
   const data=shoppingData;
+  if(data.preview_only)content.innerHTML+=deliveryPreviewMarkup(data.inventory_wait);
   if(data.error){content.innerHTML+=data.delivery_wait?deliveryWaitMarkup(data.delivery_wait):`<div class="banner error">${esc(data.error)}</div>`;bindShoppingTabs();return;}
   actions('<button class="button compact" id="refresh-all-shopping">Összesítés frissítése</button><button class="button compact" id="copy-all-shopping">Összesített lista másolása</button>'+exportButton());
   $('#refresh-all-shopping').onclick=async()=>{await reloadState();render();};
@@ -725,12 +735,13 @@ $('#save-plan').onclick=async()=>{
     if(Object.keys(dirty).length)throw new Error('A terv mentése előtt alkalmazd a beírt módosításokat.');
     if(!productId)throw new Error('Előbb válassz terméket a találatok közül.');
     const next=await calculate();if(!next)return;
+    if(next.preview_only)throw new Error('A foglalás véglegesítése friss készletadatra vár.');
     const saved=await api('/api/plans/save',{id:next.saved_plan?.id||null,product_id:next.product_id,quantity:next.quantity,name:next.saved_plan?.name||next.name,corporation_id:next.corporation_id,manufacturer_id:next.manufacturer_id});
     if(typeof financeContext!=='undefined'&&financeContext&&!financeContext.plan_id&&financeContext.plan.product_id===next.product_id&&financePrefs)await api('/api/trade/plan',{...financePrefs,plan_id:saved.id});
     if(productId===next.product_id&&corporationId===next.corporation_id&&manufacturerId===next.manufacturer_id&&targetQuantity()===next.quantity)activePlanId=saved.id;
     await calculate();toast('A terv mentve, a készletfoglalás aktív.');
   }catch(e){error(e.message);}
-  finally{button.disabled=false;}
+  finally{button.disabled=!!plan?.preview_only;}
 };
 $('#new-plan').onclick=async()=>{
   if(Object.keys(dirty).length)return error('Az új terv előtt alkalmazd a beírt módosításokat.');

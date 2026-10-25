@@ -104,6 +104,7 @@ function applyProductionFinance(){
  const target=$('#production-finance');if(!target||target.hidden||!financeContext||!financePrefs)return;
  const c=financeContext,f=financePrefs,job=jobCostKey===economicPanels.get('plan-materials')?.key?jobCostData:null;
  const out=financeValues(c,f,financeBooks,financeProfile,job),warnings=[];
+ if(c.plan.preview_only)warnings.push('Előzetes költségbecslés; a friss készletadat módosíthatja a hiányt és a gyártási költséget.');
  if(out.material.missing)warnings.push('Néhány anyag ára hiányzik; a teljes költség és profit nem számolható.');
  if(out.values.blueprints===null)warnings.push('A hiányzó reakcióformula ára nem ismert; add meg a Blueprintköltség mezőben.');
  if(out.values.hauling===null)warnings.push('Az alapanyag vagy késztermék térfogata hiányzik; a szállítási díj és a teljes költség nem számolható.');
