@@ -940,6 +940,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200,self.app.desktop_auth_start(url) if data.get('desktop') is True else {'url':url})
             elif path == '/api/characters/remove':
                 self.app.eve.forget(integer(data.get('id'), 'Karakter', 2**53-1, 1))
+            elif path == '/api/notifications/dismiss':
+                with self.app.catalog.lock:
+                    notifications.dismiss(self.app.store,self.app.notification_data(),data)
+                return self.send(200,{'ok':True})
             elif path == '/api/notifications/preferences':
                 return self.send(200,notifications.save_preferences(self.app.store,data))
             elif path == '/api/implants/preferences':

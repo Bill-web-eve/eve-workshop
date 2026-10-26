@@ -8,7 +8,7 @@ const intelAge=at=>at==null?'–':EveI18n.t('{0} perce').replace('{0}',fmt(Math.
 const intelSource=p=>p.source==='manual'?'Kézi referencia':p.source==='esi'?p.online===false?'ESI · offline':p.alertable?'ESI · élő helyzet':'ESI · korábbi adat':p.source==='local'?'Local napló · utolsó ismert hely':'Nincs helyzetadat';
 const intelPilotUrl=p=>Number.isSafeInteger(p.id)&&p.id>0?'https://zkillboard.com/character/'+p.id+'/':null;
 const intelCardLifetime=180000;
-let intelCardTimer=null,intelNotificationRevision=0;
+let intelCardTimer=null,intelNotificationRevision=0,intelNotificationToggleBusy=false;
 function intelPilotName(p){const url=intelPilotUrl(p);return url?`<a class="intel-pilot-link" data-intel-pilot href="${url}" target="_blank" rel="noopener noreferrer" data-i18n-skip>${esc(p.name)}</a>`:`<span class="intel-pilot-unresolved" data-i18n-skip>${esc(p.name)}</span><span class="intel-id-note"> · <span>Azonosító még nem ismert</span></span>`;}
 function intelShips(ships=[]){return ships.length?ships.map(s=>`<span class="intel-ship">${Number.isSafeInteger(s.type_id)&&s.type_id>0?`<img src="https://images.evetech.net/types/${s.type_id}/icon?size=32" alt="" data-intel-image loading="lazy" referrerpolicy="no-referrer">`:'<span class="intel-ship-placeholder" aria-hidden="true">◇</span>'}${verbatim(s.name)}</span>`).join(''):'<span class="muted">Nincs megadott hajó</span>';}
 async function refreshIntel(background=false){
@@ -52,7 +52,21 @@ async function applyIntelNotificationPreferences(preferences){
   if(notificationData)notificationData.preferences=preferences;
   const enabled=preferences.categories.intel!==false;
   if(intelData)intelData.notifications_enabled=enabled;
+  syncIntelNotificationSwitch();
   if(!enabled&&EveDesktop.active)await syncIntelOverlay({enabled:false,notifications_enabled:false,items:[]});
+}
+function syncIntelNotificationSwitch(){
+  const button=$('#sidebar-intel-toggle');if(!button)return;
+  const loaded=!!notificationData?.preferences,enabled=notificationData?.preferences?.categories?.intel!==false;
+  button.disabled=!loaded||intelNotificationToggleBusy;
+  button.setAttribute('aria-checked',String(loaded&&enabled));
+  button.title=EveI18n.t(enabled?'Intelértesítések: bekapcsolva':'Intelértesítések: kikapcsolva');
+  button.onclick=async()=>{
+    if(intelNotificationToggleBusy||!notificationData?.preferences)return;
+    intelNotificationToggleBusy=true;syncIntelNotificationSwitch();
+    try{const preferences=await api('/api/notifications/preferences',{categories:{intel:notificationData.preferences.categories.intel===false}});await applyIntelNotificationPreferences(preferences);await refreshNotifications(false);toast('Intelértesítések beállítása mentve.');}
+    catch(e){error(e.message);}finally{intelNotificationToggleBusy=false;syncIntelNotificationSwitch();}
+  };
 }
 function startIntelMonitor(){clearInterval(intelTick);intelTick=setInterval(()=>{if(!document.hidden)void pollIntelAlerts();},2000);void pollIntelAlerts();}
 function resetIntelMap(){intelZoom=1;intelPan={x:0,y:0};}

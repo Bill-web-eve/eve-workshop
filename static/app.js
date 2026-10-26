@@ -298,6 +298,7 @@ function navigate(next) {
 }
 function render() {
   if(!state) return;
+  syncIntelNotificationSwitch();
   syncMoonNavigation();
   syncSettingsNavigation();
   if(view==='fleet'&&dirty.fleet_settings&&$('#fleet-settings'))return;

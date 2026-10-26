@@ -409,6 +409,19 @@ class ServerTests(unittest.TestCase):
         p=next(r for r in self.request('/api/plan?product_id=92822&quantity=4')[1]['rows'] if r['id']==92822)['parameters']
         self.assertEqual((p['bpc_count'],p['source']),(0,'manual'))
 
+    def test_notification_dismiss_requires_session_csrf_and_a_current_event(self):
+        from muhely import notifications
+        self.app.store.add_character(1,'Pilot')
+        data=self.request('/api/notifications')[1]
+        item=next(a for a in data['items'] if a['category']=='data')
+        body={'id':item['id'],'dismissal_key':item['dismissal_key']}
+        self.assertEqual(self.request('/api/notifications/dismiss',body,Cookie='')[0],403)
+        self.assertEqual(self.request('/api/notifications/dismiss',body,Origin='https://other.invalid')[0],403)
+        self.assertEqual(self.request('/api/notifications/dismiss',{'id':'missing','dismissal_key':'0'*64})[0],400)
+        self.assertEqual(self.request('/api/notifications/dismiss',body)[0],200)
+        self.assertFalse(any(a['id']==item['id'] for a in self.request('/api/notifications')[1]['items']))
+        self.assertEqual(self.request('/api/notifications/dismiss',body)[0],200)
+
     def test_notification_api_separates_owners_and_persists_os_receipts(self):
         from datetime import datetime,timezone
         self.app.store.add_character(1,'Pilot');self.app.store.character_corporation(1,99,'Corp A')

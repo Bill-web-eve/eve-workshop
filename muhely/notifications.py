@@ -18,7 +18,9 @@ def schema(store):
           CREATE TABLE IF NOT EXISTS notification_events(id TEXT PRIMARY KEY,domain TEXT NOT NULL,fingerprint TEXT NOT NULL,
             episode INTEGER NOT NULL,active INTEGER NOT NULL,sent INTEGER NOT NULL DEFAULT 0,
             lease TEXT,lease_until REAL NOT NULL DEFAULT 0,updated REAL NOT NULL);
-          CREATE TABLE IF NOT EXISTS intel_alarm_sent(owner TEXT PRIMARY KEY,at REAL NOT NULL);''')
+          CREATE TABLE IF NOT EXISTS intel_alarm_sent(owner TEXT PRIMARY KEY,at REAL NOT NULL);
+          CREATE TABLE IF NOT EXISTS notification_dismissals(id TEXT PRIMARY KEY,domain TEXT NOT NULL,
+            event_key TEXT NOT NULL,updated REAL NOT NULL);''')
 
 
 def preferences(store):
@@ -151,16 +153,55 @@ def collect(store,catalog,now=None):
     observed.update('contracts:personal:'+str(c['id']) for c in chars)
     observed.update('contracts:corporation:'+str(c['id']) for c in store.corporations() if c['monitoring_enabled'])
     rows=sorted(alerts.values(),key=lambda a:(not a['reliable'],a['when'] is None,a['when'] or 0,a['subject'].casefold(),a['id']))
+    rows=visible_items(store,rows,observed,now)
     return {'items':rows,'observed_domains':sorted(observed),'corporations':[{'id':cid,'name':name} for cid,name in sorted(corps.items(),key=lambda x:x[1])],
             'moons':moon_rows,'preferences':prefs,'calculated_at':now,
             'counts':{category:sum(a['category']==category for a in rows) for category in (*CATEGORIES,'data')}}
+
+
+def dismissal_key(item):
+    # Job expected/ready and moon soon/ready describe the same event. A new
+    # extractor program or training queue end is a different event.
+    detail=item.get('episode_key','') if item['category']=='intel' else str(item.get('when')) if item['category']=='skills' or item['kind']=='pi_extractor' else ''
+    kind=item['kind'] if item['category']=='pi' else ''
+    return hashlib.sha256(json.dumps([item['id'],detail,kind],separators=(',',':')).encode()).hexdigest()
+
+
+def visible_items(store,items,observed=None,now=None):
+    schema(store);now=time.time() if now is None else now
+    with store.db() as db:
+        saved={r['id']:dict(r) for r in db.execute('SELECT * FROM notification_dismissals')}
+        # Only a successfully observed recovery ends an acknowledged episode.
+        # Missing/stale data must never make it reappear on the next refresh.
+        if observed is not None:
+            current={a['id'] for a in items}
+            ended=[key for key,row in saved.items() if row['domain'] in observed and key not in current]
+            db.executemany('DELETE FROM notification_dismissals WHERE id=?',[(key,) for key in ended])
+            for key in ended:saved.pop(key)
+    return [{**a,'dismissal_key':dismissal_key(a)} for a in items if saved.get(a['id'],{}).get('event_key')!=dismissal_key(a)]
+
+
+def dismiss(store,data,request,now=None):
+    if not isinstance(request,dict) or set(request)!={'id','dismissal_key'} or not isinstance(request['id'],str) or not 0<len(request['id'])<=500 or not isinstance(request['dismissal_key'],str) or len(request['dismissal_key'])!=64:
+        raise PlanningError('Hibás értesítési azonosító.')
+    schema(store);now=time.time() if now is None else now
+    item=next((a for a in data['items'] if a['id']==request['id']),None)
+    with store.db() as db:
+        if item is None:
+            old=db.execute('SELECT event_key FROM notification_dismissals WHERE id=?',(request['id'],)).fetchone()
+            if old and old['event_key']==request['dismissal_key']:return
+            raise PlanningError('Az értesítés megváltozott vagy már nem aktuális. Frissítsd a listát.')
+        if dismissal_key(item)!=request['dismissal_key']:
+            raise PlanningError('Az értesítés megváltozott vagy már nem aktuális. Frissítsd a listát.')
+        db.execute('INSERT OR REPLACE INTO notification_dismissals VALUES(?,?,?,?)',(item['id'],item['domain'],request['dismissal_key'],now))
+        db.execute('UPDATE notification_events SET sent=1,lease=NULL,lease_until=0 WHERE id=?',(item['id'],))
 
 
 def claim(store,data,now=None):
     """Lease only unsent active episodes. Unknown data never resolves an episode."""
     now=time.time() if now is None else now;prefs=preferences(store);schema(store)
     if not prefs['os_enabled']:return []
-    eligible=[a for a in data['items'] if a['category'] in CATEGORIES and a['reliable']]
+    eligible=[a for a in visible_items(store,data['items']) if a['category'] in CATEGORIES and a['reliable']]
     current={a['id'] for a in eligible};observed=set(data['observed_domains']);result=[]
     with store.db() as db:
         db.execute('BEGIN IMMEDIATE')

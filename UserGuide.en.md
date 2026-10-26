@@ -690,3 +690,9 @@ Switching a reservation off releases the allocation while retaining the saved pl
 Use ↑ and ↓ beside active plans to draft a new priority order. **Save order** applies it; **Discard changes** cancels it. Plans at the top receive shared inventory, active-job output and BPC runs first. Allocated item details always reflect the saved order. A stale order changed in another window cannot overwrite the current list: refresh and reorder it again.
 
 Before saving, the server validates the entire affected pool against the proposed order, then saves all priorities atomically. Failed validation preserves the previous order and other plans. During ESI inventory waits, reservations can be switched off; activation and order saving require fresh inventory. **Manage reservation** on Saved plans opens this view.
+
+## Acknowledging notifications and the quick Intel switch
+
+Every row in **Notifications** has an **Acknowledge** button. It removes that alert from the list and counts, persists across refreshes and restarts, and suppresses further OS delivery for the same event. It does not change EVE data: a finished job still needs to be delivered in the game. New events, such as another job, extractor program or a new training interruption, can alert again. Missing or stale data alone never clears an acknowledgment. Personal and corporation alerts are handled individually.
+
+The **Intel** slider immediately below the logo switches intel OS notifications and transparent overlay alerts together. It preserves the map, chat monitoring and other notification categories. It uses the same preference as the Intel category under notification settings.

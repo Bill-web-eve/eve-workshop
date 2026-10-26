@@ -1,6 +1,11 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Intelértesítések": "Intel notifications",
+"Tudomásul vettem": "Acknowledge",
+"Az értesítés tudomásul véve.": "Notification acknowledged.",
+"Hibás értesítési azonosító.": "Invalid notification identifier.",
+"Az értesítés megváltozott vagy már nem aktuális. Frissítsd a listát.": "The notification has changed or is no longer current. Refresh the list.",
 "Foglalások": "Reservations",
 "KÉSZLETFELHASZNÁLÁS": "INVENTORY ALLOCATION",
 "A mentett tervek megmaradnak, ha kikapcsolod a foglalásukat. Felülről lefelé kapnak készletet és jobkimenetet.": "Saved plans remain when their reservations are switched off. Inventory and job output are allocated from top to bottom.",

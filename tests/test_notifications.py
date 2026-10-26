@@ -111,3 +111,53 @@ class NotificationTests(unittest.TestCase):
         self.pd['colonies']=[{'id':10,'name':'Planet','character_id':2,'character_name':'Pilot 2','checked_at':NOW,'cached':True,'status':'unknown','extractors':[],'last_update':NOW}]
         rows=[a for a in self.data()['items'] if a.get('source_category')=='pi']
         self.assertEqual({a['character_name'] for a in rows},{'Pilot 1','Pilot 2'});self.assertTrue(all(not a['reliable'] for a in rows))
+
+    def dismiss(self,item):n.dismiss(self.s,{'items':[item]},{'id':item['id'],'dismissal_key':item['dismissal_key']},NOW)
+
+    def test_dismissed_job_stays_hidden_across_refresh_ready_transition_and_restart(self):
+        self.enable();self.s.save_snapshots(1,{'jobs':snap([job(1),job(2)])})
+        original=self.data();item=next(a for a in original['items'] if a['id']=='job:1');self.dismiss(item)
+        self.s=Store(Path(self.tmp.name))
+        self.s.save_snapshots(1,{'jobs':snap([job(1,'ready'),job(2)])})
+        data=self.data();self.assertEqual([a['id'] for a in data['items'] if a['category']=='jobs'],['job:2'])
+        self.assertEqual(data['counts']['jobs'],1)
+        # Direct claim routes must also respect a manual acknowledgment.
+        self.assertEqual([a['id'] for a in n.claim(self.s,original,NOW)],['job:2'])
+        self.assertEqual(len(self.s.snapshot(1,'jobs')['data']),2)
+
+    def test_dismissal_is_individual_for_personal_corporation_and_unknown_rows(self):
+        self.s.save_snapshots(1,{'jobs':snap([job(1)])});self.s.save_corporation_snapshots(99,1,{'jobs':snap([job(2)])})
+        self.sd['characters']=[skill(2,'unknown')]
+        data=self.data();personal=next(a for a in data['items'] if a['id']=='job:1');self.dismiss(personal)
+        rows=self.data()['items'];self.assertTrue(any(a['id']=='job:2' and a['corporation_id']==99 for a in rows))
+        unknown=next(a for a in rows if a['category']=='data');self.dismiss(unknown)
+        self.assertFalse(any(a['id']==unknown['id'] for a in self.data()['items']))
+
+    def test_training_acknowledgment_survives_unknown_data_but_new_episode_returns(self):
+        self.sd['characters']=[skill()];self.dismiss(next(a for a in self.data()['items'] if a['category']=='skills'))
+        self.sd['characters']=[skill(status='unknown')];self.data()
+        self.sd['characters']=[skill()];self.assertFalse(any(a['category']=='skills' for a in self.data()['items']))
+        self.sd['characters']=[skill(status='training')];self.data()
+        self.sd['characters']=[skill()];self.assertTrue(any(a['category']=='skills' for a in self.data()['items']))
+        self.sd['characters']=[skill(status='soon')];self.dismiss(next(a for a in self.data()['items'] if a['category']=='skills'))
+        self.sd['characters'][0]['stops_at']+=86400
+        self.assertTrue(any(a['category']=='skills' for a in self.data()['items']))
+
+    def test_extractor_new_program_returns_and_intel_new_episode_is_not_hidden(self):
+        item={'id':'pi:1:10:stop','domain':'pi:1:10','category':'pi','kind':'pi_extractor','when':NOW,'reliable':True,'corporation_id':None}
+        row=n.visible_items(self.s,[item])[0];self.dismiss(row)
+        self.assertEqual(n.visible_items(self.s,[item]),[])
+        self.assertEqual(len(n.visible_items(self.s,[{**item,'when':NOW+86400}])),1)
+        intel={**item,'id':'intel:1:1:event','domain':'intel:1','category':'intel','kind':'intel_near','episode_key':'report-a'}
+        self.dismiss(n.visible_items(self.s,[intel])[0]);self.assertEqual(n.visible_items(self.s,[intel]),[])
+        self.assertEqual(len(n.visible_items(self.s,[{**intel,'episode_key':'report-b'}])),1)
+
+    def test_dismiss_validates_current_event_and_is_idempotent(self):
+        self.sd['characters']=[skill(status='soon')];item=next(a for a in self.data()['items'] if a['category']=='skills')
+        request={'id':item['id'],'dismissal_key':item['dismissal_key']}
+        for bad in [{},{'id':True,'dismissal_key':'a'*64},{**request,'dismissal_key':'bad'},{**request,'extra':True}]:
+            with self.assertRaises(PlanningError):n.dismiss(self.s,self.data(),bad,NOW)
+        self.sd['characters'][0]['stops_at']+=86400
+        with self.assertRaises(PlanningError):n.dismiss(self.s,self.data(),request,NOW)
+        item=next(a for a in self.data()['items'] if a['category']=='skills');self.dismiss(item)
+        n.dismiss(self.s,self.data(),{'id':item['id'],'dismissal_key':item['dismissal_key']},NOW)

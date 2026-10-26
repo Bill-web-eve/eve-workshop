@@ -688,3 +688,9 @@ A kapcsoló kikapcsolása csak a foglalást oldja fel, a terv megmarad. A kikapc
 Az aktív tervek ↑ és ↓ gombjaival állítható az elsőbbség. Ez még csak tervezet; a **Sorrend mentése** menti, a **Módosítások visszavonása** eldobja. A lista tetején álló terv részesül először a közös készletből, aktív jobkimenetből és BPC-runokból. A részletek mindig a már mentett sorrend szerinti kiosztást mutatják. Másik ablakban módosított, elavult sorrendet nem mentünk; frissítés és újrarendezés szükséges.
 
 Mentés előtt a szerver az új sorrend szerint ellenőrzi és újraszámolja az egész érintett készletet, majd egyszerre menti az elsőbbségeket. Sikertelen ellenőrzés esetén az addigi sorrend és a többi terv változatlan marad. ESI-készletvárakozáskor a foglalás kikapcsolható, de bekapcsolása és az új sorrend mentése friss adatra vár. A Mentett tervek oldalon a **Foglalás kezelése** gomb ide vezet.
+
+## Értesítések tudomásul vétele és gyors Intel-kapcsoló
+
+Az **Értesítések** menü minden sorában a **Tudomásul vettem** gomb elrejti az adott jelzést a listából és a számlálókból. A tudomásul vétel helyben megmarad frissítés és újraindítás után is, és ugyanarra az eseményre nem indul új rendszerértesítés. Nem módosítja az EVE-adatokat: például a jobot továbbra is át kell venni a játékban. Új esemény (például egy következő job, kitermelőprogram vagy újra leálló tanulás) ismét jelezhető; hiányzó vagy régi adat önmagában nem oldja fel a tudomásul vételt. A személyes és corp értesítések egyenként kezelhetők.
+
+A logó alatti **Intel** csúszka az intel rendszerértesítéseit és az átlátszó felugró jelzéseket együtt kapcsolja. A térkép, a chatfigyelés és a többi értesítéstípus beállítása megmarad. Ugyanazt a beállítást használja, mint az értesítési beállítások Intel kapcsolója.
