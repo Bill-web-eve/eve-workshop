@@ -6,7 +6,7 @@ async function setup(){
  const types=[[42694,'Active Shielding Charge','Shield'],[42695,'Shield Harmonizing Charge','Shield'],[42696,'Shield Extension Charge','Shield'],[42838,'Evasive Maneuvers Charge','Skirmish'],[42839,'Interdiction Maneuvers Charge','Skirmish'],[42840,'Rapid Deployment Charge','Skirmish'],[42835,'Sensor Optimization Charge','Information'],[42836,'Electronic Superiority Charge','Information'],[42837,'Electronic Hardening Charge','Information']];
  const state={csrf:'test',version:'1.5.0',characters:[],corporations:[],production_characters:[],plans:[],jobs:[],settings:{source:'manual'},task:{running:false},sde:{buildNumber:1},recipe_count:1};
  let data={running:false,folder:'/logs',channel:'',started:null,stopped:null,checked:null,providers:[],rows:types.map(([id,name,group])=>({id,name,group,count:0,providers:[]})),file_errors:0,error:null};
- const copy=()=>{data.copy_text=data.rows.map(r=>r.name+'\t'+r.count).join('\n');};copy();
+ const copy=()=>{data.copy_text=data.rows.map(r=>r.name+'\t'+r.count+(r.providers.length?'\t'+r.providers.join(', '):'')).join('\n');};copy();
  w.localStorage.setItem('eve-muhely-language','en');w.confirm=()=>true;let clipboard='',pending=null;
  Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async text=>{clipboard=text;}}});
  w.fetch=async(url,opts)=>{const body=opts?.body?JSON.parse(opts.body):null;calls.push({url,body});let result;
@@ -40,7 +40,7 @@ test('start uses the selected channel, polling updates badges and copy includes 
  assert.deepEqual(f.calls.find(c=>c.url==='/api/boosts/start').body,{folder:'/logs',channel:'I. Boost X2'});assert(form.elements.channel.disabled);assert(!d.querySelector('#boost-stop').disabled);
  const data=JSON.parse(JSON.stringify(f.data()));data.rows[0].count=2;data.rows[0].providers=['Pilot A','Pilot B'];data.providers=[{name:'Pilot A',charges:[42694],at:100},{name:'Pilot B',charges:[42694],at:101}];f.setData(data);
  await run('loadBoosts()');await tick();assert.equal(d.querySelectorAll('.boost-badge').length,1);assert.equal(d.querySelector('.boost-badge').textContent,'2');assert(d.querySelector('#boost-providers').textContent.includes('Pilot B'));
- d.querySelector('#boost-copy').click();await tick();assert.equal(f.clipboard().split('\n').length,9);assert(f.clipboard().startsWith('Active Shielding Charge\t2\n'));assert(f.clipboard().includes('Electronic Hardening Charge\t0'));
+ d.querySelector('#boost-copy').click();await tick();assert.equal(f.clipboard().split('\n').length,9);assert(f.clipboard().startsWith('Active Shielding Charge\t2\tPilot A, Pilot B\n'));assert(f.clipboard().includes('Electronic Hardening Charge\t0'));
  d.querySelector('#boost-stop').click();for(let i=0;i<3;i++)await tick();assert(!form.elements.channel.disabled);assert(d.querySelector('#boost-stop').disabled);
 });
 test('polling preserves an edited folder and the view refreshes again after leaving and returning',async t=>{

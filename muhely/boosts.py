@@ -26,7 +26,7 @@ def declaration(line,now):
     if at>now+60 or len(body)>8000:return None
     plain=html.unescape(re.sub(r'<[^>]*>','',body))
     if MISSING.search(plain):return None
-    if NUMBERED.search(plain) and not re.sub(r'[\s,;|/]+','',NUMBERED.sub('',plain)):return None
+    if NUMBERED.match(plain.strip()) or NUMBERED.search(plain) and not re.sub(r'[\s,;|/]+','',NUMBERED.sub('',plain)):return None
     charges={i for i,pattern in NAMES if pattern.search(plain)}
     charges.update(int(i) for i in re.findall(r'showinfo:(\d+)(?!\d)',body,re.I) if int(i) in IDS)
     if not charges:return None
@@ -164,4 +164,4 @@ class BoostCounter:
             providers=sorted(self.state['providers'].values(),key=lambda p:p['name'].casefold())
             rows=[{'id':i,'name':name,'group':group,'count':sum(i in p['charges'] for p in providers),'providers':[p['name'] for p in providers if i in p['charges']]} for i,name,group in CHARGES]
             folder=self.state['folder'] or intel_preferences(self.store)['folder']
-            return {**{k:self.state[k] for k in ['running','channel','started','stopped','checked','error','file_errors']},'folder':folder,'rows':rows,'providers':[{k:p[k] for k in ['name','at','charges']} for p in providers],'copy_text':'\n'.join(r['name']+'\t'+str(r['count']) for r in rows)}
+            return {**{k:self.state[k] for k in ['running','channel','started','stopped','checked','error','file_errors']},'folder':folder,'rows':rows,'providers':[{k:p[k] for k in ['name','at','charges']} for p in providers],'copy_text':'\n'.join(r['name']+'\t'+str(r['count'])+('\t'+', '.join(r['providers']) if r['providers'] else '') for r in rows)}

@@ -735,7 +735,7 @@ Open **Boost counter** in the sidebar. Select the local EVE chat-log folder (the
 
 **Start a new count** starts at zero and skips messages already present in the logs. The nine in-game shield, skirmish and information charge icons show green number badges for declared characters. Each character’s latest declaration replaces their previous boost set, so declare the complete current set each time. Repeated declarations and duplicate logs from your other characters do not add providers. EVE System messages, “missing”/“need” summaries and other boost families are ignored. Full charge names and linked charge items are recognized; abbreviations are not guessed.
 
-**Copy list** copies all nine in-game names followed by their counts, including zero, as plain text. Expand **Declared characters** to inspect the counted sets. **Stop counting** preserves the result; a new start resets it. An active session resumes after restarting the app, and its watcher stops when the app quits. It operates independently of Intel monitoring and Intel notifications.
+**Copy list** copies all nine in-game names followed by their counts and comma-separated character names, including zero for missing boosts, as plain text. Expand **Declared characters** to inspect the counted sets. **Stop counting** preserves the result; a new start resets it. An active session resumes after restarting the app, and its watcher stops when the app quits. It operates independently of Intel monitoring and Intel notifications.
 
 This is a count of chat declarations, not confirmation of active in-game boosts, fleet membership or boost range.
 \nCopied name/count summary rows are also ignored if pasted back into the channel.\n

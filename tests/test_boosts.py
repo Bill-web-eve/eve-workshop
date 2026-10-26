@@ -77,6 +77,13 @@ class BoostTests(unittest.TestCase):
   self.assertEqual(len(lines),9);self.assertTrue(all(line.endswith('\t0') for line in lines))
   self.assertTrue(all(declaration(message(0,'FC',line),NOW) is None for line in lines))
   self.assertIsNone(declaration(message(0,'FC',' '.join(lines)),NOW))
+ def test_copy_names_follow_count_and_pasted_summary_is_not_a_declaration(self):
+  p=self.log();self.start();self.append(p,message(1,'Zeta','Active Shielding Charge')+message(2,'Alpha','Active Shielding Charge'))
+  self.now+=3;self.counter.scan();data=self.counter.snapshot();line=data['copy_text'].splitlines()[0]
+  self.assertEqual(line,'Active Shielding Charge\t2\tAlpha, Zeta')
+  self.assertIsNone(declaration(message(3,'FC',line),self.now))
+  self.assertIsNone(declaration(message(3,'FC',line.replace('\t','  ')),self.now))
+  self.assertTrue(data['copy_text'].splitlines()[1].endswith('\t0'))
  def test_wrong_header_and_symlink_cannot_supply_declarations(self):
   self.log();self.start();bad=self.log(character=2,text=message(1,'Bad','Active Shielding Charge'));bad.write_bytes((header('Other')+message(1,'Bad','Active Shielding Charge')).encode('utf-16'))
   external=self.root/'outside.txt';external.write_text(header()+message(1,'External','Active Shielding Charge'));(self.logs/'I. Boost X2_20261026_200001_3.txt').symlink_to(external)
