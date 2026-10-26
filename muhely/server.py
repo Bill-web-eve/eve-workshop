@@ -27,7 +27,7 @@ from . import moon_transfer
 from .trade import Trade
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
-from .esi import EveConnection, EsiError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES, INTEL_SCOPES, IMPLANT_SCOPES, CONTRACT_SCOPES
+from .esi import EveConnection, EsiError, AuthenticationError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES, INTEL_SCOPES, IMPLANT_SCOPES, CONTRACT_SCOPES
 from .corporations import dashboard as corporation_dashboard
 from .skills import dashboard as skill_dashboard
 from .production import profiles as production_profiles
@@ -62,6 +62,8 @@ class App:
         self.desktop_auth_lock = threading.RLock()
         self.task_lock = threading.RLock()
         self.planning_lock = threading.RLock()
+        self.invention_skill_lock = threading.RLock()
+        self.invention_skill_checks = {}
         self.task = {'running': False, 'kind': None, 'message': '', 'finished': None, 'results': []}
         self.intel=intel.IntelMonitor(self.store,self.catalog,self.eve)
         self.fleet=fleet.Fleet(self.store,self.catalog,self.eve,self.market)
@@ -213,15 +215,41 @@ class App:
         if product_id not in self.catalog.inventions:raise PlanningError('Ehhez a termékhez nincs T2 hajó invention-recept.')
         finance=self.trade.finance(plan_id)
         if plan_id and self._saved(self.store.plans(),plan_id)['product_id']!=product_id:raise PlanningError('Az invention-beállítás más termékhez tartozik.')
-        config=finance.get('invention')
-        if not config or config['product_id']!=product_id:config=invention.defaults(self.store,self.catalog,product_id)
+        config=finance.get('invention');configured=bool(config and config['product_id']==product_id)
+        if not configured:
+            config=invention.defaults(self.store,self.catalog,product_id)
+            if plan_id:config['inventor_id']=self._saved(self.store.plans(),plan_id).get('manufacturer_id') or None
         recipe=self.catalog.inventions[product_id]
-        return {'config':config,'manufacturing_prices':finance['materials'],'recipe':recipe,
+        return {'config':config,'configured':configured,'manufacturing_prices':finance['materials'],'recipe':recipe,
                 'product_name':self.catalog.name(product_id),'base_name':self.catalog.name(recipe['base_product_id']),
                 'decryptors':list(self.catalog.decryptors.values()),'characters':[{k:p[k] for k in ['id','name','available','stale','as_of']} for p in production_profiles(self.store,self.store.settings())],
                 'systems':{str(config[a]['system_id']):self.catalog.moon_systems.get(config[a]['system_id'],{}).get('name','') for a in ['copying','invention']}}
 
+    def start_invention_skills(self,cid):
+        if not cid:return
+        with self.invention_skill_lock:
+            if self.invention_skill_checks.get(cid,{}).get('running'):return
+            self.invention_skill_checks[cid]={'running':True,'error':None}
+        def work():
+            error=None
+            try:
+                with self.eve.sync_lock:
+                    if self.stopping:return
+                    token=self.eve.token(cid,required_scopes=SKILL_SCOPES)
+                    parts={'skills':self.eve.skill_resource(cid,'skills',token)}
+                    self.store.save_snapshots(cid,parts,domain='skills')
+            except Exception as exc:
+                error=str(exc) if isinstance(exc,EsiError) else 'Az inventáló karakter skilladata nem frissült.'
+                self.store.resource_error(cid,'skills',error,isinstance(exc,AuthenticationError))
+            finally:
+                with self.invention_skill_lock:self.invention_skill_checks[cid]={'running':False,'error':error}
+        threading.Thread(target=work,daemon=True).start()
+
     def invention_estimate(self,data):
+        for flag in ['check_data','refresh_all']:
+            if flag in data and type(data[flag]) is not bool:raise PlanningError('Hibás invention-adatellenőrzési kapcsoló.')
+        with self.invention_skill_lock:skills_running=any(v['running'] for v in self.invention_skill_checks.values())
+        was_running=self.market.running or self.industry.running or bool(self.trade.local and self.trade.local.running) or skills_running
         with self.catalog.lock:
             config=invention.validate(data.get('config'),self.store,self.catalog)
             if not config:raise PlanningError('Hibás invention-beállítás.')
@@ -231,8 +259,20 @@ class App:
             def quotes(market,ids):return self.market.snapshot(ids) if market=='jita' else self.trade.prices(ids)
             settings=self.scope_settings(cid)
             live=self.live_data(settings) if cid is None else self.corporation_data(cid,settings)
-            return invention.compare(self.store,self.catalog,self.industry,config,data.get('quantity'),quotes,source,
+            result=invention.compare(self.store,self.catalog,self.industry,config,data.get('quantity'),quotes,source,
                 self.store.mapping('parameters',cid),live[2])
+        if data.get('check_data') or data.get('refresh_all'):
+            # Explicit Compare checks every dependency. Each provider still honors ESI expiry.
+            for market,ids in result['price_ids_by_source'].items():
+                if market=='jita':self.market.start(ids,manual=True)
+                else:self.trade.prices(ids,True,True)
+            self.industry.start(manual=True)
+            self.start_invention_skills(config['inventor_id'])
+            return self.invention_estimate({**data,'check_data':False,'refresh_all':False})
+        with self.invention_skill_lock:
+            result['skill_refresh']=dict(self.invention_skill_checks.get(config['inventor_id'],{'running':False,'error':None}))
+        result['refresh_pending']=was_running
+        return result
 
     def notification_data(self):
         with self.catalog.lock:

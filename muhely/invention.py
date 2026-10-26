@@ -119,7 +119,10 @@ def compare(store,catalog,industry,config,quantity,quote_provider,manufacturing_
         jobs=industry.estimate([{'id':r['id'],'batches':r['batches']} for r in plan['queue']],settings,catalog)
         plans[variant['id']]={'plan':plan,'materials':mats,'formulas':formula,'jobs':jobs}
     source,mode=config['prices'].split(':');ms,mm=manufacturing_prices.split(':')
-    books={s:quote_provider(s,sorted(all_ids)) for s in set([source,ms])};rows=[];price_requests={s:set() for s in books}
+    required={s:set() for s in [source,ms]}
+    required[source].update(m['typeID'] for m in recipe['materials']);required[source].update(v['id'] for v in variants if v['id'])
+    required[ms].update(m['id'] for plan in plans.values() for m in plan['materials']+plan['formulas'])
+    books={s:quote_provider(s,sorted(ids)) for s,ids in required.items()};rows=[];price_requests={s:set() for s in books}
     def missing_details(ids,market,mode):
         details=[];book=books[market]
         for missing_id in sorted(set(ids)):
@@ -160,5 +163,5 @@ def compare(store,catalog,industry,config,quantity,quote_provider,manufacturing_
     clean=lambda f:{k:v for k,v in f.items() if k!='cost'}
     return {'product_id':tid,'quantity':quantity,'config':config,'skills':skills,'character':{k:character.get(k) for k in ['id','name','available','as_of','stale']} if character else None,
             'skills_ready':ready,'rows':rows,'best_decryptor_id':best,'selected':next(r for r in rows if r['decryptor_id']==config['decryptor_id']),
-            'copying':clean(copy_fee),'invention':clean(invention_fee),'price_ids':sorted(all_ids),'industry':industry.status(),
+            'copying':clean(copy_fee),'invention':clean(invention_fee),'price_ids':sorted(all_ids),'price_ids_by_source':{s:sorted(ids) for s,ids in required.items()},'industry':industry.status(),
             'stale':bool(character and character['stale']) or copy_fee['stale'] or invention_fee['stale'] or any(r['stale'] for r in rows),'price_sources':sorted(set([source,ms])),'price_requests':{s:sorted(ids) for s,ids in price_requests.items() if ids},'price_running':any(b.get('running') for b in books.values())}

@@ -1,6 +1,11 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Válassz inventáló karaktert.": "Select an inventing character.",
+"Válassz inventáló karaktert az esély és a BPC-költség kiszámításához.": "Select an inventing character to calculate the chance and BPC cost.",
+"Invention-adatok ellenőrzése: árak, ipari indexek és karakter-skillek…": "Checking invention data: prices, industry indices and character skills…",
+"Az inventáló karakter skilladata nem frissült.": "The inventing character's skill data could not be refreshed.",
+"Hibás invention-adatellenőrzési kapcsoló.": "Invalid invention data-check option.",
 "BPC-költség / run": "BPC cost / run",
 "Hiányzó piaci ár": "Missing market price",
 "Az ár még nincs letöltve.": "The price has not been loaded yet.",

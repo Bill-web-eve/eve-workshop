@@ -79,6 +79,14 @@ class InventionTests(unittest.TestCase):
   self.assertEqual(result['price_requests'],{})
   self.assertEqual(result['selected']['missing_details'][0]['reason'],'unavailable_buy')
   self.assertIsNone(result['selected']['per_run_cents'])
+ def test_required_market_ids_are_scoped_to_their_actual_use(self):
+  self.config['prices']='local:buy';calls={}
+  def quotes(source,ids):calls[source]=set(ids);return self.quotes(source,ids)
+  result=self.compare(quotes=quotes)
+  required=result['price_ids_by_source']
+  self.assertEqual(calls,{k:set(v) for k,v in required.items()})
+  self.assertEqual(set(required['local']),{m['typeID'] for m in self.recipe['materials']}|set(self.catalog.decryptors))
+  self.assertNotIn(next(iter(self.catalog.decryptors)),required['jita'])
  def test_normalization_retains_copy_and_invention_indices(self):
   data=normalize('systems',[{'solar_system_id':1,'cost_indices':[{'activity':'copying','cost_index':.01},{'activity':'invention','cost_index':.02}]}])
   self.assertEqual(data['1'],{'copying':'0.01','invention':'0.02'})
@@ -96,5 +104,60 @@ class InventionApiTests(unittest.TestCase):
   self.assertEqual(self.request('/api/invention/options?product_id=1')[0],400)
   self.assertEqual(self.request('/invention.js')[0],200)
   self.assertNotIn('access_token',str(result));self.assertNotIn('refresh_token',str(result))
+
+ def test_each_explicit_comparison_checks_all_sources_but_polling_never_restarts_requests(self):
+  self.app.store.add_character(1,'Inventor');status,opts,_=self.request('/api/invention/options?product_id=11985')
+  config=opts['config'];config.update(inventor_id=1,prices='local:buy')
+  body={'config':config,'quantity':10,'manufacturing_prices':'jita:sell','check_data':True}
+  self.app.market.start=Mock();self.app.industry.start=Mock();self.app.start_invention_skills=Mock()
+  self.app.trade.prices=Mock(return_value={'quotes':{},'running':False})
+  for count in [1,2]:
+   status,result,_=self.request('/api/invention/estimate',body);self.assertEqual(status,200)
+   self.assertEqual(self.app.market.start.call_count,count)
+   self.app.market.start.assert_called_with(result['price_ids_by_source']['jita'],manual=True)
+   self.app.industry.start.assert_called_with(manual=True)
+   self.app.start_invention_skills.assert_called_with(1)
+   self.assertTrue(any(c.args== (result['price_ids_by_source']['local'],True,True) for c in self.app.trade.prices.call_args_list))
+  self.assertEqual(self.request('/api/invention/estimate',{**body,'check_data':False})[0],200)
+  self.assertEqual(self.app.market.start.call_count,2);self.assertEqual(self.app.start_invention_skills.call_count,2)
+  self.assertEqual(self.request('/api/invention/estimate',{**body,'check_data':'yes'})[0],400)
+
+ def test_unconfigured_plan_inherits_manufacturer_but_saved_inventor_is_preserved(self):
+  self.app.store.add_character(1,'Producer');self.app.store.add_character(2,'Inventor')
+  self.app.store.save_plan({'id':'b','name':'Basilisk','product_id':11985,'quantity':10,'created':1,'manufacturer_id':1,'reserve_active':False,'reserved_at':None})
+  _,options,_=self.request('/api/invention/options?product_id=11985&plan_id=b')
+  self.assertFalse(options['configured']);self.assertEqual(options['config']['inventor_id'],1)
+  config=options['config'];config['inventor_id']=2
+  self.app.trade.save_finance({'plan_id':'b','invention':config})
+  _,options,_=self.request('/api/invention/options?product_id=11985&plan_id=b')
+  self.assertTrue(options['configured']);self.assertEqual(options['config']['inventor_id'],2)
+
+ def test_inventor_refresh_is_targeted_deduplicated_and_completes_missing_skills(self):
+  import threading
+  self.app.store.add_character(1,'Inventor');self.app.store.add_character(2,'Other')
+  entered=threading.Event();release=threading.Event()
+  recipe=self.app.catalog.inventions[11985]
+  skills={'data':{'skills':[{'skill_id':r['typeID'],'active_skill_level':5,'trained_skill_level':5,'skillpoints_in_skill':1000} for r in recipe['skills']],'total_sp':3000},'fetched':time.time(),'expires':time.time()+60}
+  self.app.eve.token=Mock(return_value='private-not-exposed')
+  def fetch(cid,kind,token):entered.set();release.wait(3);return skills
+  self.app.eve.skill_resource=Mock(side_effect=fetch)
+  self.app.start_invention_skills(1);self.assertTrue(entered.wait(2));self.app.start_invention_skills(1)
+  self.assertEqual(self.app.eve.skill_resource.call_count,1)
+  release.set()
+  deadline=time.time()+3
+  while self.app.invention_skill_checks[1]['running'] and time.time()<deadline:time.sleep(.01)
+  self.assertFalse(self.app.invention_skill_checks[1]['running']);self.assertIsNone(self.app.invention_skill_checks[1]['error'])
+  self.assertIsNotNone(self.app.store.snapshot(1,'skills'));self.assertIsNone(self.app.store.snapshot(2,'skills'))
+  self.assertIsNone(self.app.store.snapshot(1,'skillqueue'))
+
+ def test_refresh_failure_is_visible_and_does_not_replace_prior_skills(self):
+  from muhely.esi import EsiError
+  self.app.store.add_character(1,'Inventor');self.app.eve.token=Mock(side_effect=EsiError('Skill request failed'))
+  self.app.start_invention_skills(1);deadline=time.time()+3
+  while self.app.invention_skill_checks[1]['running'] and time.time()<deadline:time.sleep(.01)
+  config=self.app.invention_options(11985)['config'];config['inventor_id']=1
+  result=self.app.invention_estimate({'config':config,'quantity':10})
+  self.assertEqual(result['skill_refresh'],{'running':False,'error':'Skill request failed'})
+  self.assertIsNone(result['selected']['per_run_cents']);self.assertNotIn('private-not-exposed',str(result))
 
 if __name__=='__main__':unittest.main()
