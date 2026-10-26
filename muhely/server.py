@@ -21,7 +21,7 @@ import uuid
 import webbrowser
 
 from . import __version__
-from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe, mining, assets, jobs as job_browser, fleet, contracts
+from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe, mining, assets, jobs as job_browser, fleet, contracts, invention
 from .market import Market,validate_ids as market_ids
 from . import moon_transfer
 from .trade import Trade
@@ -207,6 +207,32 @@ class App:
             market={'running':self.market.running,'done':self.market.done,'total':self.market.total,'errors':len(self.market.errors),'current':getattr(self.market,'current',None),'current_name':self.catalog.name(self.market.current) if getattr(self.market,'current',None) else None,'page':getattr(self.market,'page',None),'pages':getattr(self.market,'pages',None)}
         with self.intel.lock:intel_status=dict(self.intel.status)
         return {'task':task,'market':market,'industry':self.industry.status(),'trade':self.trade.status(),'local_market':self.trade.local.snapshot([]) if self.trade.local else {},'intel':intel_status,'fleet':self.fleet.status()}
+
+    def invention_options(self,product_id,plan_id=None):
+        product_id=integer(product_id,'Termék',10**9,1)
+        if product_id not in self.catalog.inventions:raise PlanningError('Ehhez a termékhez nincs T2 hajó invention-recept.')
+        finance=self.trade.finance(plan_id)
+        if plan_id and self._saved(self.store.plans(),plan_id)['product_id']!=product_id:raise PlanningError('Az invention-beállítás más termékhez tartozik.')
+        config=finance.get('invention')
+        if not config or config['product_id']!=product_id:config=invention.defaults(self.store,self.catalog,product_id)
+        recipe=self.catalog.inventions[product_id]
+        return {'config':config,'manufacturing_prices':finance['materials'],'recipe':recipe,
+                'product_name':self.catalog.name(product_id),'base_name':self.catalog.name(recipe['base_product_id']),
+                'decryptors':list(self.catalog.decryptors.values()),'characters':[{k:p[k] for k in ['id','name','available','stale','as_of']} for p in production_profiles(self.store,self.store.settings())],
+                'systems':{str(config[a]['system_id']):self.catalog.moon_systems.get(config[a]['system_id'],{}).get('name','') for a in ['copying','invention']}}
+
+    def invention_estimate(self,data):
+        with self.catalog.lock:
+            config=invention.validate(data.get('config'),self.store,self.catalog)
+            if not config:raise PlanningError('Hibás invention-beállítás.')
+            source=data.get('manufacturing_prices','jita:sell')
+            if source not in [s+':'+m for s in ['jita','local'] for m in ['buy','sell','split']]:raise PlanningError('Ismeretlen árforrás.')
+            cid=self.scope_id(data.get('corporation_id'))
+            def quotes(market,ids):return self.market.snapshot(ids) if market=='jita' else self.trade.prices(ids)
+            settings=self.scope_settings(cid)
+            live=self.live_data(settings) if cid is None else self.corporation_data(cid,settings)
+            return invention.compare(self.store,self.catalog,self.industry,config,data.get('quantity'),quotes,source,
+                self.store.mapping('parameters',cid),live[2])
 
     def notification_data(self):
         with self.catalog.lock:
@@ -577,7 +603,7 @@ class App:
                 'corporations':corporation_dashboard(self.store)['corporations'],'corporation_scopes':CORPORATION_SCOPES,
                 'industry_facilities':{a:{'system_id':settings[a].get('system_id'),'system_name':self.catalog.moon_systems.get(settings[a].get('system_id'),{}).get('name')} for a in ['manufacturing','reaction']},
                 'production_characters':[{k:p[k] for k in ['id','name','available','as_of']} for p in production_profiles(self.store,settings,corporation_id)],
-                'characters': chars, 'plans': plans, 'reservation_revision':reservation_revision(plans,corporation_id), 'reservation_error': reservation_error,'delivery_wait':delivery_wait,
+                'characters': chars, 'plans': plans, 'invention_products':sorted(self.catalog.inventions), 'reservation_revision':reservation_revision(plans,corporation_id), 'reservation_error': reservation_error,'delivery_wait':delivery_wait,
                 'inventory': self.store.mapping('inventory',corporation_id), 'parameters': self.store.mapping('parameters',corporation_id),
                 'locations': locations, 'jobs': [j for j in jobs if j.get('status') in ['active', 'paused', 'ready']],
                 'blueprint_count': len(bps), 'stale_characters': stale, 'sde': self.catalog.meta,
@@ -680,7 +706,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/invention.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -769,6 +795,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(200, skill_dashboard(self.app.store,self.app.catalog))
             if path == '/api/industry':return self.send(200,self.app.industry.status())
             if path == '/api/trade':return self.send(200,self.app.trade.dashboard())
+            if path == '/api/invention/options':return self.send(200,self.app.invention_options(int(query.get('product_id',['0'])[0]),query.get('plan_id',[None])[0]))
             if path == '/api/trade/plan':return self.send(200,self.app.trade.finance(query.get('plan_id',[None])[0]))
             if path == '/api/trade/seller':return self.send(200,self.app.trade.profile(int(query.get('character_id',['0'])[0]),query.get('source',['jita'])[0]))
             if path == '/api/industry/system':return self.send(200,self.app.industry.system(int(query.get('id',['0'])[0]),self.app.catalog))
@@ -845,6 +872,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == '/api/intel/claim':return self.send(200,{'items':notifications.claim(self.app.store,intel.collect_alerts(self.app.store,self.app.intel.universe))})
             elif path == '/api/industry/refresh':
                 self.app.industry.start(manual=data.get('manual') is True);return self.send(200,self.app.industry.status())
+            elif path == '/api/invention/estimate':return self.send(200,self.app.invention_estimate(data))
             elif path == '/api/industry/estimate':
                 with self.app.catalog.lock:return self.send(200,self.app.industry.estimate(data.get('rows'),self.app.store.settings(),self.app.catalog))
             elif path == '/api/trade/hauling':return self.send(200,self.app.trade.save_hauling(data))

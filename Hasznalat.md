@@ -700,3 +700,27 @@ A logó alatti **Intel** cím alatt az **On / Off** kapcsoló az intel rendszer�
 A gyártási költség összesítésében az **Import szállítás** és az **Export szállítás** saját kapcsolót kapott. Mindkettő tervenként külön mentődik; a kikapcsolt irány 0 ISK-val szerepel a költségben és a profitban, a másik irány továbbra is számolódik. A korábbi közös kapcsoló állapotát mindkét irány örökli. A Jita/helyi market díjai és a térfogatszámítás megmaradnak; a kapcsolók nem írják át a díjakat.
 
 A célbeállítások alján a **Mentett tervek** lenyílóból választhatsz az aktuális személyes vagy corp kör mentései közül. A kiválasztás az aktuális nézetben marad (például az ütemezőben), és a nem mentett módosítások eldobásához továbbra is megerősítés kell. A tömörebb fejlécben a készlettulajdonos és a gyártó magyarázata az adott mező fölé vitt egérrel érhető el.
+
+## T2 hajók invention- és BPC-költsége
+
+A külön **Invention és BPC-költség** menüpontban válassz T2 hajót és darabszámot. A **Gyártási költség és várható bevétel → Invention-költség** gomb is ide vezet. A receptek, datacore-ok, alapesélyek és a nyolc aktuális decryptor módosítói az alkalmazás katalógusával azonos hivatalos SDE-ből jönnek; a receptfrissítés ezeket is frissíti. A funkció T2 hajókra használható, nem T3 reverse engineeringre.
+
+Válaszd ki az inventáló karaktert. A beolvasott **aktív** tudományskill-szintek és a racial encryption skill adják az esélyt:
+
+`alapesély × (1 + (science1 + science2)/30 + encryption/40) × decryptor-szorzó`
+
+Hiányzó skilladat vagy szükséges skill esetén az esély és a hozzá tartozó várható költség ismeretlen marad. Korábbi adatokból történő számítást jelzünk. A próbálkozások mező egy összehasonlítási mintamennyiség: például 100 × 65% = 65 várható siker; tört eredménynél nincs egészre kerekítés vagy véletlenszimuláció. A játék valódi eredménye eltérhet. A táblázat legfeljebb hat tizedesjegyet mutat; a költségszámítás nem a megjelenített, kerekített értéket használja.
+
+Az invention anyagainak (datacore és decryptor) árforrása és a gyártás anyagárforrása külön választható: Jita vagy helyi market buy/sell/split. A másoláshoz és az inventionhöz külön rendszer, facility tax, jobköltség-csökkentés, SCC és Alpha-pótdíj adható meg. A rendszer mező gépelésre szűkül. Az indexet az ESI ipari adataiból vesszük; nem használjuk helyette a manufacturing indexet. Az **Árak és indexek frissítése** gomb a szokásos piaci és ESI-cache szabályokat betartva kér új adatokat.
+
+Egy próbálkozás költsége: datacore-ok + decryptor + invention-job díja + a T1 másolási job egy licensed runra felosztott díja. A másolásnál a T1 termék módosítatlan gyártási inputjaiból, inventionnél a lehetséges T2 outputok módosítatlan gyártási inputjainak átlagából számolt 2%-os EIV az alap; erre kerül az adott tevékenység rendszerindexe, struktúrabónusza és adói. A **Run / T1 másolat** mező az egy másolatot készítő copy job licensed runjainak száma; ennyi invention-próbálkozásra osztjuk fel a copy díját. A T1 BPO vételára nincs benne, mert újrahasználható.
+
+`BPC költség / run = próbálkozás teljes költsége / sikerességi esély / run egy sikeres BPC-n`
+
+A kudarcok anyag-, másolási és jobköltsége így is benne marad. A **Próbálkozások** mező módosítása a várható sikerek számát változtatja, nem a fajlagos költséget. A BPC-runköltséget a hajó gyártási outputjával is osztjuk, majd a valóban újonnan gyártandó darabszámmal szorozzuk; a végső összegnél kerekítünk ISK-centre.
+
+A táblázat az összes decryptort és a decryptor nélküli esetet hasonlítja össze. A teljes gyártási láncot ugyanannyi új hajóra számolja újra, a decryptor ME/TE-jével és BPC-runhatárával; a jobonkénti anyagkerekítés is változik. A gyártási struktúrabeállításokat használja, készlet és aktív jobkimenet levonása nélkül. A teljes összehasonlító összeg invention BPC-költségből, gyártási anyagköltségből és gyártási jobdíjakból áll. Szállítás, eladási díjak és újrahasználható BPO-k/reakcióformulák beszerzése nincs benne. Hiányos sor nem lehet „legolcsóbb”. Így egy drágább, jobb ME-t adó decryptor is nyerhet.
+
+Az **Ezt használom** gomb az adott tervhez menti és bekapcsolja a választott profilt. Az engedélyező kapcsolóval később kikapcsolható. Új tervnél a piszkozat beállítása a tervvel együtt menthető. A gyártási összesítés Blueprint beszerzés sorában megjelenik az inventionből számolt költség; amíg aktív, a korábbi kézi blueprintköltség-felülírás nem érvényesül. T2 BPO használatakor nem számítunk fel invention-költséget. Az eredeti BPC-id valódi ME/TE értékeit és a foglalásokat nem írjuk át: ha az eltér a profiltól, a gyártási összesítés külön figyelmeztet. A létrehozás és a science slotok ütemezése nem automatikus; ez költségmodell.
+
+Források: [CCP invention](https://support.eveonline.com/hc/en-us/articles/203210642-Invention), [decryptorok](https://support.eveonline.com/hc/en-us/articles/203270631-Decryptors), [invention formula](https://www.eveonline.com/news/view/invention-updates), [ipari EIV](https://www.eveonline.com/news/view/eve-industry-all-you-want-to-know).

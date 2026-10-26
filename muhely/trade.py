@@ -18,7 +18,7 @@ from .refresh_policy import RefreshPolicy,AUTO_SECONDS
 ACCOUNTING=16622
 BROKER_RELATIONS=3446
 DEFAULTS={'system_id':None,'reader_id':None,'location_id':None,'location':None,'search':'' ,'structure_broker_fee':None,'hauling_isk_per_m3':'0'}
-FINANCE={'materials':'jita:sell','sale':'jita:sell','seller_id':None,'sale_order':'auto','hauling_enabled':True,'hauling_import_enabled':True,'hauling_export_enabled':True,'other_isk':'0','blueprints_isk':None}
+FINANCE={'materials':'jita:sell','sale':'jita:sell','seller_id':None,'sale_order':'auto','hauling_enabled':True,'hauling_import_enabled':True,'hauling_export_enabled':True,'other_isk':'0','blueprints_isk':None,'invention':None}
 
 def decimal(value,name,minimum=0,maximum=100):
     if isinstance(value,bool):raise PlanningError(name+': szám szükséges.')
@@ -261,6 +261,12 @@ class Trade:
 
     def save_finance(self,data):
         key=self.key(data.get('plan_id'));p=self.finance(data.get('plan_id'))
+        if 'invention' in data:
+            from .invention import validate
+            config=validate(data['invention'],self.store,self.catalog)
+            saved=next((r for r in self.store.plans() if r['id']==data.get('plan_id')),None)
+            if saved and config and saved['product_id']!=config['product_id']:raise PlanningError('Az invention-beállítás más termékhez tartozik.')
+            p['invention']=config
         for field in ['materials','sale']:
             value=data.get(field,p[field])
             if value not in [s+':'+m for s in ['jita','local'] for m in ['buy','sell','split']]:raise PlanningError('Ismeretlen árforrás.')

@@ -102,6 +102,8 @@ def import_sde(archive_path, target):
                                     product['quantity'], a.get('time', 0), r.get('maxProductionLimit', 1),
                                     json.dumps(a.get('materials', []), separators=(',', ':')),
                                     json.dumps(a.get('skills', []), separators=(',', ':'))))
+            from .invention_catalog import import_invention
+            import_invention(db,archive)
             bonuses={}
             if 'typeDogma.jsonl' in archive.namelist():
                 for r in rows('typeDogma.jsonl'):
@@ -152,6 +154,8 @@ class Catalog:
                         if not self.skill_time_bonuses:
                             self.skill_time_bonuses={int(k):v for k,v in json.loads(meta.get('requiredSkillTimeBonuses','{}')).items()}
             self.by_blueprint = {r['bp_id']: r for r in self.recipes.values()}
+            from .invention_catalog import load as load_invention
+            load_invention(self)
             self.pi_schematics,self.pi_types,self.pi_planets,self.pi_systems={},{},{},{}
             self.pi_meta={}
             for source in dict.fromkeys(p for p in [self.path,self.pi_fallback] if p):

@@ -46,7 +46,7 @@ def normalize(kind,data):
             for item in indices:
                 if not isinstance(item,dict):raise EsiError('Hibás system cost index.')
                 activity=item.get('activity')
-                if activity not in ['manufacturing','reaction']:continue
+                if activity not in ['manufacturing','reaction','copying','invention']:continue
                 if activity in values:raise EsiError('Ismételt system cost index.')
                 value=decimal_value(item.get('cost_index'))
                 if value>1:raise EsiError('Hibás system cost index.')
@@ -78,16 +78,16 @@ class IndustryCosts:
         for index,(kind,path) in enumerate(PATHS.items()):
             with self.lock:self.current=kind;self.done=index
             old=self.cached(kind);now=self.clock()
-            if old and (old['data']['expires'] if manual else old['data'].get('next_check',old['data']['expires']))>now:continue
+            if old and (kind!='systems' or old['data'].get('activities_version')==2) and (old['data']['expires'] if manual else old['data'].get('next_check',old['data']['expires']))>now:continue
             if not self.refresh_policy.claim(['industry-cost:'+kind],manual,now):continue
             try:
-                headers={'If-None-Match':old['etag']} if old and old.get('etag') else {}
+                headers={'If-None-Match':old['etag']} if old and old.get('etag') and (kind!='systems' or old['data'].get('activities_version')==2) else {}
                 data,h=self.http.request(ESI+path,headers=headers)
                 h={k.lower():v for k,v in h.items()}
                 if data is None and not old:raise EsiError('Hiányzó korábbi ipari költségadat.')
                 values=old['data']['values'] if data is None else normalize(kind,data)
                 # Each endpoint replaces its old snapshot only after validation.
-                self.store.save_universe_cache('industry-'+kind,0,{'values':values,'expires':cache_expiry(h,now),'next_check':max(now+AUTO_SECONDS,cache_expiry(h,now))},now,h.get('etag') or (old or {}).get('etag'))
+                self.store.save_universe_cache('industry-'+kind,0,{'activities_version':2,'values':values,'expires':cache_expiry(h,now),'next_check':max(now+AUTO_SECONDS,cache_expiry(h,now))},now,h.get('etag') or (old or {}).get('etag'))
                 with self.lock:self.errors.pop(kind,None)
             except Exception as e:
                 with self.lock:
@@ -100,7 +100,7 @@ class IndustryCosts:
         with self.lock:
             if self.running or not manual and self.clock()<self.retry_after:return
             records=[self.cached(k) for k in PATHS]
-            if all(r and (r['data']['expires'] if manual else r['data'].get('next_check',r['data']['expires']))>self.clock() for r in records):return
+            if all(r and (kind!='systems' or r['data'].get('activities_version')==2) and (r['data']['expires'] if manual else r['data'].get('next_check',r['data']['expires']))>self.clock() for kind,r in zip(PATHS,records)):return
             self.running=True
         def work():
             try:self.refresh(manual=manual)

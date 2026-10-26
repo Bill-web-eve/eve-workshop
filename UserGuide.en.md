@@ -702,3 +702,27 @@ The **On / Off** control under the **Intel** heading immediately below the logo 
 The production cost summary has separate **Import hauling** and **Export hauling** checkboxes. Each is saved per plan. A disabled direction contributes 0 ISK to cost and profit; the other direction continues to calculate. Existing plans inherit their previous shared hauling switch for both directions. Market-specific rates and volume rules are preserved; toggles never change rates.
 
 Use the **Saved plans** dropdown below the target fields to select a plan in the current personal or corporation pool. Selection keeps the current view, including the scheduler. Discarding unsaved edits still requires confirmation. In the more compact target panel, hover over the inventory-owner or production-character field for its explanation.
+
+## T2 ship invention and BPC costs
+
+Open **Invention and BPC cost** in the sidebar, or **Invention cost** in the production cost card. Choose a T2 ship, quantity and inventing character. T2 recipes, base probabilities, datacores and all eight current decryptors come from the same official SDE build as the production catalogue. Recipe updates also update invention data. T3 reverse engineering is outside this feature.
+
+Chance uses the character’s downloaded **active** skill levels:
+
+`base chance × (1 + (science1 + science2)/30 + encryption/40) × decryptor multiplier`
+
+Missing skill data or unmet requirements leave chance and expected BPC cost unknown. Older skills are marked. Attempts define the comparison sample: 100 attempts at 65% means 65 expected successes. Fractional expectations are retained; there is no random simulation or whole-success rounding. Actual in-game outcomes may differ. The table displays up to six decimals; costing uses the unrounded values.
+
+Select separate invention-material and manufacturing-material price sources: Jita or local buy/sell/split. Copying and invention have independent searchable systems, facility taxes, job cost reductions, SCC and Alpha surcharges. Each uses its own ESI cost index. **Refresh prices and indices** respects the existing market/ESI cache rules.
+
+Each attempt costs datacores, the consumed decryptor, the invention job fee and one licensed T1 copy run’s share of copying cost. Copying EIV is 2% of unmodified T1 manufacturing inputs; invention EIV is 2% of the average unmodified manufacturing inputs of possible T2 outputs. Activity index, facility reduction and taxes are applied to that EIV. **Runs per T1 copy** defines the licensed runs in one copying job producing one copy, over which that copying fee is spread. The reusable T1 BPO purchase is excluded.
+
+`BPC cost per run = full attempt cost / success chance / runs per successful BPC`
+
+Failures therefore still consume and incur all attempt costs. Attempts change expected successes, not unit cost. Run cost is divided by manufacturing output per run and multiplied by the number of newly manufactured ships; final amounts are rounded to ISK cents.
+
+Every decryptor and no-decryptor option is compared across the full manufacturing chain for the same number of new ships, with its ME/TE and BPC run boundaries, including per-job material rounding. Current production facilities and blueprint parameters are used for intermediates. Stock and active output are not deducted in this benchmark. Totals include expected BPC cost, manufacturing materials and manufacturing jobs; hauling, selling fees and reusable BPO/formula purchases are excluded. Incomplete rows cannot win. A more expensive decryptor can therefore win through ME savings.
+
+**Use this** saves and enables the selected profile for the plan. Disable **Include invention cost in this plan** to stop applying it. A new plan can carry its draft invention settings when saved. The production card’s Blueprint procurement value uses the modeled cost for newly manufactured output only; the old manual blueprint override is inactive while the model applies. T2 BPO manufacturing is never charged invention cost. Owned BPC ME/TE and reservations remain unchanged; a profile mismatch produces a warning. This is a costing model, not automatic invention execution or science-slot scheduling.
+
+Sources: [CCP invention](https://support.eveonline.com/hc/en-us/articles/203210642-Invention), [decryptors](https://support.eveonline.com/hc/en-us/articles/203270631-Decryptors), [invention formula](https://www.eveonline.com/news/view/invention-updates), [industry EIV](https://www.eveonline.com/news/view/eve-industry-all-you-want-to-know).

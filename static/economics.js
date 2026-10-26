@@ -69,7 +69,7 @@ async function loadIndustry(manual=false){
     industryData=await industryRequest;
     if(!industryData.running&&(manual||Object.values(industryData.resources).some(r=>r.stale))&&(manual||(industryData.retry_after||0)<=Date.now()/1000))industryData=await api('/api/industry/refresh',{manual});
     applyEconomics();if(view==='settings')void updateFacilityIndices();
-    await refreshJobCosts();
+    await refreshJobCosts();if(view==='queue'&&typeof loadFinanceInvention==='function')await loadFinanceInvention();
   }catch(e){if(view==='queue'||view==='settings')error(e.message);}
   finally{industryRequest=null;if(industryData?.running&&['queue','settings'].includes(view))industryTimer=setTimeout(()=>void loadIndustry(),1500);}
 }

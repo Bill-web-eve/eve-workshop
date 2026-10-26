@@ -297,7 +297,7 @@ function navigate(next) {
   clearTimeout(piTimer);
   if(['reservations','contracts','fleet','mining','intel','skills','pi','notifications'].includes(next))error('');
   $$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
-  const names={reservations:'Foglalások',contracts:'Szerződések',fleet:'Flottatevékenység',mining:'Bányászati napló',intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
+  const names={invention:'Invention és BPC-költség',reservations:'Foglalások',contracts:'Szerződések',fleet:'Flottatevékenység',mining:'Bányászati napló',intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
   $('#breadcrumb').textContent='Műhely / '+names[view]; render();return true;
 }
 function render() {
@@ -329,6 +329,7 @@ function render() {
   if(view==='settings') return renderSettings(content);
   if(view==='connection') return renderConnection(content);
   if(view==='reservations')return renderReservations(content);
+  if(view==='invention')return renderInvention(content);
   if(view==='saved') return renderSaved(content);
   if(view==='schedule')return renderSchedule(content);
   if(view==='jobs')return renderJobs(content);
@@ -734,6 +735,7 @@ $('#save-plan').onclick=async()=>{
     if(next.preview_only&&next.saved_plan?.reserve_active!==false)throw new Error('A foglalás véglegesítése friss készletadatra vár.');
     const saved=await api('/api/plans/save',{id:next.saved_plan?.id||null,product_id:next.product_id,quantity:next.quantity,name:next.saved_plan?.name||next.name,corporation_id:next.corporation_id,manufacturer_id:next.manufacturer_id});
     if(typeof financeContext!=='undefined'&&financeContext&&!financeContext.plan_id&&financeContext.plan.product_id===next.product_id&&financePrefs)await api('/api/trade/plan',{...financePrefs,plan_id:saved.id});
+    if(!next.saved_plan&&view==='invention'&&inventionOptions?.config.product_id===next.product_id)await api('/api/trade/plan',{plan_id:saved.id,invention:inventionOptions.config,materials:inventionOptions.manufacturing_prices});
     if(productId===next.product_id&&corporationId===next.corporation_id&&manufacturerId===next.manufacturer_id&&targetQuantity()===next.quantity)activePlanId=saved.id;
     await calculate();toast(next.saved_plan?.reserve_active===false?'A terv mentve, a foglalása kikapcsolva maradt.':'A terv mentve, a készletfoglalás aktív.');
   }catch(e){error(e.message);}

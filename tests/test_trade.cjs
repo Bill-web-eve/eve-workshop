@@ -191,3 +191,11 @@ test('independent hauling switches calculate all four combinations including unk
  const missingInbound=run(`financeValues({...transport,plan:{...transport.plan,shopping:[{id:2,buy:10}]}},{...f,hauling_import_enabled:false,hauling_export_enabled:true},books,profile,{complete:true,cents:'10000'})`);assert.notEqual(missingInbound.values.total,null);
  const missingOutbound=run(`financeValues({...transport,plan:{...transport.plan,rows:[]}},{...f,hauling_import_enabled:true,hauling_export_enabled:false},books,profile,{complete:true,cents:'10000'})`);assert.notEqual(missingOutbound.values.total,null);
 });
+
+test('invention unit allocation replaces the target BPC estimate, rejects stale results and never charges a T2 BPO',t=>{
+ const {w,run}=setup();t.after(()=>w.close());run(fs.readFileSync(__dirname+'/../static/invention.js','utf8'));
+ run(`financeKey='invention-plan';financeContext=c;financePrefs={...f,invention:{enabled:true,product_id:1}};financeInvention={key:JSON.stringify([financeKey,financePrefs.invention,financePrefs.materials,c.quantity]),selected:{bpc_total_cents:'12345'}};`);
+ const modeled=run(`financeValues(c,financePrefs,books,profile,{complete:true,cents:'10000'})`);assert.equal(modeled.values.blueprints,12345n);assert.equal(modeled.values.total,63345n);assert.equal(modeled.bpcUnspecified,false);
+ assert.equal(run(`financeValues({...c,quantity:3},financePrefs,books,profile,{complete:true,cents:'10000'}).values.total`),null);
+ const bpo=run(`financeValues({...c,plan:{...c.plan,blueprint_shortages:[],queue:[{id:1,parameters:{kind:'BPO'}}]}},financePrefs,books,profile,{complete:true,cents:'10000'})`);assert.equal(bpo.invented.active,false);assert.equal(bpo.values.blueprints,0n);
+});
