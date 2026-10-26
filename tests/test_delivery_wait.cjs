@@ -2,6 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {JSDOM}=require('jsdom');
 const root=path.join(__dirname,'../static'),tick=()=>new Promise(r=>setImmediate(r));
+function selectSaved(d,w,id){const input=d.querySelector('#saved-plan-select');input.value=id;input.dispatchEvent(new w.Event('change'));}
 const expiry=Date.parse('2099-10-18T15:42:56Z')/1000;
 function pending(retry=expiry){return {plan_name:'Redeemer',retry_at:retry,items:['Caesarium Cadmide','Carbon Polymers','Fluxed Condensates','Prometium'].map((name,id)=>({id,name,character_name:'Test Pilot',assets_as_of:retry-3600,completed_at:retry-600}))};}
 async function setup(wait=pending()){
@@ -69,7 +70,7 @@ test('saved-plan shortcuts keep the scheduler open and retain options while disc
  const selector=d.querySelector('.plan-selector'),calculate=d.querySelector('#calculate'),form=d.querySelector('#schedule-form');
  form.elements.min_job_hours.value='24';form.elements.owned_only.checked=false;form.dispatchEvent(new w.Event('input',{bubbles:true}));
  run('scheduleResult={key:scheduleKey(),data:{}};scheduleSelected=99;');
- d.querySelector('[data-saved-shortcut="saved-salvation"]').click();await tick();await tick();
+ selectSaved(d,w,'saved-salvation');await tick();await tick();
  assert.equal(run('view'),'schedule');assert.equal(run('activePlanId'),'saved-salvation');assert.equal(run('productId'),92822);assert.equal(run('plan.product_id'),92822);
  assert.equal(d.querySelector('.schedule-setup>.plan-selector'),selector);assert.equal(d.querySelector('#calculate'),calculate);
  assert.equal(d.querySelector('#product-search').value,'Salvation');assert.equal(d.querySelector('#target-quantity').value,'2');
@@ -78,7 +79,7 @@ test('saved-plan shortcuts keep the scheduler open and retain options while disc
  assert(d.querySelector('[data-view=schedule]').classList.contains('active'));
  const query=new URL(calls.find(p=>p.startsWith('/api/plan?')),w.location.href).searchParams;
  assert.equal(query.get('saved_plan_id'),'saved-salvation');assert.equal(query.get('quantity'),'2');
- assert.equal(d.querySelector('[data-saved-shortcut="saved-salvation"]').getAttribute('aria-pressed'),'true');
+ assert.equal(d.querySelector('#saved-plan-select').value,'saved-salvation');
  // Calculate plan remains bound to the original selector after moving it.
  calculate.click();await tick();await tick();assert.equal(calls.filter(p=>p.startsWith('/api/plan?')).length,2);assert.equal(run('view'),'schedule');
 });
@@ -90,10 +91,10 @@ test('every plan shortcut and the saved-plan Open action retain the current view
  for(const view of ['schedule','queue','graph','shopping','inventory','blueprints','jobs','saved']){
   run('navigate('+JSON.stringify(view)+')');await tick();
   const id=run('activePlanId')==='saved-salvation'?'saved-redeemer':'saved-salvation';
-  d.querySelector('[data-saved-shortcut="'+id+'"]').click();await tick();await tick();
+  selectSaved(d,w,id);await tick();await tick();
   assert.equal(run('view'),view,view);assert.equal(run('activePlanId'),id,view);
   assert.equal(d.querySelector('.plan-selector'),selector);assert(d.querySelector('[data-view="'+view+'"]').classList.contains('active'),view);
-  assert.equal(d.querySelector('[data-saved-shortcut="'+id+'"]').getAttribute('aria-pressed'),'true');
+  assert.equal(d.querySelector('#saved-plan-select').value,id);
  }
  d.querySelector('[data-load-plan="saved-salvation"]').click();await tick();await tick();
  assert.equal(run('view'),'saved');assert.equal(run('activePlanId'),'saved-salvation');assert(d.querySelector('[data-load-plan="saved-salvation"]'));
@@ -103,9 +104,9 @@ test('cancelled dirty-plan switches leave the current view, target and unsaved i
  fixture.plans.push({...fixture.plans[0],id:'saved-salvation',name:'Salvation',product_name:'Salvation',product_id:92822,quantity:2});run('updatePlanControls();dirty={inventory:true};');
  let prompts=0;w.confirm=()=>{prompts++;return false;};
  const selector=d.querySelector('.plan-selector'),before=calls.length;d.querySelector('#target-quantity').value='73';
- d.querySelector('[data-saved-shortcut="saved-salvation"]').click();await tick();
+ selectSaved(d,w,'saved-salvation');await tick();
  assert.equal(prompts,1);assert.equal(calls.length,before);assert.equal(run('view'),'schedule');assert.equal(run('activePlanId'),'saved-redeemer');assert.equal(run('productId'),22428);assert.equal(run('dirty.inventory'),true);
- assert.equal(d.querySelector('.plan-selector'),selector);assert.equal(d.querySelector('#target-quantity').value,'73');
+ assert.equal(d.querySelector('.plan-selector'),selector);assert.equal(d.querySelector('#target-quantity').value,'73');assert.equal(d.querySelector('#saved-plan-select').value,'saved-redeemer');
  w.confirm=()=>{prompts++;return true;};await run('openSavedPlan("saved-salvation")');await tick();
  assert.equal(prompts,2);assert.equal(run('view'),'schedule');assert.equal(run('activePlanId'),'saved-salvation');assert.equal(run('Object.keys(dirty).length'),0);
 });
@@ -236,4 +237,13 @@ test('editing an inactive plan keeps reservations off, including while other inv
  w.fetch=async(url,options)=>{if(url==='/api/plans/save'){saved=JSON.parse(options.body);return {ok:true,json:async()=>({ok:true,id:fixture.plans[0].id,allocation:null})};}return original(url,options);};
  d.querySelector('#calculate').click();await tick();await tick();assert.equal(d.querySelector('#save-plan').disabled,false);assert.match(d.querySelector('#save-plan').textContent,/Update plan without reservations/);
  await d.querySelector('#save-plan').onclick();await tick();assert(saved);assert.equal(saved.id,fixture.plans[0].id);assert.equal(fixture.plans[0].reserve_active,false);assert(!calls.some(p=>p==='/api/plans/reservation'));
+});
+
+test('saved-plan dropdown contains only its owner pool, safely renders names and switches language without copying',async t=>{
+ const {w,d,run,fixture}=await setup(null);t.after(()=>w.close());
+ fixture.plans.push({...fixture.plans[0],id:'other-corp',corporation_id:99,name:'Corp plan'}, {...fixture.plans[0],id:'named',name:'<img onerror=bad()>',quantity:15000});run('updatePlanControls()');
+ const input=d.querySelector('#saved-plan-select');assert.equal(input.tagName,'SELECT');assert.equal(d.querySelectorAll('[data-saved-shortcut]').length,0);assert.equal(input.querySelector('option[value="other-corp"]'),null);assert(input.querySelector('option[value="named"]').textContent.includes('<img onerror=bad()>'));assert.equal(input.querySelector('img'),null);
+ w.EveI18n.setLanguage('hu');await tick();assert(d.querySelector('#saved-plan-select option[value="named"]').textContent.includes('db'));
+ w.EveI18n.setLanguage('en');await tick();assert(d.querySelector('#saved-plan-select option[value="named"]').textContent.includes('units'));
+ fixture.plans.splice(0);run('updatePlanControls()');await tick();assert.equal(d.querySelector('#saved-plan-select').disabled,true);assert(d.querySelector('#saved-plan-select').textContent.includes('No saved plans'));
 });

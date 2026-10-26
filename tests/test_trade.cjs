@@ -169,13 +169,25 @@ test('hauling switch excludes both directions, preserves rates and missing volum
  assert.equal(run('financeValues({...transport,plan:{...transport.plan,rows:[],shopping:[{id:2,buy:10}]}},f,books,profile,{complete:true,cents:"10000"}).values.profit'),null);
 });
 
-test('hauling checkbox restores the saved state, updates totals immediately and saves only this plan',async t=>{
+test('import and export checkboxes restore, change costs immediately and save only the selected plan',async t=>{
  const {w,run,d}=setup();t.after(()=>w.close());const calls=[];
  w.api=async(path,body)=>{calls.push({path,body});if(path.startsWith('/api/trade/plan'))return {...run('f'),hauling_enabled:false};if(path==='/api/trade')return {settings:{hauling_rates:{jita:{import:'500',export:'650'},local:{import:'100',export:'200'}}},status:{running:false}};if(path.startsWith('/api/trade/seller?'))return run('profile');return {...run('books.jita'),errors:{},retry_after:{},running:false};};
  run(`activePlanId='plan-hauling';document.querySelector('#production-finance').innerHTML=productionFinance({...c.plan,rows:[{id:1,volume:2500}],shopping:[{id:2,buy:1,volume:313.2}]},c.materials);bindProductionFinance();`);
  await tick();await tick();await tick();
- const checkbox=d.querySelector('[data-finance-field=hauling_enabled]');assert.equal(checkbox.checked,false);assert.match(d.querySelector('[data-finance-hauling=import]').textContent,/Kikapcsolva/);
- checkbox.checked=true;checkbox.dispatchEvent(new w.Event('change'));assert.equal(run('financePrefs.hauling_enabled'),true);assert.notEqual(d.querySelector('[data-finance-value=hauling_export]').textContent,'0,00 ISK');
- await new Promise(r=>setTimeout(r,350));const saved=calls.find(c=>c.path==='/api/trade/plan'&&c.body);assert.equal(saved.body.plan_id,'plan-hauling');assert.equal(saved.body.hauling_enabled,true);assert(!calls.some(c=>c.path==='/api/trade/hauling'));
- w.EveI18n.setLanguage('en');await tick();assert.match(checkbox.closest('label').textContent,/Include hauling cost/);assert.equal(checkbox.checked,true);
+ const inbound=d.querySelector('[data-finance-field=hauling_import_enabled]'),outbound=d.querySelector('[data-finance-field=hauling_export_enabled]');assert.equal(inbound.checked,false);assert.equal(outbound.checked,false);
+ inbound.checked=true;inbound.dispatchEvent(new w.Event('change'));assert.equal(run('financePrefs.hauling_import_enabled'),true);assert.equal(d.querySelector('[data-finance-value=hauling_export]').textContent,'0,00 ISK');assert.notEqual(d.querySelector('[data-finance-value=hauling_import]').textContent,'0,00 ISK');
+ await new Promise(r=>setTimeout(r,350));let saved=calls.filter(c=>c.path==='/api/trade/plan'&&c.body).at(-1);assert.equal(saved.body.plan_id,'plan-hauling');assert.equal(saved.body.hauling_import_enabled,true);assert.equal(saved.body.hauling_export_enabled,false);
+ outbound.checked=true;outbound.dispatchEvent(new w.Event('change'));inbound.checked=false;inbound.dispatchEvent(new w.Event('change'));
+ await new Promise(r=>setTimeout(r,350));saved=calls.filter(c=>c.path==='/api/trade/plan'&&c.body).at(-1);assert.equal(saved.body.hauling_import_enabled,false);assert.equal(saved.body.hauling_export_enabled,true);assert.equal(d.querySelector('[data-finance-value=hauling_import]').textContent,'0,00 ISK');assert.notEqual(d.querySelector('[data-finance-value=hauling_export]').textContent,'0,00 ISK');assert(!calls.some(c=>c.path==='/api/trade/hauling'));
+ w.EveI18n.setLanguage('en');await tick();assert.match(inbound.closest('label').textContent,/Import hauling/);assert.match(outbound.closest('label').textContent,/Export hauling/);assert.equal(inbound.checked,false);assert.equal(outbound.checked,true);
+});
+test('independent hauling switches calculate all four combinations including unknown volumes',t=>{
+ const {w,run}=setup();t.after(()=>w.close());run(`tradeData={settings:{hauling_rates:{jita:{import:'100',export:'400'},local:{import:'200',export:'800'}}}};const transport={...c,plan:{...c.plan,rows:[{id:1,volume:100}],shopping:[{id:2,buy:10,volume:.01}]}};`);
+ const baseline=run('financeValues(transport,f,books,profile,{complete:true,cents:"10000"})');
+ for(const inbound of [false,true])for(const outbound of [false,true]){
+  const out=run(`financeValues(transport,{...f,hauling_import_enabled:${inbound},hauling_export_enabled:${outbound}},books,profile,{complete:true,cents:'10000'})`);
+  assert.equal(out.values.hauling_import,inbound?2000n:0n);assert.equal(out.values.hauling_export,outbound?8000000n:0n);assert.equal(out.values.total,baseline.values.total-baseline.values.hauling+out.values.hauling);assert.equal(out.values.profit,baseline.values.profit+baseline.values.hauling-out.values.hauling);
+ }
+ const missingInbound=run(`financeValues({...transport,plan:{...transport.plan,shopping:[{id:2,buy:10}]}},{...f,hauling_import_enabled:false,hauling_export_enabled:true},books,profile,{complete:true,cents:'10000'})`);assert.notEqual(missingInbound.values.total,null);
+ const missingOutbound=run(`financeValues({...transport,plan:{...transport.plan,rows:[]}},{...f,hauling_import_enabled:true,hauling_export_enabled:false},books,profile,{complete:true,cents:'10000'})`);assert.notEqual(missingOutbound.values.total,null);
 });

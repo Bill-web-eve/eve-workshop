@@ -168,6 +168,24 @@ class TradeTests(unittest.TestCase):
             time.sleep(.01)
         self.assertIsNone(self.trade.state['error']);self.assertEqual(self.trade.state['candidates'],[LOC]);self.assertIsNone(self.trade.settings()['location_id'])
 
+    def test_import_export_switches_migrate_and_persist_independently_without_changing_rates(self):
+        for pid in ['a','b']:self.store.save_plan({'id':pid,'name':pid,'product_id':590,'quantity':1,'created':1000,'reserve_active':False,'reserved_at':None})
+        with self.store.db() as db:db.execute('INSERT INTO trade_plans VALUES(?,?)',('plan:a','{"hauling_enabled":false}'))
+        self.assertFalse(self.trade.finance('a')['hauling_import_enabled']);self.assertFalse(self.trade.finance('a')['hauling_export_enabled'])
+        rates=self.trade.settings()['hauling_rates']
+        self.trade.save_finance({'plan_id':'a','hauling_import_enabled':True})
+        again=Trade(self.store,self.catalog,self.eve);self.assertTrue(again.finance('a')['hauling_import_enabled']);self.assertFalse(again.finance('a')['hauling_export_enabled'])
+        self.assertTrue(again.finance('b')['hauling_export_enabled']);self.assertTrue(again.finance()['hauling_import_enabled'])
+        self.trade.save_finance({'plan_id':'a','other_isk':'75'});self.assertFalse(self.trade.finance('a')['hauling_export_enabled'])
+        for field in ['hauling_import_enabled','hauling_export_enabled']:
+            before=self.trade.finance('a')
+            for value in ['false',0,None,{}]:
+                with self.assertRaises(PlanningError):self.trade.save_finance({'plan_id':'a',field:value})
+                self.assertEqual(self.trade.finance('a'),before)
+        self.trade.save_finance({'plan_id':'a','hauling_import_enabled':False,'hauling_export_enabled':True})
+        self.assertFalse(self.trade.finance('a')['hauling_import_enabled']);self.assertTrue(self.trade.finance('a')['hauling_export_enabled'])
+        self.assertEqual(self.trade.settings()['hauling_rates'],rates)
+
 import test_server as base
 class TradeApiTests(unittest.TestCase):
     setUp=base.ServerTests.setUp

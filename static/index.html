@@ -107,8 +107,8 @@
     <div id="plan-selector-anchor" hidden></div>
     <section class="plan-selector" aria-label="Gyártási cél">
       <div class="eyebrow">MIT ÉPÍTÜNK?</div>
-      <div class="scope-selector"><label for="production-scope">Gyártási kör</label><select id="production-scope"><option value="">Személyes gyártás</option></select><span id="scope-hint">Csak a személyes készlet és jobok.</span></div>
-      <div class="scope-selector"><label for="manufacturer">Gyártó karakter</label><select id="manufacturer"><option value="manual">Válassz karaktert · addig kézi időbecslés</option></select><span>A választás a tervvel együtt mentődik; a készlet tulajdonosát nem változtatja.</span></div>
+      <div class="scope-selector"><label for="production-scope">Gyártási kör</label><select id="production-scope" aria-describedby="scope-hint"><option value="">Személyes gyártás</option></select><span id="scope-hint">Csak a személyes készlet és jobok.</span></div>
+      <div class="scope-selector"><label for="manufacturer">Gyártó karakter</label><select id="manufacturer" aria-describedby="manufacturer-hint" title="A választás a tervvel együtt mentődik; a készlet tulajdonosát nem változtatja."><option value="manual">Válassz karaktert · addig kézi időbecslés</option></select><span id="manufacturer-hint">A választás a tervvel együtt mentődik; a készlet tulajdonosát nem változtatja.</span></div>
       <form id="plan-form" autocomplete="off">
         <div class="product-field"><label for="product-search">Termék</label><div class="search-wrap"><span class="search-icon">⌕</span><input id="product-search" type="search" placeholder="Hajó, modul, komponens vagy reakció…" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="search-results"><div id="search-results" class="search-results" role="listbox" hidden></div></div></div>
         <div class="quantity-field"><label for="target-quantity">Célmennyiség</label><div class="input-unit"><input id="target-quantity" type="text" inputmode="numeric" data-grouped-number data-number-min="1" data-number-max="100000000" value="1" required><span>db</span></div></div>

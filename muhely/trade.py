@@ -18,7 +18,7 @@ from .refresh_policy import RefreshPolicy,AUTO_SECONDS
 ACCOUNTING=16622
 BROKER_RELATIONS=3446
 DEFAULTS={'system_id':None,'reader_id':None,'location_id':None,'location':None,'search':'' ,'structure_broker_fee':None,'hauling_isk_per_m3':'0'}
-FINANCE={'materials':'jita:sell','sale':'jita:sell','seller_id':None,'sale_order':'auto','hauling_enabled':True,'other_isk':'0','blueprints_isk':None}
+FINANCE={'materials':'jita:sell','sale':'jita:sell','seller_id':None,'sale_order':'auto','hauling_enabled':True,'hauling_import_enabled':True,'hauling_export_enabled':True,'other_isk':'0','blueprints_isk':None}
 
 def decimal(value,name,minimum=0,maximum=100):
     if isinstance(value,bool):raise PlanningError(name+': szám szükséges.')
@@ -253,7 +253,11 @@ class Trade:
     def finance(self,pid=None):
         key=self.key(pid)
         with self.store.db() as db:r=db.execute('SELECT data FROM trade_plans WHERE key=?',(key,)).fetchone()
-        return {**FINANCE,**(json.loads(r[0]) if r else {})}
+        stored=json.loads(r[0]) if r else {}
+        result={**FINANCE,**stored}
+        for direction in ['import','export']:result['hauling_'+direction+'_enabled']=stored.get('hauling_'+direction+'_enabled',stored.get('hauling_enabled',True))
+        result['hauling_enabled']=result['hauling_import_enabled'] and result['hauling_export_enabled']
+        return result
 
     def save_finance(self,data):
         key=self.key(data.get('plan_id'));p=self.finance(data.get('plan_id'))
@@ -263,9 +267,14 @@ class Trade:
             p[field]=value
         seller=data.get('seller_id',p['seller_id']);p['seller_id']=self.character(seller) if seller else None
         if data.get('sale_order',p['sale_order']) not in ['auto','instant','order']:raise PlanningError('Ismeretlen eladási mód.')
-        hauling=data.get('hauling_enabled',p['hauling_enabled'])
-        if type(hauling) is not bool:raise PlanningError('A szállítási kapcsoló be vagy ki értéket vár.')
-        p['hauling_enabled']=hauling
+        if 'hauling_enabled' in data and type(data['hauling_enabled']) is not bool:raise PlanningError('A szállítási kapcsoló be vagy ki értéket vár.')
+        split=any('hauling_'+direction+'_enabled' in data for direction in ['import','export'])
+        for direction in ['import','export']:
+            field='hauling_'+direction+'_enabled'
+            value=data.get(field,p[field] if split else data.get('hauling_enabled',p[field]))
+            if type(value) is not bool:raise PlanningError('A szállítási kapcsoló be vagy ki értéket vár.')
+            p[field]=value
+        p['hauling_enabled']=p['hauling_import_enabled'] and p['hauling_export_enabled']
         p['sale_order']=data.get('sale_order',p['sale_order']);p['other_isk']=decimal(data.get('other_isk',p['other_isk']),'Egyéb költség',0,10**18)
         blueprints=data.get('blueprints_isk',p['blueprints_isk'])
         p['blueprints_isk']=None if blueprints in [None,''] else decimal(blueprints,'Blueprintköltség',0,10**18)

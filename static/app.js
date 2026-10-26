@@ -173,9 +173,12 @@ function renderDeliveryWait(content){
 }
 function renderPlanShortcuts(){
   const target=$('#saved-plan-shortcuts'),plans=scopedPlans();
-  target.innerHTML='<span>Mentett tervek</span>'+plans.map(p=>`<button data-saved-shortcut="${esc(p.id)}" class="${p.id===activePlanId?'selected':''}" aria-pressed="${p.id===activePlanId}" title="${esc(p.product_name)} · ${fmt(p.quantity)} db">${verbatim(p.name)} · ${fmt(p.quantity)} db</button>`).join('')+(plans.length?'':'<span>Ebben a gyártási körben még nincs mentett terv</span>');
-  $$('[data-saved-shortcut]').forEach(el=>el.onclick=()=>openSavedPlan(el.dataset.savedShortcut));
+  target.innerHTML=`<label for="saved-plan-select">Mentett tervek</label><select id="saved-plan-select" ${plans.length?'':'disabled'}><option value="">${plans.length?'Válassz mentett tervet':'Ebben a gyártási körben még nincs mentett terv'}</option>${plans.map(p=>`<option value="${esc(p.id)}" data-i18n-skip>${esc(p.name)} · ${fmt(p.quantity)} ${esc(EveI18n.t('db'))}</option>`).join('')}</select>`;
+  const select=$('#saved-plan-select');select.value=activePlanId||'';
+  select.onchange=async()=>{if(select.value)await openSavedPlan(select.value);if(select.isConnected)select.value=activePlanId||'';};
 }
+
+window.addEventListener('eve-language-change',()=>{if(state)renderPlanShortcuts();});
 async function openSavedPlan(id){
   const saved=state.plans.find(p=>p.id===id);if(!saved)return;
   if(Object.keys(dirty).length&&!confirmUI('Az új számítás eldobja a még nem alkalmazott módosításokat. Folytatod?'))return;
@@ -195,6 +198,7 @@ function updatePlanControls() {
     $('#manufacturer').value=manufacturerValue();
     $('#target-quantity').dataset.numberMax=productActivity==='manufacturing'?'1000000':'100000000';EveNumbers.validate($('#target-quantity'));
     $('#scope-hint').textContent=corporationId?'Csak '+state.scope_label+' készlete és jobjai.':'Csak személyes készlet és jobok; corp készlet nélkül.';
+    $('#production-scope').title=EveI18n.t($('#scope-hint').textContent);
   }
   updateReadyJobs();
   const target=$('#product-search');

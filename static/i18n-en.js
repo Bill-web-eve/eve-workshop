@@ -1,6 +1,7 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Válassz mentett tervet": "Choose a saved plan",
 "Intelértesítések": "Intel notifications",
 "Tudomásul vettem": "Acknowledge",
 "Az értesítés tudomásul véve.": "Notification acknowledged.",
