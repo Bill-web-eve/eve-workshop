@@ -62,6 +62,23 @@ class InventionTests(unittest.TestCase):
   for patch in [{'enabled':'yes'},{'decryptor_id':999},{'inventor_id':999},{'copy_runs':0},{'attempts':True}]:
    with self.assertRaises(PlanningError):trade.save_finance({'plan_id':'a','invention':{**conf,**patch}})
    self.assertEqual(trade.finance('a')['invention'],conf)
+ def test_missing_datacore_is_named_and_only_absent_prices_are_requested(self):
+  missing_id=self.recipe['materials'][-1]['typeID']
+  def partial(source,ids):
+   book=self.quotes(source,ids);book['quotes'].pop(str(missing_id),None);return book
+  result=self.compare(quotes=partial)
+  self.assertEqual(result['price_requests'],{'jita':[missing_id]})
+  self.assertIsNone(result['best_decryptor_id'])
+  self.assertEqual(result['selected']['missing_details'],[{'id':missing_id,'name':self.catalog.name(missing_id),'source':'jita','mode':'sell','reason':'not_loaded'}])
+  complete=self.compare();self.assertEqual(complete['price_requests'],{});self.assertIsNotNone(complete['best_decryptor_id'])
+ def test_a_loaded_quote_without_a_buy_price_is_not_continually_refetched(self):
+  self.config['prices']='jita:buy';missing_id=self.recipe['materials'][-1]['typeID']
+  def partial(source,ids):
+   book=self.quotes(source,ids);book['quotes'][str(missing_id)]['buy']=None;return book
+  result=self.compare(quotes=partial)
+  self.assertEqual(result['price_requests'],{})
+  self.assertEqual(result['selected']['missing_details'][0]['reason'],'unavailable_buy')
+  self.assertIsNone(result['selected']['per_run_cents'])
  def test_normalization_retains_copy_and_invention_indices(self):
   data=normalize('systems',[{'solar_system_id':1,'cost_indices':[{'activity':'copying','cost_index':.01},{'activity':'invention','cost_index':.02}]}])
   self.assertEqual(data['1'],{'copying':'0.01','invention':'0.02'})

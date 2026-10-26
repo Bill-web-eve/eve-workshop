@@ -119,7 +119,17 @@ def compare(store,catalog,industry,config,quantity,quote_provider,manufacturing_
         jobs=industry.estimate([{'id':r['id'],'batches':r['batches']} for r in plan['queue']],settings,catalog)
         plans[variant['id']]={'plan':plan,'materials':mats,'formulas':formula,'jobs':jobs}
     source,mode=config['prices'].split(':');ms,mm=manufacturing_prices.split(':')
-    books={s:quote_provider(s,sorted(all_ids)) for s in set([source,ms])};rows=[]
+    books={s:quote_provider(s,sorted(all_ids)) for s in set([source,ms])};rows=[];price_requests={s:set() for s in books}
+    def missing_details(ids,market,mode):
+        details=[];book=books[market]
+        for missing_id in sorted(set(ids)):
+            quote=book.get('quotes',{}).get(str(missing_id))
+            reason='not_loaded' if quote is None else 'unavailable_'+mode
+            message=book.get('errors',{}).get(str(missing_id))
+            if message:reason='quote_error'
+            details.append({'id':missing_id,'name':catalog.name(missing_id),'source':market,'mode':mode,'reason':reason})
+            if (quote is None or quote.get('stale')) and book.get('retry_after',{}).get(str(missing_id),0)<=industry.clock():price_requests[market].add(missing_id)
+        return details
     for variant in variants:
         p=chance(recipe,(character or {}).get('levels',{}),variant['probability_multiplier']) if ready else None
         runs=recipe['runs']+variant['runs'];consumables=[{'id':m['typeID'],'quantity':m['quantity']} for m in recipe['materials']]
@@ -142,7 +152,7 @@ def compare(store,catalog,industry,config,quantity,quote_provider,manufacturing_
             'per_run_isk':format(per_run,'f') if per_run is not None else None,'per_item_isk':format(per_item,'f') if per_item is not None else None,
             'per_run_cents':cents(per_run),'bpc_total_cents':cents(bpc_total),'manufacturing_materials_cents':cents(mfg),
             'manufacturing_jobs_cents':cents(job),'total_cents':cents(total),'per_ship_cents':cents(total/quantity) if total is not None else None,
-            'missing_prices':sorted(set(missing+unpriced)),'missing_jobs':not production['jobs']['complete'],'stale':stale or mfg_stale,
+            'missing_prices':sorted(set(missing+unpriced)),'missing_details':missing_details(missing,source,mode)+missing_details(unpriced,ms,mm),'missing_jobs':not production['jobs']['complete'],'stale':stale or mfg_stale,
             'manufacturing_runs':next(r['runs'] for r in production['plan']['rows'] if r['id']==tid)})
     complete=[r for r in rows if r['total_cents'] is not None]
     best=min(complete,key=lambda r:int(r['total_cents']))['decryptor_id'] if complete else None
@@ -151,4 +161,4 @@ def compare(store,catalog,industry,config,quantity,quote_provider,manufacturing_
     return {'product_id':tid,'quantity':quantity,'config':config,'skills':skills,'character':{k:character.get(k) for k in ['id','name','available','as_of','stale']} if character else None,
             'skills_ready':ready,'rows':rows,'best_decryptor_id':best,'selected':next(r for r in rows if r['decryptor_id']==config['decryptor_id']),
             'copying':clean(copy_fee),'invention':clean(invention_fee),'price_ids':sorted(all_ids),'industry':industry.status(),
-            'stale':bool(character and character['stale']) or copy_fee['stale'] or invention_fee['stale'] or any(r['stale'] for r in rows),'price_sources':sorted(set([source,ms])),'price_running':any(b.get('running') for b in books.values())}
+            'stale':bool(character and character['stale']) or copy_fee['stale'] or invention_fee['stale'] or any(r['stale'] for r in rows),'price_sources':sorted(set([source,ms])),'price_requests':{s:sorted(ids) for s,ids in price_requests.items() if ids},'price_running':any(b.get('running') for b in books.values())}

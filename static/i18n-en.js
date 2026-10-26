@@ -1,6 +1,16 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"BPC-költség / run": "BPC cost / run",
+"Hiányzó piaci ár": "Missing market price",
+"Az ár még nincs letöltve.": "The price has not been loaded yet.",
+"Az árlekérés nem sikerült.": "The price request failed.",
+"A kiválasztott ártípus nem érhető el.": "The selected price type is unavailable.",
+"Invention-anyagárak betöltése…": "Loading invention material prices…",
+"Hiányzó invention-skilladat vagy szükséges skill.": "Missing invention skill data or a required skill.",
+"A másolás költségadata hiányzik.": "Copying cost data is missing.",
+"Az invention-job költségadata hiányzik.": "Invention job cost data is missing.",
+"A gyártási jobköltség hiányos.": "Manufacturing job costs are incomplete.",
 "Próbálkozások és költségrészletek": "Attempts and cost breakdown",
 "Próbák teljes költsége": "Total attempt cost",
 "Invention-adatok betöltése": "Loading invention data",
