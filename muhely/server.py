@@ -38,6 +38,7 @@ from .store import Store, default_data_dir, DEFAULT_SETTINGS
 
 from .refresh_policy import RefreshPolicy
 from .asset_locations import AssetLocations
+from .boosts import BoostCounter,discover as boost_channels
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -68,6 +69,7 @@ class App:
         self.intel=intel.IntelMonitor(self.store,self.catalog,self.eve)
         self.fleet=fleet.Fleet(self.store,self.catalog,self.eve,self.market)
         self.asset_locations=AssetLocations(self.store,self.eve)
+        self.boosts=BoostCounter(self.store)
 
     def desktop_auth_start(self, url):
         """One-use browser handoff; OAuth codes and tokens never enter the UI."""
@@ -746,7 +748,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/invention.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -779,6 +781,8 @@ class Handler(BaseHTTPRequestHandler):
                 radius=integer(int(query.get('radius',['5'])[0]),'Jump',12,1)
                 return self.send(200,self.app.intel.dashboard(center,radius,query.get('history',['0'])[0]=='1',region=integer(int(query.get('region',['0'])[0]),'Régió',2**31-1,0) or None,character_id=integer(int(query.get('character_id',['0'])[0]),'Karakter',2**31-1,0) or None))
             if path == '/api/intel/channels':return self.send(200,{'channels':self.app.intel.channels(query.get('folder',[''])[0])})
+            if path == '/api/boosts':return self.send(200,self.app.boosts.snapshot())
+            if path == '/api/boosts/channels':return self.send(200,{'channels':boost_channels(query.get('folder',[''])[0])})
             if path == '/api/intel/systems':
                 q=query.get('q',[''])[0].strip().casefold()
                 rows=[s for s in self.app.intel.universe.systems.values() if q and q in s['name'].casefold()]
@@ -902,6 +906,8 @@ class Handler(BaseHTTPRequestHandler):
             query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             corporation_id=self.app.scope_id(query.get('corporation_id',[None])[0])
             if path == '/api/fleet/preferences':return self.send(200,fleet.save_preferences(self.app.store,data))
+            elif path == '/api/boosts/start':return self.send(200,self.app.boosts.start(data.get('folder'),data.get('channel')))
+            elif path == '/api/boosts/stop':return self.send(200,self.app.boosts.stop())
             elif path == '/api/fleet/sides':return self.send(200,self.app.fleet.configure_sides(data))
             elif path == '/api/fleet/refresh':return self.send(200,self.app.fleet.start_refresh(data.get('character_id'),data.get('session_id')))
             elif path == '/api/intel/preferences':return self.send(200,self.app.intel.configure(data))
@@ -1075,6 +1081,7 @@ class Server(ThreadingHTTPServer):
     def server_close(self):
         if getattr(self,'_workers_stopped',False):return super().server_close()
         self._workers_stopped=True
+        self.app.boosts.close()
         self.app.asset_locations.stop()
         self.app.fleet.stop()
         self.app.intel.stop()
@@ -1084,6 +1091,7 @@ class Server(ThreadingHTTPServer):
         # The shutdown button and native window close share the same complete
         # teardown, including the listening socket, rather than only the loop.
         self.app.stopping=True;self.app.fleet.closed=True;self.app.intel.closed=True
+        self.app.boosts.stop_event.set()
         with self.app.asset_locations.lock:self.app.asset_locations.closed=True;self.app.asset_locations.pending.clear()
         self.app.fleet.stop_event.set();self.app.intel.stop_event.set()
         super().shutdown()
@@ -1094,6 +1102,7 @@ class Server(ThreadingHTTPServer):
         super().__init__(('127.0.0.1', app.port), Handler)
         app.port = self.server_address[1]
         app.origin = f'http://127.0.0.1:{app.port}'
+        app.boosts.resume()
 
 
 def main():

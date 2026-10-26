@@ -297,7 +297,7 @@ function navigate(next) {
   clearTimeout(piTimer);
   if(['reservations','contracts','fleet','mining','intel','skills','pi','notifications'].includes(next))error('');
   $$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
-  const names={invention:'Invention és BPC-költség',reservations:'Foglalások',contracts:'Szerződések',fleet:'Flottatevékenység',mining:'Bányászati napló',intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
+  const names={boosts:'Boost számláló',invention:'Invention és BPC-költség',reservations:'Foglalások',contracts:'Szerződések',fleet:'Flottatevékenység',mining:'Bányászati napló',intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
   $('#breadcrumb').textContent='Műhely / '+names[view]; render();return true;
 }
 function render() {
@@ -314,12 +314,13 @@ function render() {
   const content=$('#view-content'); actions();
   const finance=$('#production-finance');if(finance)finance.hidden=true;
   document.body.classList.toggle('manual-view',view==='documentation');
-  $('.plan-selector').hidden=['reservations','contracts','fleet','jobs','mining','intel','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures')||(view==='inventory'&&inventoryMode!=='plan');
+  $('.plan-selector').hidden=['reservations','contracts','fleet','jobs','mining','intel','boosts','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures')||(view==='inventory'&&inventoryMode!=='plan');
   $('#plan-status').hidden=view==='jobs'||!plan?.stale_characters.length;
   if(view==='contracts'){ $('#plan-status').hidden=true;return renderContracts(content); }
   if(view==='fleet'){ $('#plan-status').hidden=true;return renderFleet(content); }
   if(view==='mining'){ $('#plan-status').hidden=true;return renderMining(content); }
   if(view==='intel')return renderIntel(content);
+  if(view==='boosts'){ $('#plan-status').hidden=true;return renderBoosts(content); }
   if(view==='notifications')return renderNotifications(content);
   if(view==='documentation')return void renderDocumentation(content);
   if(view==='skills') return renderSkills(content);
