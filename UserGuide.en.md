@@ -695,7 +695,7 @@ Before saving, the server validates the entire affected pool against the propose
 
 Every row in **Notifications** has an **Acknowledge** button. It removes that alert from the list and counts, persists across refreshes and restarts, and suppresses further OS delivery for the same event. It does not change EVE data: a finished job still needs to be delivered in the game. New events, such as another job, extractor program or a new training interruption, can alert again. Missing or stale data alone never clears an acknowledgment. Personal and corporation alerts are handled individually.
 
-The **Intel** slider immediately below the logo switches intel OS notifications and transparent overlay alerts together. It preserves the map, chat monitoring and other notification categories. It uses the same preference as the Intel category under notification settings.
+The **On / Off** control under the **Intel** heading immediately below the logo switches intel OS notifications and transparent overlay alerts together. It preserves the map, chat monitoring and other notification categories. It uses the same preference as the Intel category under notification settings.
 
 ## Independent import/export costs and saved-plan dropdown
 

@@ -693,7 +693,7 @@ Mentés előtt a szerver az új sorrend szerint ellenőrzi és újraszámolja az
 
 Az **Értesítések** menü minden sorában a **Tudomásul vettem** gomb elrejti az adott jelzést a listából és a számlálókból. A tudomásul vétel helyben megmarad frissítés és újraindítás után is, és ugyanarra az eseményre nem indul új rendszerértesítés. Nem módosítja az EVE-adatokat: például a jobot továbbra is át kell venni a játékban. Új esemény (például egy következő job, kitermelőprogram vagy újra leálló tanulás) ismét jelezhető; hiányzó vagy régi adat önmagában nem oldja fel a tudomásul vételt. A személyes és corp értesítések egyenként kezelhetők.
 
-A logó alatti **Intel** csúszka az intel rendszerértesítéseit és az átlátszó felugró jelzéseket együtt kapcsolja. A térkép, a chatfigyelés és a többi értesítéstípus beállítása megmarad. Ugyanazt a beállítást használja, mint az értesítési beállítások Intel kapcsolója.
+A logó alatti **Intel** cím alatt az **On / Off** kapcsoló az intel rendszerértesítéseit és az átlátszó felugró jelzéseket együtt kapcsolja. A térkép, a chatfigyelés és a többi értesítéstípus beállítása megmarad. Ugyanazt a beállítást használja, mint az értesítési beállítások Intel kapcsolója.
 
 ## Külön import- és exportköltség, lenyíló tervválasztó
 

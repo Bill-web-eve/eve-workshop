@@ -47,7 +47,7 @@
 <body>
   <aside class="sidebar">
     <a class="brand" href="/" aria-label="EVE Műhely kezdőlap"><img src="/app-window-icon.png" alt=""><span>EVE <strong>MŰHELY</strong><small>EVE gyártástervező</small></span></a>
-    <button type="button" id="sidebar-intel-toggle" class="sidebar-intel-toggle" role="switch" aria-checked="false" aria-label="Intelértesítések" disabled><span data-i18n-skip>Intel</span><span class="intel-toggle-track" aria-hidden="true"></span></button>
+    <section id="sidebar-intel-toggle" class="sidebar-intel-control"><h3 id="sidebar-intel-label" data-i18n-skip>Intel</h3><div class="language-control intel-notification-control" role="group" aria-labelledby="sidebar-intel-label"><button type="button" data-sidebar-intel="on" aria-pressed="false" data-i18n-skip disabled>On</button><button type="button" data-sidebar-intel="off" aria-pressed="false" data-i18n-skip disabled>Off</button></div></section>
     <div class="nav-label">A TERVED</div>
     <nav aria-label="Főmenü">
       <button class="nav" data-view="notifications"><span class="nav-icon">⚑</span>Értesítések <span id="notification-count" class="nav-count" hidden></span></button>

@@ -56,18 +56,23 @@ async function applyIntelNotificationPreferences(preferences){
   if(!enabled&&EveDesktop.active)await syncIntelOverlay({enabled:false,notifications_enabled:false,items:[]});
 }
 function syncIntelNotificationSwitch(){
-  const button=$('#sidebar-intel-toggle');if(!button)return;
+  const control=$('#sidebar-intel-toggle');if(!control)return;
   const loaded=!!notificationData?.preferences,enabled=notificationData?.preferences?.categories?.intel!==false;
-  button.disabled=!loaded||intelNotificationToggleBusy;
-  button.setAttribute('aria-checked',String(loaded&&enabled));
-  button.title=EveI18n.t(enabled?'Intelértesítések: bekapcsolva':'Intelértesítések: kikapcsolva');
-  button.onclick=async()=>{
-    if(intelNotificationToggleBusy||!notificationData?.preferences)return;
-    intelNotificationToggleBusy=true;syncIntelNotificationSwitch();
-    try{const preferences=await api('/api/notifications/preferences',{categories:{intel:notificationData.preferences.categories.intel===false}});await applyIntelNotificationPreferences(preferences);await refreshNotifications(false);toast('Intelértesítések beállítása mentve.');}
-    catch(e){error(e.message);}finally{intelNotificationToggleBusy=false;syncIntelNotificationSwitch();}
-  };
+  control.setAttribute('aria-busy',String(intelNotificationToggleBusy));
+  control.title=EveI18n.t(enabled?'Intelértesítések: bekapcsolva':'Intelértesítések: kikapcsolva');
+  control.querySelectorAll('[data-sidebar-intel]').forEach(button=>{
+    const desired=button.dataset.sidebarIntel==='on';
+    button.disabled=!loaded||intelNotificationToggleBusy;
+    button.setAttribute('aria-pressed',String(loaded&&desired===enabled));
+    button.onclick=async()=>{
+      if(intelNotificationToggleBusy||!notificationData?.preferences||desired===(notificationData.preferences.categories.intel!==false))return;
+      intelNotificationToggleBusy=true;syncIntelNotificationSwitch();
+      try{const preferences=await api('/api/notifications/preferences',{categories:{intel:desired}});await applyIntelNotificationPreferences(preferences);await refreshNotifications(false);toast('Intelértesítések beállítása mentve.');}
+      catch(e){error(e.message);}finally{intelNotificationToggleBusy=false;syncIntelNotificationSwitch();}
+    };
+  });
 }
+
 function startIntelMonitor(){clearInterval(intelTick);intelTick=setInterval(()=>{if(!document.hidden)void pollIntelAlerts();},2000);void pollIntelAlerts();}
 function resetIntelMap(){intelZoom=1;intelPan={x:0,y:0};}
 function showIntelSystem(id){intelCenter=Number(id);intelRegion=null;intelSelected=Number(id);resetIntelMap();if(intelWindowMode==='chat'){void openIntelWindow('map',{center:intelCenter});return;}if(view!=='intel')navigate('intel');void refreshIntel();}
