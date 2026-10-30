@@ -4,7 +4,7 @@ Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple S
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.5.0**, **Windows 11 x64 1.5.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.6.0**, **Windows 11 x64 1.6.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -21,6 +21,15 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Választható helyi station/struktúra market buy/sell/split árakkal, külön ESI-olvasóval; a privát piac gyorsítótára elkülönül Jitától és más olvasóktól.
 - Kompakt tervenkénti bekerülés/bevétel/profit, független anyag- és eladási árforrással, Accounting/standing alapú NPC-díjakkal, megadható struktúra broker fee-vel és egyéb költségekkel.
 - Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
+
+## Az 1.6.0 kiadás újdonságai
+
+- Új, W-formájú arculat: egységes alkalmazás-, oldalsáv- és böngészőikon Macen és Windowson.
+- **Boost számláló:** Boost nevű chatcsatorna kiválasztása, indítás utáni bejelentések figyelése, kilenc játékbeli ikon és zöld számbuborék. Karakterenként az utolsó összeállítás érvényes; az ismétlések, „missing” és számos összesítések kimaradnak. A másolható lista minden típust, számot és karakternevet tartalmaz.
+- **T2 hajók invention-költsége:** inventáló karakter skillekkel, decryptorok, copy/invention jobdíjak és várható sikeresség. Teljes gyártási lánc szerinti összehasonlítás, ME/TE és runhatárok figyelembevételével. Minden Compare ellenőrzi az árakat, ipari adatokat és a kiválasztott inventor skilljeit.
+- Külön **Foglalások** menü, tervenkénti be-/kikapcsolás és tulajdonosi körön belüli sorrend. A korábbi assetpillanatképre váró jobátvételek idején az előzetes terv továbbra is megtekinthető; a végleges foglalás friss készlethez kötött.
+- Tudomásul vehető értesítések, Intel On/Off kapcsoló, külön import/export szállítási kapcsolók, kompakt tervválasztó és javított nagy pontosságú brokerfee-számítás.
+- Frissített magyar–angol kézikönyv. Tiszta, karakter-, terv- és tokenmentes telepítők, a meglévő helyi profil megőrzésével.
 
 ## Az 1.5.0 kiadás újdonságai
 
@@ -149,7 +158,7 @@ Corporation planning (`muhely/corporations.py`, `static/corporations.js`): optio
 
 Appearance and language controls are under Settings. `static/desktop.js` supplies the platform adapter for clipboard, CSV/ICS/Markdown save dialogs, printing, external links, OAuth return and quit. Native messages are accepted only from the main frame at the exact local origin; local APIs retain session and CSRF protection. EVE login uses a ten-minute one-use browser handoff and authenticated result polling. OAuth codes and tokens are not returned to JavaScript. Closing the window checks pending work and gracefully stops the local service.
 
-The generated `static/app-window-icon.png` and `static/app-window.icns` combine the existing amber cube with the EVE wordmark; the image-generation prompt is retained alongside them. The existing release icons remain available. `tests/macos_window_smoke.m` exercises real WKWebView against a temporary synthetic App profile (never port 8765), including preferences, plan switching, clipboard/export adapters, an offline mocked OAuth round trip and graceful shutdown.
+The user-approved connected W identity is used by `static/app-window-icon.png`, both ICNS files and the SVG fallback. It also supplies the Windows executable/window icon. The symbol has an amber W, three connected nodes and a pale-cyan terminal on a navy tile; the built-in ImageGen prompt is retained alongside the assets. Raster resizing and icon-format conversion preserve this generated master. `tests/macos_window_smoke.m` exercises real WKWebView against a temporary synthetic App profile (never port 8765), including preferences, plan switching, clipboard/export adapters, an offline mocked OAuth round trip and graceful shutdown.
 
 ## Windows 11 x64 portable release
 

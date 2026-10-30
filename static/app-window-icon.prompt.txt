@@ -1,5 +1,13 @@
-Generated with the built-in ImageGen tool for EVE Workshop's macOS test window.
-Reference: the existing amber industrial cube icon (static/app.icns).
-EVE Online and its logo are CCP trademarks. Independent fan application.
+Generated with the built-in ImageGen tool from the user-approved connected W proposal.
+Used in the sidebar, favicon, macOS app/Dock icon and Windows executable/window icon.
+PNG and ICNS sizes are packaging conversions of this generated master.
+EVE Online and its game data are CCP trademarks. Independent fan application.
 
-Use case: logo-brand. Generate one polished macOS application icon for the personal EVE Workshop industry planning app. Reference image 1 is the existing icon: retain its recognizable amber outline isometric industrial cube/package, with its small cream circle detail, and the deep navy #122331 and warm amber #ecad62 palette. Combine this industrial cube symbol with the recognizable futuristic white EVE Online EVE wordmark, integrating the EVE letters into the front face of the cube as one balanced emblem. Make the EVE lettering large and legible, no other text. Premium restrained flat vector-like geometry, crisp edges, generous negative space, strong readable silhouette at 32px, gentle depth only, no star field, no ships, no busy ornament, no mockup or device. Square 1024px icon, deep navy rounded-square tile centered with transparent corners outside the tile. The cube and EVE wordmark should both remain identifiable. This is an independent fan workshop app, do not add an official seal or endorsement.
+Use case: precise-object-edit / production app-icon extraction.
+Edit target: the approved W-shaped EVE Workshop concept presentation.
+Produce ONLY one square desktop application icon, no presentation board, no lettering, no caption, no tagline, no extra examples.
+Preserve the approved main W silhouette: broad amber angular W joined to two round open terminal rings at the upper left and upper right and an open circular third node centered near the bottom; the upper-right node has a pale cyan filled center, other node interiors are navy.
+Keep its recognizable geometry and optical proportions. Place the single amber W centered on a flat deep-navy (#101f2a) rounded-square tile.
+W fills about 76 percent of tile width with generous safe margins. Full tile fills canvas; outside the rounded tile corners must be genuinely transparent alpha.
+Flat crisp clean edges, restrained amber (#e4a64e) and pale cyan, no texture, no metallic shading, no 3D, no glow, no shadow outside the tile.
+Used at 16, 32, 64, 256 and 1024 pixels. Preserve the reference identity rather than redesigning it.

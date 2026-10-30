@@ -105,3 +105,9 @@ runtime/
 !release-assets/v1.5.0/EVE_Muhely-1.5.0-macOS-AppleSilicon.sha256
 !release-assets/v1.5.0/EVE_Muhely-1.5.0-Windows11-x64.zip
 !release-assets/v1.5.0/EVE_Muhely-1.5.0-Windows11-x64.sha256
+
+# Reviewed 1.6.0 connected W, Boost and invention release.
+!release-assets/v1.6.0/EVE_Muhely-1.6.0-macOS-AppleSilicon.dmg
+!release-assets/v1.6.0/EVE_Muhely-1.6.0-macOS-AppleSilicon.sha256
+!release-assets/v1.6.0/EVE_Muhely-1.6.0-Windows11-x64.zip
+!release-assets/v1.6.0/EVE_Muhely-1.6.0-Windows11-x64.sha256

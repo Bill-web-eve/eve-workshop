@@ -1,0 +1,30 @@
+{
+  "tag": "v1.6.0",
+  "title": "EVE Workshop 1.6.0 \u2013 Connected W, Boost counter and invention",
+  "assets": [
+    {
+      "name": "EVE_Muhely-1.6.0-Windows11-x64.sha256",
+      "sha256": "b157e2470b8689245a9e9ae621a0be78bfbed750f44c0a8c955c3b5345d3eb71"
+    },
+    {
+      "name": "EVE_Muhely-1.6.0-Windows11-x64.zip",
+      "sha256": "29388a4e390efb1976dcb88fd3a56c7bf993a94dc587a9bd6031d560348c62b1"
+    },
+    {
+      "name": "EVE_Muhely-1.6.0-macOS-AppleSilicon.dmg",
+      "sha256": "37630dfaba02469d7be8203d78ab39b12e5ba4d26ad2adfa93b1afb556c8ec7a"
+    },
+    {
+      "name": "EVE_Muhely-1.6.0-macOS-AppleSilicon.sha256",
+      "sha256": "6386566babf0c2545ebcad0bebbe8f2e89d17a719f047392e9e467d3d5a54def"
+    },
+    {
+      "name": "EVE_Muhely-Telepites.txt",
+      "sha256": "78942ac9784873719250ced1428ee786a4eca223308abdeb0eaf52f6aae73cee"
+    },
+    {
+      "name": "EVE_Muhely-Windows-Telepites.txt",
+      "sha256": "0133ac1e931a766da571d4e04536d5095e36aff127996fdb7c9fa62932f7ecb3"
+    }
+  ]
+}
