@@ -1,6 +1,23 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Piaci forgalom": "Market trading volume",
+"Piaci forgalom betöltése…": "Loading market trading volume…",
+"Piaci forgalom frissítése": "Refreshing market trading volume",
+"A teljes régió forgalma, buy és sell együtt. Az ESI nem közöl külön sell orderes vagy állomásonkénti előzményt. A napok EVE-idő (UTC) szerint értendők.": "Total regional trades, buy and sell combined. ESI does not provide separate sell-order or station history. Days use EVE time (UTC).",
+"{0} régiója": "Region containing {0}",
+"Jita régiója · The Forge": "Jita region · The Forge",
+"Utolsó 7 lezárt nap": "Last 7 completed days",
+"Heti átlag · előző 30 nap": "Weekly average · previous 30 days",
+"db / hét": "units / week",
+"30 nap összforgalma ÷ 30 × 7": "30-day total volume ÷ 30 × 7",
+"Nincs közzétett piaci forgalmi adat.": "No published market trading volume is available.",
+"Az utolsó lezárt nap adata még nem érkezett meg; a heti átlag a legutolsó közzétett nappal záruló 30 napra vonatkozik.": "The latest completed day has not been published yet; the weekly average covers the 30 days ending on the latest published day.",
+"Korábbi piaci forgalmi adatot mutatunk.": "Showing an older market trading volume snapshot.",
+"Hibás piaci forgalmi adatok.": "Invalid market trading volume data.",
+"Üres piaci forgalmi válasz korábbi adat nélkül.": "Empty market history response without a previous snapshot.",
+"A piaci forgalom nem frissült.": "Market trading volume could not be refreshed.",
+"Előbb állítsd be a helyi marketet.": "Configure the local market first.",
 "Boost számláló": "Boost counter",
 "FLOTTATÁMOGATÁS": "FLEET SUPPORT",
 "A kiválasztott csatornán bejelentett shield, skirmish és information boostok.": "Shield, skirmish and information boosts declared in the selected channel.",

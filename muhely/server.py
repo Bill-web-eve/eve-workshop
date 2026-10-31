@@ -23,6 +23,7 @@ import webbrowser
 from . import __version__
 from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe, mining, assets, jobs as job_browser, fleet, contracts, invention
 from .market import Market,validate_ids as market_ids
+from .market_history import MarketHistory
 from . import moon_transfer
 from .trade import Trade
 from .industry_costs import IndustryCosts
@@ -50,6 +51,7 @@ class App:
         self.planner = Planner(self.catalog)
         self.eve = EveConnection(self.store)
         self.market = Market(self.store)
+        self.market_history = MarketHistory(self.store)
         self.trade = Trade(self.store,self.catalog,self.eve)
         self.industry = IndustryCosts(self.store)
         self.port = port
@@ -748,7 +750,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/market-history.js', '/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -839,6 +841,15 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(200, skill_dashboard(self.app.store,self.app.catalog))
             if path == '/api/industry':return self.send(200,self.app.industry.status())
             if path == '/api/trade':return self.send(200,self.app.trade.dashboard())
+            if path == '/api/market/history':
+                tid=market_ids([int(query.get('type_id',['0'])[0])],self.app.catalog)[0]
+                source=query.get('source',['jita'])[0]
+                if source not in ['jita','local']:raise PlanningError('Ismeretlen árforrás.')
+                location=self.app.trade.settings()['location'] if source=='local' else None
+                if source=='local' and not location:raise PlanningError('Előbb állítsd be a helyi marketet.')
+                region=location['region_id'] if location else self.app.market.region
+                self.app.market_history.start(region,tid)
+                return self.send(200,self.app.market_history.snapshot(region,tid))
             if path == '/api/invention/options':return self.send(200,self.app.invention_options(int(query.get('product_id',['0'])[0]),query.get('plan_id',[None])[0]))
             if path == '/api/trade/plan':return self.send(200,self.app.trade.finance(query.get('plan_id',[None])[0]))
             if path == '/api/trade/seller':return self.send(200,self.app.trade.profile(int(query.get('character_id',['0'])[0]),query.get('source',['jita'])[0]))
@@ -922,6 +933,15 @@ class Handler(BaseHTTPRequestHandler):
             elif path == '/api/industry/estimate':
                 with self.app.catalog.lock:return self.send(200,self.app.industry.estimate(data.get('rows'),self.app.store.settings(),self.app.catalog))
             elif path == '/api/trade/hauling':return self.send(200,self.app.trade.save_hauling(data))
+            elif path == '/api/market/history/refresh':
+                tid=market_ids([data.get('type_id')],self.app.catalog)[0]
+                source=data.get('source','jita')
+                if source not in ['jita','local']:raise PlanningError('Ismeretlen árforrás.')
+                location=self.app.trade.settings()['location'] if source=='local' else None
+                if source=='local' and not location:raise PlanningError('Előbb állítsd be a helyi marketet.')
+                region=location['region_id'] if location else self.app.market.region
+                self.app.market_history.start(region,tid,manual=True)
+                return self.send(200,self.app.market_history.snapshot(region,tid))
             elif path == '/api/trade/settings':return self.send(200,self.app.trade.save(data))
             elif path == '/api/trade/discover':return self.send(200,self.app.trade.discover(data))
             elif path == '/api/trade/plan':return self.send(200,self.app.trade.save_finance(data))

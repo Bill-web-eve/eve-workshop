@@ -13,6 +13,23 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class ServerTests(unittest.TestCase):
+    def test_market_history_is_public_esi_but_app_authenticated_region_scoped_and_no_planning(self):
+        self.app.market_history.start=Mock()
+        self.app.market_history.snapshot=Mock(return_value={'daily':[],'running':False})
+        self.assertEqual(self.request('/api/market/history?type_id=35',Cookie='')[0],403)
+        with patch.object(self.app,'plan',side_effect=AssertionError('History must not calculate a plan')):
+            self.assertEqual(self.request('/api/market/history?type_id=35')[0],200)
+        self.app.market_history.start.assert_called_once_with(10000002,35)
+        for query in ['type_id=0','type_id=no','type_id=35&source=invalid','type_id=35&source=local']:
+            self.assertEqual(self.request('/api/market/history?'+query)[0],400)
+        self.app.trade.settings=Mock(return_value={'location':{'id':1234,'region_id':10000058}})
+        self.assertEqual(self.request('/api/market/history?type_id=35&source=local')[0],200)
+        self.app.market_history.start.assert_called_with(10000058,35)
+        self.assertEqual(self.request('/api/market/history/refresh',{'type_id':35,'source':'local'},Origin='https://other.invalid')[0],403)
+        self.assertEqual(self.request('/api/market/history/refresh',{'type_id':35,'source':'local'})[0],200)
+        self.app.market_history.start.assert_called_with(10000058,35,manual=True)
+        self.assertEqual(self.request('/market-history.js')[0],200)
+
     def test_contract_routes_are_authenticated_scoped_and_independent_of_planning(self):
         from muhely import contracts
         from test_contracts import contract,NOW
