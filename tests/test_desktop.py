@@ -11,6 +11,14 @@ from tools.build_macos_release import public_config,audit_bundle,install_window_
 
 
 class CleanReleaseTests(unittest.TestCase):
+    def test_macos_accepts_every_backend_notification_category(self):
+        import re
+        from muhely.notifications import CATEGORIES
+        source=(Path(__file__).resolve().parents[1]/'tools/macos_launcher.m').read_text()
+        allowed=re.search(r'\[@\[([^\]]+)\] containsObject:category\]',source)
+        self.assertIsNotNone(allowed)
+        self.assertEqual(set(re.findall(r'@"([^"]+)"',allowed[1])),set(CATEGORIES)|{'all'})
+
     def test_windows_refused_connection_codes_are_accepted_without_a_posix_exception_subclass(self):
         import urllib.error
         opener=Mock();opener.open.side_effect=urllib.error.URLError(OSError(10061,'synthetic closed Windows socket'))
