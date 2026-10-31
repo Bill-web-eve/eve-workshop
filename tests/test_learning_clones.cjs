@@ -43,3 +43,17 @@ test('manual checks preserve unsaved settings while displaying real progress',as
  await w.refreshLearningClones(true);assert.equal(d.querySelector('[data-learning-authorize]'),old);
  assert(d.querySelector('[data-learning-status]').textContent.includes('Checking online status · 1 / 4'));assert(w.$('#learning-clone-refresh').disabled);
 });
+test('a missing online reader is named while authorized clone comparisons stay visible and translated',async t=>{
+ const {dom,w,d,data}=setup();t.after(()=>dom.window.close());
+ data.gate='unknown';data.online_fresh=false;data.online_blockers=[{id:22,name:'Other <pilot>',reason:'access'}];data.next_check=Date.now()/1000+900;
+ data.characters[0].online_status='offline';
+ data.characters.push({id:22,name:'Other <pilot>',online_status:'access',authorized:false,status:'waiting'});
+ d.querySelector('main').innerHTML=w.learningCloneSettingsPanel(data);w.EveI18n.translate(d.body);
+ assert(d.querySelector('[data-learning-blockers]').textContent.includes('Other <pilot>'));
+ assert(d.querySelector('[data-learning-blockers]').textContent.includes('Online-status read access is required.'));
+ assert(d.body.textContent.includes('Notifications are waiting: not all characters are confirmed offline.'));
+ assert(d.body.textContent.includes('A faster owned clone is available'));assert(d.body.textContent.includes('4.5 → 7.5'));
+ assert(d.body.textContent.includes('Next automatic check:'));assert(d.body.textContent.includes('Online status'));
+ assert.equal(d.querySelector('pilot'),null);assert(!/[áéőű]/i.test(d.body.textContent));
+ w.EveI18n.setLanguage('hu');w.EveI18n.translate(d.body);assert(d.body.textContent.includes('Onlineállapot-olvasási engedély szükséges.'));
+});

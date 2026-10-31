@@ -202,16 +202,21 @@ class LearningCloneWatch:
                     self.fetch(cid,'learning_online','online',ONLINE_SCOPE,60,manual)
                 except (EsiError,OSError,ValueError,TypeError) as exc:errors[str(cid)]=str(exc)
             gate,fresh,_,_=online_gate(self.store,self.clock())
-            if gate!='offline' or not fresh or errors:
-                self.update(phase='Van online karakter; nincs tanulóklón-riasztás.' if gate=='online' else 'Nem igazolt, hogy minden karakter offline.',errors=errors)
+            verified=gate=='offline' and fresh and not errors
+            if gate=='online':
+                self.update(phase='Van online karakter; nincs tanulóklón-riasztás.',errors=errors)
                 return
-            self.update(online_verified=True,phase='Klónok és tanulási attribútumok ellenőrzése')
+            # Missing online access for another pilot blocks notifications, not
+            # reading an authorized pilot's clone comparison for diagnosis.
+            self.update(online_verified=verified,phase='Klónok és tanulási attribútumok ellenőrzése')
             resources=[('active_implants','implants','esi-clones.read_implants.v1'),('jump_clones','clones','esi-clones.read_clones.v1'),('skillqueue','skillqueue','esi-skills.read_skillqueue.v1')]
             for index,char in enumerate(chars):
                 if self.stop_event.is_set():return
                 cid=char['id'];self.update(current=char['name'],done=len(chars)+index)
                 try:
-                    if not set(LEARNING_CLONE_SCOPES)<=set(granted.get(cid,[])):raise EsiError('Tanulóklón-olvasási engedély szükséges.')
+                    if not set(LEARNING_CLONE_SCOPES)<=set(granted.get(cid,[])):
+                        errors.setdefault(str(cid),'Tanulóklón-olvasási engedély szükséges.')
+                        continue
                     parts={}
                     for kind,path,scope in resources:
                         if self.stop_event.is_set():return
@@ -224,24 +229,27 @@ class LearningCloneWatch:
                             self.type(tid,manual)
                     compare(self.store,cid,self.clock())
                 except (EsiError,OSError,ValueError,TypeError) as exc:errors[str(cid)]=str(exc)
-            self.update(errors=errors,phase='Tanulóklónok ellenőrizve.')
+            self.update(errors=errors,phase='Tanulóklónok ellenőrizve.' if verified else 'Nem igazolt, hogy minden karakter offline.')
         finally:
             if self.state.get('running'):self.update(running=False,done=self.state['total'],current=None,checked_at=self.clock())
             self.work_lock.release()
 
     def dashboard(self):
-        granted=self.eve.granted_scopes();gate,fresh,_,online=online_gate(self.store,self.clock());rows=[]
+        now=self.clock();granted=self.eve.granted_scopes();gate,fresh,snapshots,online=online_gate(self.store,now);rows=[];blockers=[]
         with self.lock:status=dict(self.state)
         status['running']=bool(status.get('running') or status.get('queued'))
         for char in self.store.characters():
             cid=char['id'];row={'id':cid,'name':char['name'],'authorized':set(LEARNING_CLONE_SCOPES)<=set(granted.get(cid,[])),
                 'online_access':ONLINE_SCOPE in granted.get(cid,[]),'status':'waiting','error':status.get('errors',{}).get(str(cid))}
-            if gate=='offline':
-                try:row.update(compare(self.store,cid,self.clock()))
+            snapshot=snapshots[cid]
+            row['online_status']='access' if not row['online_access'] else 'missing' if not snapshot else 'stale' if not(snapshot['expires']>now and 0<=now-snapshot['fetched']<=FRESH_SECONDS) else 'online' if snapshot['data']['online'] else 'offline'
+            if row['online_status'] not in ['online','offline']:blockers.append({'id':cid,'name':char['name'],'reason':row['online_status']})
+            if snapshot and snapshot['data'].get('online') is False:
+                try:row.update(compare(self.store,cid,now))
                 except EsiError as exc:row.update(status='unknown',error=str(exc))
             rows.append(row)
         return {'scopes':LEARNING_CLONE_SCOPES,'enabled':enabled(self.store),'gate':gate,'online_fresh':fresh,'online_characters':online,
-                'status':status,'characters':rows,'next_check':self.policy.next_at(['learning-clones:cycle'])}
+                'online_blockers':blockers,'status':status,'characters':rows,'next_check':self.policy.next_at(['learning-clones:cycle'])}
 
     def request(self):
         if self.stop_event.is_set() or not enabled(self.store) or not self.store.characters():return self.dashboard()

@@ -1,6 +1,13 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Online állapot": "Online status",
+"Onlineállapot-adat hiányzik.": "Online status is missing.",
+"Korábbi onlineállapot; frissítés szükséges.": "Online status is outdated; refresh required.",
+"Az értesítés várakozik: nem igazolt, hogy minden karakter offline.": "Notifications are waiting: not all characters are confirmed offline.",
+"Következő automatikus ellenőrzés:": "Next automatic check:",
+"Korábbi klónadat; frissítés szükséges.": "Clone data is outdated; refresh required.",
+
 "Alapanyag készleten": "Materials in stock",
 "Alapanyag folyamatban": "Materials in progress",
 "Alapanyag hiányzik": "Materials missing",

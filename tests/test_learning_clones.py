@@ -52,8 +52,34 @@ class LearningCloneTests(unittest.TestCase):
     def test_missing_online_scope_for_one_character_blocks_all_reliable_alerts(self):
         self.scopes[22].remove(lc.ONLINE_SCOPE);self.watch.tick()
         self.assertEqual(self.alerts()['items'],[])
-        self.assertFalse(next(c for c in self.watch.dashboard()['characters'] if c['id']==22)['online_access'])
-        self.assertFalse(any('/clones/' in u for u in self.calls))
+        data=self.watch.dashboard()
+        self.assertFalse(next(c for c in data['characters'] if c['id']==22)['online_access'])
+        self.assertEqual(data['online_blockers'],[{'id':22,'name':'Other','reason':'access'}])
+        pilot=next(c for c in data['characters'] if c['id']==11)
+        self.assertEqual(pilot['status'],'better');self.assertTrue(pilot['fresh'])
+        self.assertEqual(pilot['online_status'],'offline')
+        self.assertFalse(data['status']['online_verified'])
+        self.assertTrue(any('/characters/11/clones/' in u for u in self.calls))
+        self.assertFalse(any('/characters/22/clones/' in u for u in self.calls))
+
+    def test_authorizing_missing_online_reader_recovers_alerts_without_resetting_state(self):
+        self.scopes[22].remove(lc.ONLINE_SCOPE);self.watch.tick()
+        self.assertEqual(self.alerts()['items'],[])
+        self.scopes[22]=list(LEARNING_CLONE_SCOPES);self.now+=130
+        self.watch.tick(manual=True)
+        self.assertEqual(self.watch.dashboard()['online_blockers'],[])
+        self.assertTrue(self.watch.dashboard()['status']['online_verified'])
+        self.assertEqual(len(self.alerts()['items']),2)
+        self.assertTrue(all(a['reliable'] for a in self.alerts()['items']))
+
+    def test_dashboard_distinguishes_missing_access_missing_data_and_stale_online_snapshots(self):
+        data=self.watch.dashboard();self.assertEqual({r['reason'] for r in data['online_blockers']},{'missing'})
+        self.watch.tick();self.now+=121
+        data=self.watch.dashboard();self.assertEqual({r['reason'] for r in data['online_blockers']},{'stale'})
+        self.assertEqual(data['next_check'],NOW+900)
+        self.assertTrue(all(c['status']=='better' and not c['fresh'] for c in data['characters']))
+        notifications.save_preferences(self.store,{'os_enabled':True})
+        self.assertEqual(notifications.claim(self.store,self.alerts(),self.now),[])
 
     def test_equal_better_active_and_empty_queue_do_not_alert(self):
         for active,queue in [([3,4],self.queue),([3,4,2],self.queue),([1,2],[])]:
