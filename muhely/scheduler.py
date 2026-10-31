@@ -366,7 +366,7 @@ def _strategy(context,store,catalog,calculate,options,now=None,granularity=1):
     finish=max([start]+[j['end'] for j in scheduled]+([target_ready] if math.isfinite(target_ready) else []))
     scheduled,shopping,merged=compact_reactions(scheduled,initial,catalog,context['settings'],merge_limits,start,plan['shopping'])
     for j in scheduled:j['below_minimum']=bool(minimum_seconds and j['seconds']+1e-6<minimum_seconds)
-    return {'running_jobs':running_jobs(context,store,catalog,workers,plan,now),'min_job_hours':min_hours,'short_jobs':sum(j['below_minimum'] for j in scheduled),'jobs':sorted(scheduled,key=lambda j:(j['start'],j['end'],j['id'])),'merged_reaction_jobs':merged,'blocked':blocked,'blueprint_shortages':shortages,
+    result={'running_jobs':running_jobs(context,store,catalog,workers,plan,now),'min_job_hours':min_hours,'short_jobs':sum(j['below_minimum'] for j in scheduled),'jobs':sorted(scheduled,key=lambda j:(j['start'],j['end'],j['id'])),'merged_reaction_jobs':merged,'blocked':blocked,'blueprint_shortages':shortages,
             'workers':[{k:w[k] for k in ['id','name','capacity','as_of','jobs_as_of','stale','excluded','until']} for w in workers],
             'material_shortfall':shopping,'material_warnings':warnings,'start':start,'finish':finish if not blocked and not warnings else None,
             'partial_finish':finish,'seconds':finish-start,'complete':not blocked and not warnings,'owned_only':owned,
@@ -375,6 +375,9 @@ def _strategy(context,store,catalog,calculate,options,now=None,granularity=1):
             'assumptions':['Az alapanyagok és az új blueprintek a megadott anyagérkezéskor rendelkezésre állnak.',
                            'A kész jobok átvétele és a szükséges árumozgatás késedelem nélkül történik.',
                            'Csak a kiválasztott ME/TE-vel egyező blueprinteket használjuk. A corp indítási jogosultságokat biztosítottnak tekintjük.']}
+    from .material_readiness import annotate_schedule
+    annotate_schedule(result,plan,context)
+    return result
 
 
 def build(context,store,catalog,calculate,options,now=None):

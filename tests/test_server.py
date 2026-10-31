@@ -200,12 +200,15 @@ class ServerTests(unittest.TestCase):
         status,plan,_=self.request('/api/plan?product_id=22428&quantity=1')
         self.assertEqual(status,200);self.assertTrue(plan['queue'])
         self.assertEqual(plan['summary']['items'],45)
+        for row in plan['queue']:
+            self.assertEqual(row['input_readiness']['status'],'missing')
+            self.assertEqual(row['input_readiness']['location_status'],'unknown')
         status,rows,_=self.request('/api/search?q=Hulk')
         self.assertEqual(status,200);self.assertTrue(rows)
         status,_,headers=self.request('/')
         self.assertIn('HttpOnly',headers['Set-Cookie'])
         self.assertIn("frame-ancestors 'none'",headers['Content-Security-Policy'])
-        for path in ['/graph.js','/graph.css','/skills.js','/pi.js','/numbers.js','/i18n.js','/i18n-en.js','/settings.js','/accounts.js','/schedule.js','/schedule-graph.js','/multibuy.js','/documentation.js']:
+        for path in ['/readiness.js','/graph.js','/graph.css','/skills.js','/pi.js','/numbers.js','/i18n.js','/i18n-en.js','/settings.js','/accounts.js','/schedule.js','/schedule-graph.js','/multibuy.js','/documentation.js']:
             status,content,headers=self.request(path)
             self.assertEqual(status,200)
             self.assertTrue(content)

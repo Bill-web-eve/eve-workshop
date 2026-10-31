@@ -1,6 +1,28 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Alapanyag készleten": "Materials in stock",
+"Alapanyag folyamatban": "Materials in progress",
+"Alapanyag hiányzik": "Materials missing",
+"A blueprint helyén": "At blueprint location",
+"Áthelyezés szükséges": "Transfer required",
+"Az állomás nem igazolható": "Location unverified",
+"Alapanyagállapot nem ismert": "Material status unknown",
+"Alapanyagállapot": "Material status",
+"Állomásellenőrzés": "Location check",
+"Készletből:": "From stock:",
+"Folyamatban:": "In progress:",
+"Még szükséges:": "Still needed:",
+"Folyamatban lévő job": "Running EVE job",
+"Ütemezett job": "Planned job",
+"Részben folyamatban": "Partly in progress",
+"Alapanyag-részletek": "Material details",
+"Blueprint helye:": "Blueprint location:",
+"A blueprint helye nem ismert.": "The blueprint location is unknown.",
+"Több blueprintállomás; a pontos helyet az ütemező rendeli hozzá.": "Multiple blueprint locations; the scheduler assigns the exact location.",
+"Az alapanyagállapot a sor összes hátralévő gyártásának bemeneteit jelzi, a listabeli kiosztás szerint. A más tervhez lefoglalt mennyiségek nem számítanak elérhetőnek. Az állomás a felhasznált blueprint helye; kézi készletnél vagy bizonytalan helyfoglalásnál nem állítjuk, hogy az anyag helyben van.": "Material status covers all remaining production inputs in the row, allocated in list order. Quantities reserved by other plans are excluded. The destination is the blueprint location; manual inventory or uncertain location allocations cannot confirm that materials are on site.",
+"A jelölés az adott job tényleges bemenetkiosztását és blueprinthelyét mutatja. Az ütemezett előgyártás és a beszerzés még nem készlet vagy futó EVE-job. Az állomásjelzés nem ad hozzá szállítási időt.": "The indicator shows this job’s actual input allocations and blueprint location. Planned upstream jobs and purchases are not stock or running EVE jobs. Location indicators do not add hauling time.",
+
 "Tanulóklónok offline állapotban": "Offline training clones",
 "Gyorsabb tanulóklón érhető el": "A faster training clone is available",
 "Tanulóklónok ellenőrzése": "Checking training clones",

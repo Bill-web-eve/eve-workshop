@@ -21,7 +21,7 @@ async function setup(data,preference){
  if(preference!==undefined)dom.window.localStorage.setItem('eve-muhely-schedule-timeline',preference);
  run(`const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),verbatim=v=>'<span data-i18n-skip>'+esc(v)+'</span>',itemName=verbatim,fmt=String,date=String,hours=String;
  const panel=(title,sub,body)=>'<section><h2>'+title+'</h2><small>'+sub+'</small>'+body+'</section>',table=(h,r,cls='')=>EveTables.markup(h,r,cls,cls||JSON.stringify(h));`);
- for(const f of ['i18n-en.js','i18n.js','tables.js','graph.js','schedule-graph.js','schedule.js'])run(fs.readFileSync(__dirname+'/../static/'+f,'utf8'));
+ for(const f of ['i18n-en.js','i18n.js','tables.js','graph.js','schedule-graph.js','readiness.js','schedule.js'])run(fs.readFileSync(__dirname+'/../static/'+f,'utf8'));
  await new Promise(r=>setImmediate(r));run(`renderScheduleResult($('main'),fixture);`);await new Promise(r=>setImmediate(r));
  return {dom,d:dom.window.document,run};
 }
@@ -126,4 +126,16 @@ test('actual EVE jobs have separate lanes and IDs; planned start times do not im
 test('running-only plans show the current window even when the next planned start is in the future',()=>{
  const data={...fixture(),start:200000,calculated_at:1000,jobs:[],running_jobs:[{...j('eve:77','reaction',500,5000),existing:true,eve_job_id:77}]};
  const g=graph.build(data,0,null,{days:1,window:0});assert.equal(g.start,1000);assert.equal(g.nodes.length,1);assert.equal(g.nodes[0].id,'eve:77');assert.equal(g.nodes[0].x,g.left);
+});
+test('material markers and tooltips distinguish stock, actual WIP, missing inputs and transfers',async t=>{
+ const data=fixture();
+ data.jobs[0].input_readiness={status:'stock',location_status:'local',materials:[],blueprint_locations:[]};
+ data.jobs[1].input_readiness={status:'wip',location_status:'transfer',materials:[],blueprint_locations:[]};
+ data.jobs[2].input_readiness={status:'missing',location_status:'unknown',materials:[],blueprint_locations:[]};
+ const {dom,d}=await setup(data);t.after(()=>dom.window.close());
+ assert.equal(d.querySelectorAll('.material-dot').length,3);assert.equal(d.querySelectorAll('.material-dot.input-stock').length,1);assert.equal(d.querySelectorAll('.material-dot.input-transfer').length,1);assert.equal(d.querySelectorAll('.material-dot.input-missing').length,1);
+ dom.window.EveI18n.setLanguage('en');await new Promise(r=>setImmediate(r));
+ d.querySelector('g[data-schedule-select="2"]').dispatchEvent(new dom.window.MouseEvent('click',{bubbles:true}));await new Promise(r=>setImmediate(r));
+ assert.match(d.querySelector('g[data-schedule-select="2"]').getAttribute('aria-label'),/Materials in progress · Transfer required/);
+ assert(d.querySelector('#schedule-job-detail').textContent.includes('Materials in progress'));assert(d.querySelector('#schedule-job-detail').textContent.includes('Transfer required'));
 });

@@ -403,7 +403,9 @@ class App:
             stock, wip, bps, jobs, _, stale = self.live_data(settings, strict=settings['source'] == 'eve')
         if settings['source'] != 'eve':
             stock, wip = {}, {}
-        return dict(settings=settings, stock=stock, wip=wip, blueprints=bps, jobs=jobs, stale=stale,
+        from .material_readiness import locations
+        physical=locations(self.store,settings,corporation_id,jobs)
+        return dict(settings=settings, stock=stock, wip=wip, blueprints=bps, jobs=jobs, stale=stale,material_locations=physical,
                     skill_profiles=production_profiles(self.store,settings,corporation_id),
                     corporation_id=corporation_id,inventory=self.store.mapping('inventory',corporation_id),
                     parameters=self.store.mapping('parameters',corporation_id))
@@ -413,7 +415,7 @@ class App:
         plan = self.planner.calculate(product_id, quantity, settings, context['inventory'], context['parameters'],
                                       context['stock'], context['wip'], context['blueprints'], context['jobs'],
                                       reservations=reservations, own_reservations=own,
-                                      skill_profiles=context['skill_profiles'],manufacturer_id=manufacturer_id)
+                                      skill_profiles=context['skill_profiles'],manufacturer_id=manufacturer_id,material_locations=context.get('material_locations'))
         # Asset and job caches can disagree just after delivery. Do not allocate
         # those materials or create duplicate production until the assets catch up.
         planned = {r['id']: r for r in plan['rows']}
@@ -753,7 +755,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/learning-clones.js', '/locations.js', '/market-history.js', '/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/readiness.js', '/learning-clones.js', '/locations.js', '/market-history.js', '/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):

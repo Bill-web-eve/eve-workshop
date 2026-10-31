@@ -24,7 +24,7 @@ globalThis.EveLocations=(()=>{
   if(node.hasAttribute('data-i18n-skip')!==!!name)node.toggleAttribute('data-i18n-skip',!!name);
   const title=t('Helyazonosító')+': '+id;if(node.title!==title)node.title=title;
   const cell=node.closest('td');
-  if(cell){
+  if(cell&&!node.closest('[data-location-sort-skip]')){
    const sort=name||text,filter=sort+' '+id;
    if(cell.dataset.sortValue!==sort||cell.dataset.filterValue!==filter){cell.dataset.sortValue=sort;cell.dataset.filterValue=filter;changed=true;}
   }

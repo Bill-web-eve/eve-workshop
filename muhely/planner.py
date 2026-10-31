@@ -136,7 +136,7 @@ class Planner:
 
     def calculate(self, product_id, quantity, settings, inventory=None, parameters=None,
                   stock=None, wip=None, blueprints=(), jobs=(), reservations=None, own_reservations=None,
-                  skill_profiles=(), manufacturer_id=None):
+                  skill_profiles=(), manufacturer_id=None,material_locations=None):
         c = self.catalog
         product_id = integer(product_id, 'Termékazonosító', 10**9, 1)
         if product_id not in c.recipes:
@@ -284,7 +284,7 @@ class Planner:
         blueprint_ids={recipe['bp_id'] for recipe in c.recipes.values()}
         for row in [*rows.values(),*blueprint_shortages]:row['is_blueprint']=row['id'] in blueprint_ids
         shopping = sorted([r for r in rows.values() if r['buy']]+blueprint_shortages, key=lambda r: (r['category'], normalize_name(r['name'])))
-        return {'product_id': product_id, 'name': c.name(product_id), 'quantity': quantity,
+        result={'product_id': product_id, 'name': c.name(product_id), 'quantity': quantity,
                 'activity':c.recipes[product_id]['activity'],'manufacturer_id':manufacturer_id,
                 'blueprint_shortages':blueprint_shortages,'blueprint_usage':blueprint_usage,
                 'queue': queue, 'shopping': shopping, 'rows': [rows[i] for i in reversed(order)],
@@ -292,6 +292,9 @@ class Planner:
                             'jobs': sum(r['jobs'] for r in queue), 'seconds': sum(r['seconds'] for r in queue),
                             'shopping_items': len(shopping)},
                 'sde': c.meta}
+        from .material_readiness import annotate_plan
+        annotate_plan(result,material_locations)
+        return result
 
     def parameters(self, recipe, override, bp_index, busy,holds=None):
         if not recipe:

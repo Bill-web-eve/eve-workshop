@@ -752,3 +752,15 @@ In progress output destinations, blueprint instance locations, full inventory, c
 Use **Authorize training clones** to grant online status, jump-clone, active implant and skill-queue read access together. The `esi-clones.read_clones.v1` scope is new and may also need adding in the EVE Developer application. Online-status access is required for every character: missing or old online data is not proof that everyone is offline. Clone and implant snapshots must be newer than logout before an alert is eligible. The table shows the current skill, active and best weighted bonuses, and the better clone’s name and location.
 
 Automatic checks run at most every 15 minutes. **Check training clones now** permits an earlier check while respecting EVE’s valid cache. Toggle the category with the notification switches above. OS delivery requires the app running and System notifications, Personal alerts and this category enabled. An unchanged offline episode is not sent repeatedly; a new login/logout episode or a changed recommended skill/clone can produce a new alert. Alerts can be acknowledged. The app never jumps clones or controls the EVE client.
+
+## Material coverage and blueprint location
+
+**Production plan** and the scheduler’s manufacturing/reaction tables include a **Material status** column for each row’s direct inputs:
+
+- **Materials in stock:** available inventory covers every input.
+- **Materials in progress:** inventory plus actual running EVE-job output covers every input.
+- **Materials missing:** at least one input still needs upstream production or procurement. Partial running coverage is shown separately.
+
+The destination is the location of the **BPO, BPC or reaction formula used**. **Transfer required** means an input is available or will arrive at another location. Expand the details for each material’s quantity, source and known location name. When the plan uses multiple blueprint locations, it does not assume one destination; the scheduler follows the exact blueprint assigned to each job. Unknown blueprint locations, manual inventory and uncertain location allocations show **Location unverified**.
+
+Shared materials are allocated only once; other plans’ reservations are excluded. Plan indicators cover all remaining inputs in a row; scheduler indicators follow that job’s actual allocations. Colored timeline dots and the selected-job details show the same status. A future scheduled job does not count as a running EVE job. These indicators do not change reservations or material balances, and do not add hauling time to the schedule. CSV exports also include material and location status.

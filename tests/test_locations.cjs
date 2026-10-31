@@ -62,3 +62,10 @@ test('a late lookup before an inventory refresh cannot overwrite the new contain
  await w.EveLocations.load();release({locations:{1000000000001:{name:'Old station',status:'resolved'}}});await first;await tick();
  assert.equal(d.querySelector('[data-location-id]').textContent,'New station');
 });
+test('material details with several locations cannot replace the cell material-status filter or sorting',async t=>{
+ const {dom,w,d}=setup();t.after(()=>w.close());
+ w.api=async()=>({locations:{6001:{name:'Blueprint place',status:'resolved'},6002:{name:'Supply place',status:'resolved'}}});
+ d.querySelector('#places').innerHTML='<tr><td data-sort-value="Materials in stock" data-filter-value="stock"><div data-location-sort-skip>'+w.EveLocations.markup(6001)+w.EveLocations.markup(6002)+'</div></td></tr>';
+ await w.EveLocations.load();await tick();
+ assert(d.body.textContent.includes('Supply place'));assert.equal(d.querySelector('td').dataset.sortValue,'Materials in stock');assert.equal(d.querySelector('td').dataset.filterValue,'stock');
+});

@@ -752,3 +752,15 @@ A **Beállítások → Értesítések → Tanulóklónok offline állapotban** r
 Az online állapot, a saját klónok, az aktív implantok és a tanulási sor olvasását a **Tanulóklónok engedélyezése** gombbal lehet egyben engedélyezni. A `esi-clones.read_clones.v1` scope új; az EVE Developer alkalmazásban is szükség lehet hozzáadására. Onlineállapot-olvasás minden karakterhez kell: hiányzó vagy elavult online adat nem bizonyítja, hogy mindenki offline. Klón- és implantadat csak a kijelentkezésnél frissebb pillanatképből riaszthat. A nézet megmutatja a tanult skillt, az aktív és legjobb súlyozott bónuszt, a jobb klón nevét és helyét.
 
 Automatikus ellenőrzés legfeljebb 15 percenként történik. A **Tanulóklónok ellenőrzése most** gomb korábbi ellenőrzést enged, az EVE érvényes gyorsítótárát megtartva. A kategória a fenti értesítési kapcsolók között kikapcsolható. Az OS-jelzéshez az alkalmazás fusson, és a Rendszerértesítések, Személyes jelzések és ez a kategória legyen bekapcsolva. Egy változatlan offline állapotot nem küld újra; új be-/kijelentkezési epizódnál vagy másik ajánlott skill/klón esetén új jelzés lehetséges. Az értesítés tudomásul vehető. Az app nem vált klónt és nem irányítja az EVE klienst.
+
+## Alapanyagfedezet és blueprintállomás
+
+A **Gyártási terv** és az ütemező reakciós/gyártási táblázata az **Alapanyagállapot** oszlopban jelzi az adott sor közvetlen bemeneteinek fedezetét:
+
+- **Alapanyag készleten:** minden bemenet megvan a terv számára elérhető készletben.
+- **Alapanyag folyamatban:** a készlet és a ténylegesen futó EVE-jobok kimenete együtt fedezi a bemeneteket.
+- **Alapanyag hiányzik:** még elő kell gyártani vagy be kell szerezni valamelyik bemenetet. Részben már futó gyártást külön jelölünk.
+
+A célállomás a használt **BPO, BPC vagy reakcióformula helye**. Az **Áthelyezés szükséges** jelzés azt mutatja, hogy egy bemenet készleten van vagy oda érkezik majd, de másik helyen. A részletekben anyagonként látható a mennyiség, forrás és az ismert hely neve. Több blueprintállomás esetén a terv nem választ önkényesen célhelyet; az ütemező a konkrét job blueprintjét követi. Ismeretlen blueprinthely, kézi készlet vagy bizonytalan hely szerinti foglalás esetén **Az állomás nem igazolható** látszik.
+
+A közös anyagokat egyszer osztjuk ki; más tervek foglalásai nem számítanak elérhetőnek. A terv jelzése a sor összes hátralévő bemenetére, az ütemezőé az adott job tényleges kiosztására vonatkozik. Az idővonal színes pontjai és a jobra kattintva megnyíló részletek is mutatják az állapotot. A jövőbeli ütemezett job nem számít már futó EVE-gyártásnak. A jelzés tájékoztató: nem módosítja a foglalást vagy az anyagegyenleget, és nem ad szállítási időt az ütemtervhez. A CSV is tartalmazza az anyag- és helyállapotot.
