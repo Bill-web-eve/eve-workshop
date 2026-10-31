@@ -152,3 +152,11 @@ test('dynamic PI, price and industry fragments switch both ways without translat
  assert(text.includes('Őr Test · Gyártás'));assert.equal(input.value,'1 234 567');assert.equal(input.selectionStart,2);assert.equal(d.activeElement,input);
  w.EveI18n.setLanguage('hu');await tick();assert.equal(d.querySelector('main').textContent,original);assert.equal(input.value,'1 234 567');
 });
+test('nested character and industry-resource failures translate the complete preserved-snapshot message',async t=>{
+ const dom=await page();t.after(()=>dom.window.close());const i=dom.window.EveI18n;i.setLanguage('en');
+ const tail='Az EVE-adatok most nem érhetők el. A korábbi adatok megmaradtak.';
+ for(const [hu,en] of [['Ipari jobok','Industry jobs'],['Blueprintok','Blueprints'],['Készlet','Inventory']]){
+  const message='Pehra Qirna: '+hu+': '+tail+' Kézi módban folytathatod a tervezést.';
+  assert.equal(i.t(message),'Pehra Qirna: '+en+': EVE data is currently unavailable. Previous data has been preserved. You can continue planning in manual mode.');
+ }
+});

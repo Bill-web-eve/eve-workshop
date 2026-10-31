@@ -1,6 +1,18 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Ipari jobok: {0}": "Industry jobs: {0:t}",
+"Blueprintok: {0}": "Blueprints: {0:t}",
+"Készlet: {0}": "Inventory: {0:t}",
+"Ipari jobok": "Industry jobs",
+"Az EVE-adatok most nem érhetők el.": "EVE data is currently unavailable.",
+"A korábbi adatok megmaradtak.": "Previous data has been preserved.",
+"Az újraszámítás nem sikerült; a legutóbbi sikeres terv látható.": "Recalculation failed; showing the last successful plan.",
+"A mentés és az ütemezés friss számításig szünetel. A meglévő foglalások megmaradnak.": "Saving and scheduling are paused until recalculation succeeds. Existing reservations are preserved.",
+"Az utolsó sikeres számítás:": "Last successful calculation:",
+"Az utolsó sikeres számítás: {0}": "Last successful calculation: {0}",
+"A mentéshez előbb sikeres újraszámítás szükséges.": "Recalculate successfully before saving.",
+
 "Online állapot": "Online status",
 "Onlineállapot-adat hiányzik.": "Online status is missing.",
 "Korábbi onlineállapot; frissítés szükséges.": "Online status is outdated; refresh required.",

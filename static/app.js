@@ -8,7 +8,7 @@ const verbatim=value=>`<span data-i18n-skip>${esc(value)}</span>`;
 const confirmUI=message=>confirm(EveI18n.t(message));
 const date = n => n ? EveI18n.date(n * 1000, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Még nem frissült';
 let state, plan, productId = null, productName = '', view = 'queue', dirty = {}, searchTimer, taskTimer, lastTaskFinished;
-let planGeneration = 0;
+let planGeneration = 0, planLoadedKey = null;
 let blueprintDetailId = null;
 let activePlanId = null, reservationDetailId = null;
 let corporationId=null,manufacturerId=0,productActivity=null;
@@ -208,8 +208,9 @@ function updatePlanControls() {
   const inactiveSaved=activePlanId&&state.plans.some(p=>p.id===activePlanId&&!p.reserve_active);
   $('#save-plan').textContent=inactiveSaved?'↻ Terv frissítése foglalás nélkül':activePlanId?'↻ Terv és foglalás frissítése':'＋ Terv mentése és foglalás';
   $('#save-plan').title='Mentés ide: '+(corporationId?'Corp · '+state.scope_label:'Személyes');
-  $('#save-plan').disabled=!!plan?.preview_only&&!inactiveSaved;
+  $('#save-plan').disabled=!!plan?.refresh_error||!!plan?.preview_only&&!inactiveSaved;
   if(plan?.preview_only&&!inactiveSaved)$('#save-plan').title=EveI18n.t('A foglalás véglegesítése friss készletadatra vár.');
+  if(plan?.refresh_error)$('#save-plan').title=EveI18n.t('A mentéshez előbb sikeres újraszámítás szükséges.');
   $('#new-plan').hidden=!activePlanId;
 }
 function scheduleTaskPoll() {
@@ -224,7 +225,7 @@ function scheduleTaskPoll() {
         if(view==='contracts'){await loadContracts(true);}
         else if(state.task.kind==='contracts'){void refreshNotifications();render();}
         else if(view==='jobs'){render();}
-        else if(state.task.kind==='notifications'){skillData=null;piData=null;moonData=null;settingsAccessData=null;void refreshNotifications();if(view==='mining')await refreshMining();else if(view==='skills')await refreshSkills();else if(view==='pi')await refreshPI();else if(view==='moons')await refreshMoons();}
+        else if(state.task.kind==='notifications'){skillData=null;piData=null;moonData=null;settingsAccessData=null;void refreshNotifications();if(view==='mining')await refreshMining();else if(view==='skills')await refreshSkills();else if(view==='pi')await refreshPI();else if(view==='moons')await refreshMoons();else if(productId&&(!plan||plan.refresh_error)&&['queue','graph','shopping','inventory','blueprints','schedule'].includes(view))await calculate(false);}
         else if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else if(view==='settings')render();else await calculate(false);}
         else if(state.task.kind==='skills') await refreshSkills();
         else if(state.task.kind==='mining')await refreshMining();
@@ -235,10 +236,17 @@ function scheduleTaskPoll() {
     } catch(e) { error(e.message); }
   },1200);
 }
+function currentPlanKey(id=productId,quantity=targetQuantity()){
+  return JSON.stringify([id,quantity,corporationId,activePlanId,manufacturerValue(),state?.settings,state?.inventory,state?.parameters,state?.reservation_revision]);
+}
+function planRefreshFailureMarkup(current){
+  return '<div class="banner warn" data-plan-refresh-failed><strong>Az újraszámítás nem sikerült; a legutóbbi sikeres terv látható.</strong><div>A mentés és az ütemezés friss számításig szünetel. A meglévő foglalások megmaradnak.</div><div>'+esc(current.refresh_error)+'</div><div><span>Az utolsó sikeres számítás:</span> '+date(current.calculated_at)+'</div></div>';
+}
 async function calculate(refreshState=true,announce=false) {
   if(Object.keys(dirty).length && !confirmUI('Az új számítás eldobja a még nem alkalmazott módosításokat. Folytatod?')) return;
   const generation=++planGeneration;
   const targetId=productId, targetName=productName, quantity=targetQuantity();
+  let requestKey=currentPlanKey(targetId,quantity);
   $('#calculate').disabled=true;
   const feedback=$('#calculation-feedback');
   feedback.hidden=!announce;
@@ -249,9 +257,10 @@ async function calculate(refreshState=true,announce=false) {
     if(generation!==planGeneration)return;
     if(activePlanId && !state.plans.some(p=>p.id===activePlanId&&p.product_id===targetId))activePlanId=null;
     const owner=activePlanId;
+    requestKey=currentPlanKey(targetId,quantity);
     const next=await api(scoped(`/api/plan?product_id=${encodeURIComponent(targetId)}&quantity=${encodeURIComponent(quantity)}${owner?'&saved_plan_id='+encodeURIComponent(owner):''}&manufacturer_id=${encodeURIComponent(manufacturerValue())}&preview=1`));
     if(generation!==planGeneration) return;
-    plan=next;productActivity=next.activity; dirty={};
+    plan=next;planLoadedKey=requestKey;productActivity=next.activity; dirty={};
     deliveryWait=next.inventory_wait||null;scheduleDeliveryCheck();
     updatePlanControls();
     localStorage.setItem('eve-muhely-last-plan',JSON.stringify({id:targetId,name:targetName,quantity,saved_plan_id:owner,corporation_id:corporationId,manufacturer_id:manufacturerId,activity:productActivity}));
@@ -271,12 +280,15 @@ async function calculate(refreshState=true,announce=false) {
     return next;
   } catch(e) {
     if(generation!==planGeneration) return;
-    plan=null;
+    const retained=!!plan&&planLoadedKey===requestKey&&requestKey===currentPlanKey();
+    if(retained)plan={...plan,refresh_error:e.message};
+    else{plan=null;planLoadedKey=null;}
     feedback.hidden=true;
     if(e.delivery_wait){deliveryWait=e.delivery_wait;scheduleDeliveryCheck();}
     error(e.message);
-    $('#queue-count').textContent='–';
-    $('#calculated-at').textContent='A számítás nem frissült';
+    $('#queue-count').textContent=retained?plan.summary.items:'–';
+    $('#calculated-at').textContent=retained?'Az utolsó sikeres számítás: '+date(plan.calculated_at):'A számítás nem frissült';
+    updatePlanControls();
     $('#plan-status').hidden=true;
     render();
     if(refreshState)$('#global-error').scrollIntoView?.({block:'nearest',behavior:'smooth'});
@@ -355,6 +367,7 @@ function render() {
   if(view==='blueprints') renderBlueprints(content);
   if(!(view==='shopping'&&shoppingMode==='all'))renderReservationContext(content);
   if(plan.preview_only)content.insertAdjacentHTML('afterbegin',deliveryPreviewMarkup(plan.inventory_wait));
+  if(plan.refresh_error)content.insertAdjacentHTML('afterbegin',planRefreshFailureMarkup(plan));
   if(corporationId&&!(view==='shopping'&&shoppingMode==='all'))content.insertAdjacentHTML('afterbegin',scopeBanner());
   if(state.settings.source==='manual' && state.characters.length) {
     content.insertAdjacentHTML('afterbegin','<div class="banner warn stock-source-notice"><div><strong>A terv kézi készlettel számol.</strong><br>A letöltött személyes EVE-készletet és a jobok kimenetét jelenleg nem vonja le.</div><button class="button compact" id="enable-eve-stock">Személyes EVE-készlet használata</button></div>');
@@ -742,7 +755,7 @@ $('#save-plan').onclick=async()=>{
     if(productId===next.product_id&&corporationId===next.corporation_id&&manufacturerId===next.manufacturer_id&&targetQuantity()===next.quantity)activePlanId=saved.id;
     await calculate();toast(next.saved_plan?.reserve_active===false?'A terv mentve, a foglalása kikapcsolva maradt.':'A terv mentve, a készletfoglalás aktív.');
   }catch(e){error(e.message);}
-  finally{button.disabled=!!plan?.preview_only&&plan.saved_plan?.reserve_active!==false;}
+  finally{button.disabled=!!plan?.refresh_error||!!plan?.preview_only&&plan.saved_plan?.reserve_active!==false;}
 };
 $('#new-plan').onclick=async()=>{
   if(Object.keys(dirty).length)return error('Az új terv előtt alkalmazd a beírt módosításokat.');

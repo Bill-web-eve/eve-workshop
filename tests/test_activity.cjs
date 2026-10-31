@@ -60,3 +60,10 @@ test('a cached refresh-start response cannot leave a completed task waiting fore
  await w.EveActivity.run('/api/notifications/sync',async()=>({ok:true}));w.EveActivity.task({...task,running:false,outcome:'success'});
  assert.equal(d.querySelector('#activity-panel').getAttribute('aria-busy'),'false');assert(d.body.textContent.includes('No data refresh is running.'));
 });
+test('production-plan failures show the entire character and job error in English',async t=>{
+ const {w,d}=fixture();t.after(()=>w.close());
+ const message='Pehra Qirna: Ipari jobok: Az EVE-adatok most nem érhetők el. A korábbi adatok megmaradtak. Kézi módban folytathatod a tervezést.';
+ await assert.rejects(w.EveActivity.run('/api/plan',async()=>{throw Error(message);}));
+ assert(d.querySelector('#activity-panel').textContent.includes('Pehra Qirna: Industry jobs: EVE data is currently unavailable. Previous data has been preserved. You can continue planning in manual mode.'));
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('#activity-panel').textContent));
+});
