@@ -23,6 +23,9 @@ test('seven daily totals and 30-day weekly average use EVE dates and switch lang
  const {dom,run,d,w}=setup();t.after(()=>dom.window.close());w.api=async()=>snapshot();
  run('syncFinanceHistory()');await tick();
  assert.equal(d.querySelectorAll('.history-day').length,7);
+ assert.equal(d.querySelector('[data-history-refresh]').textContent,'↻ Refresh');
+ assert.equal(d.querySelector('.history-day:last-child .history-bar').style.getPropertyValue('--volume'),'100%');
+ assert.equal(d.querySelector('.history-day:first-child .history-bar').style.getPropertyValue('--volume'),'0%');
  assert.equal(d.querySelector('.history-day strong').textContent,'0');
  assert(d.body.textContent.includes('105 units / week'));
  assert(d.body.textContent.includes('Jita region · The Forge'));

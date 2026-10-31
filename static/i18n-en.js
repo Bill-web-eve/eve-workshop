@@ -1,6 +1,7 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"↻ Frissítés": "↻ Refresh",
 "Piaci forgalom": "Market trading volume",
 "Piaci forgalom betöltése…": "Loading market trading volume…",
 "Piaci forgalom frissítése": "Refreshing market trading volume",

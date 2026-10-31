@@ -232,7 +232,8 @@ html[data-intel-window=map] .page-heading{display:none}html[data-intel-window=ma
 .history-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin:8px 0}
 .history-day{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;font-size:10px}
 .history-day strong{font-size:11px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-align:center}
-.history-bar{display:block;height:25px;width:100%;max-width:28px;background:var(--accent);clip-path:inset(calc((1 - var(--volume))*100%) 0 0);opacity:.8}
+.history-bar{display:flex;align-items:flex-end;height:25px;width:100%;max-width:28px;opacity:.8}
+.history-bar::after{content:"";display:block;height:var(--volume);width:100%;background:var(--accent)}
 .history-average{font-size:11px}
 .finance-total{border-top:1px solid var(--line);padding-top:8px;margin-top:4px}
 .finance-total strong{font-size:19px}
