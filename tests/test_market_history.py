@@ -47,13 +47,20 @@ class MarketHistoryTests(unittest.TestCase):
 
     def test_unpublished_days_and_empty_history_are_unknown_not_zero(self):
         result = summarize_history(self.rows()[:-1], NOW)
-        self.assertIsNone(result['daily'][-1]['volume'])
+        self.assertEqual([r['date'] for r in result['daily']], [f'2026-10-{i}' for i in range(23, 30)])
+        self.assertEqual(result['daily'][-1]['volume'], 290)
         self.assertEqual(result['weekly_average'], 1015)
         self.assertEqual((result['month_start'],result['month_end']), ('2026-09-30','2026-10-29'))
         self.assertFalse(result['complete'])
         result = summarize_history([], NOW)
         self.assertTrue(all(d['volume'] is None for d in result['daily']))
         self.assertIsNone(result['month_volume'])
+
+    def test_window_follows_latest_published_day_even_when_several_days_are_missing(self):
+        result = summarize_history(self.rows()[:-3], NOW)
+        self.assertEqual([r['date'] for r in result['daily']], [f'2026-10-{i}' for i in range(21, 28)])
+        self.assertEqual(result['month_end'], result['daily'][-1]['date'])
+        self.assertTrue(all(r['volume'] is not None for r in result['daily']))
 
     def test_daily_cache_age_expires_and_fallback_not_order_book_five_minutes(self):
         self.assertEqual(history_expiry({'Cache-Control': 'public, max-age=86400', 'Age': '100'}, NOW), NOW+86300)

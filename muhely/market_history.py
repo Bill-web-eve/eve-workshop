@@ -59,8 +59,8 @@ def summarize_history(rows, now):
         # An omitted trading day inside the published period has no trades;
         # an unpublished day is unknown, never a manufactured zero.
         return values.get(day.isoformat(), 0) if latest and day.isoformat() <= latest else None
-    daily = [{'date': (today-timedelta(days=i)).isoformat(), 'volume': volume(today-timedelta(days=i))}
-             for i in range(7, 0, -1)]
+    daily = [{'date': (month_end-timedelta(days=i)).isoformat(), 'volume': volume(month_end-timedelta(days=i))}
+             for i in range(6, -1, -1)]
     complete = latest is not None and latest >= end.isoformat()
     total = sum(volume(start+timedelta(days=i)) or 0 for i in range(30)) if latest else None
     return {'daily': daily, 'month_start': start.isoformat(), 'month_end': month_end.isoformat(),

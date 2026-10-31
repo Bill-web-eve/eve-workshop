@@ -36,12 +36,18 @@ test('seven daily totals and 30-day weekly average use EVE dates and switch lang
  assert(!d.body.textContent.includes('betöltése'));
  w.EveI18n.setLanguage('hu');assert(d.body.textContent.includes('Heti átlag · előző 30 nap'));
 });
+test('shifted available-day window shows its actual dates without an unpublished-day warning',async t=>{
+ const {dom,run,d,w}=setup();t.after(()=>dom.window.close());const data=snapshot({complete:false,latest_date:'2026-10-29',month_end:'2026-10-29'});data.daily=data.daily.map((r,i)=>({...r,date:'2026-10-'+(23+i)}));w.api=async()=>data;
+ run('syncFinanceHistory()');await tick();
+ assert(d.body.textContent.includes('Last 7 available days'));assert(d.querySelector('.history-day:last-child strong').title.startsWith('2026-10-29'));
+ assert(!d.body.textContent.includes('30 Oct'));assert(!d.body.textContent.includes('has not been published yet'));
+});
 test('unknown days and incomplete average stay unknown while valid zero stays zero',async t=>{
  const {dom,run,d,w}=setup();t.after(()=>dom.window.close());const data=snapshot({complete:false,weekly_average:null});data.daily[6].volume=null;w.api=async()=>data;
  run('syncFinanceHistory()');await tick();
  assert.equal(d.querySelector('.history-day:last-child strong').textContent,'–');
  assert(d.querySelector('.history-average').textContent.includes('–'));
- assert(d.body.textContent.includes('has not been published yet'));
+ assert(!d.body.textContent.includes('has not been published yet'));
  assert.equal(d.querySelector('.history-day strong').textContent,'0');
 });
 test('changing sell/buy mode does not refetch same regional volume and local source changes do',async t=>{

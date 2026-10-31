@@ -8,7 +8,7 @@ globalThis.EveEnglish={
 "A teljes régió forgalma, buy és sell együtt. Az ESI nem közöl külön sell orderes vagy állomásonkénti előzményt. A napok EVE-idő (UTC) szerint értendők.": "Total regional trades, buy and sell combined. ESI does not provide separate sell-order or station history. Days use EVE time (UTC).",
 "{0} régiója": "Region containing {0}",
 "Jita régiója · The Forge": "Jita region · The Forge",
-"Utolsó 7 lezárt nap": "Last 7 completed days",
+"Utolsó 7 elérhető nap": "Last 7 available days",
 "Heti átlag · előző 30 nap": "Weekly average · previous 30 days",
 "db / hét": "units / week",
 "30 nap összforgalma ÷ 30 × 7": "30-day total volume ÷ 30 × 7",
