@@ -28,7 +28,7 @@ from . import moon_transfer
 from .trade import Trade
 from .industry_costs import IndustryCosts
 from .catalog import Catalog, import_sde
-from .esi import EveConnection, EsiError, AuthenticationError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES, INTEL_SCOPES, IMPLANT_SCOPES, CONTRACT_SCOPES
+from .esi import EveConnection, EsiError, AuthenticationError, SCOPES, SKILL_SCOPES, PI_SCOPES, CORPORATION_SCOPES, INTEL_SCOPES, IMPLANT_SCOPES, LEARNING_CLONE_SCOPES, CONTRACT_SCOPES
 from .corporations import dashboard as corporation_dashboard
 from .skills import dashboard as skill_dashboard
 from .production import profiles as production_profiles
@@ -39,6 +39,7 @@ from .store import Store, default_data_dir, DEFAULT_SETTINGS
 
 from .refresh_policy import RefreshPolicy
 from .asset_locations import AssetLocations
+from .learning_clones import LearningCloneWatch
 from .boosts import BoostCounter,discover as boost_channels
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -71,6 +72,7 @@ class App:
         self.intel=intel.IntelMonitor(self.store,self.catalog,self.eve)
         self.fleet=fleet.Fleet(self.store,self.catalog,self.eve,self.market)
         self.asset_locations=AssetLocations(self.store,self.eve)
+        self.learning_clones=LearningCloneWatch(self.store,self.eve)
         self.boosts=BoostCounter(self.store)
 
     def desktop_auth_start(self, url):
@@ -282,6 +284,7 @@ class App:
         with self.catalog.lock:
             data=notifications.collect(self.store,self.catalog)
         data['implants']=self.fleet.implants.dashboard()
+        data['learning_clones']=self.learning_clones.dashboard()
         data.update(task=self.task_snapshot(),next_sync_at=self.refresh_policy.next_at(self.refresh_domains('notifications')))
         return data
 
@@ -652,7 +655,7 @@ class App:
                 'locations': locations, 'jobs': [j for j in jobs if j.get('status') in ['active', 'paused', 'ready']],
                 'blueprint_count': len(bps), 'stale_characters': stale, 'sde': self.catalog.meta,
                 'recipe_count': sum(self.catalog.types.get(i, {}).get('published', 0) for i in self.catalog.recipes),
-                'fleet_running':self.fleet.status()['task']['running'],'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,'implant_scopes':IMPLANT_SCOPES,'contract_scopes':CONTRACT_SCOPES,'market_scopes':self.trade.dashboard()['scopes'],'mining_scopes':mining.MINING_SCOPES,
+                'fleet_running':self.fleet.status()['task']['running'],'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,'implant_scopes':IMPLANT_SCOPES,'learning_clone_scopes':LEARNING_CLONE_SCOPES,'contract_scopes':CONTRACT_SCOPES,'market_scopes':self.trade.dashboard()['scopes'],'mining_scopes':mining.MINING_SCOPES,
                 'crypto_available': crypto_available()}
 
 
@@ -750,7 +753,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/locations.js', '/market-history.js', '/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/learning-clones.js', '/locations.js', '/market-history.js', '/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -801,6 +804,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200,self.app.notification_data())
             if path == '/api/contracts':return self.send(200,contracts.dashboard(self.app.store,query.get('scope',['personal'])[0],query.get('owner',[None])[0],query.get('start',[None])[0],query.get('end',[None])[0],self.app.eve.granted_scopes(),self.app.asset_locations))
             if path == '/api/contracts/details':return self.send(200,contracts.details(self.app.eve,self.app.catalog,query.get('scope',['personal'])[0],int(query.get('owner',['0'])[0]),int(query.get('id',['0'])[0])))
+            if path == '/api/learning-clones':return self.send(200,self.app.learning_clones.dashboard())
             if path == '/api/implants':return self.send(200,self.app.fleet.implants.dashboard())
             if path == '/api/desktop/auth':
                 with self.app.desktop_auth_lock:
@@ -815,6 +819,7 @@ class Handler(BaseHTTPRequestHandler):
                 if error:
                     raise PlanningError('Az EVE-belépés megszakadt. Az EVE-kapcsolat oldalon újraindítható.')
                 self.app.eve.finish(query.get('state', [''])[0], query.get('code', [''])[0], self.app.cookie)
+                if self.app.eve.authorized_feature in ['learning_clones','all']:self.app.learning_clones.request()
                 if self.app.eve.authorized_feature=='intel':self.app.intel.request_locations()
                 if self.app.eve.authorized_feature=='contracts':
                     try:self.app.start_task('contracts')
@@ -922,7 +927,11 @@ class Handler(BaseHTTPRequestHandler):
             path = urllib.parse.urlsplit(self.path).path
             query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             corporation_id=self.app.scope_id(query.get('corporation_id',[None])[0])
-            if path == '/api/fleet/preferences':return self.send(200,fleet.save_preferences(self.app.store,data))
+            if path == '/api/learning-clones/refresh':return self.send(200,self.app.learning_clones.request())
+            elif path == '/api/learning-clones/claim':
+                from .learning_clones import alerts
+                return self.send(200,{'items':notifications.claim(self.app.store,alerts(self.app.store))})
+            elif path == '/api/fleet/preferences':return self.send(200,fleet.save_preferences(self.app.store,data))
             elif path == '/api/boosts/start':return self.send(200,self.app.boosts.start(data.get('folder'),data.get('channel')))
             elif path == '/api/boosts/stop':return self.send(200,self.app.boosts.stop())
             elif path == '/api/fleet/sides':return self.send(200,self.app.fleet.configure_sides(data))
@@ -1035,7 +1044,7 @@ class Handler(BaseHTTPRequestHandler):
                     if char_id not in {c['id'] for c in self.app.store.characters()}:
                         raise PlanningError('A karakter már nincs hozzáadva.')
                 feature=data.get('feature')
-                if feature not in [None,'skills','pi','corporations','moons','intel','mining','markets','implants','contracts','all']:raise PlanningError('Ismeretlen engedélyezési cél.')
+                if feature not in [None,'skills','pi','corporations','moons','intel','mining','markets','implants','learning_clones','contracts','all']:raise PlanningError('Ismeretlen engedélyezési cél.')
                 url = self.app.eve.start(self.app.cookie, self.app.origin+'/callback',char_id,feature)
                 return self.send(200,self.app.desktop_auth_start(url) if data.get('desktop') is True else {'url':url})
             elif path == '/api/characters/remove':
@@ -1109,6 +1118,7 @@ class Server(ThreadingHTTPServer):
         self._workers_stopped=True
         self.app.boosts.close()
         self.app.asset_locations.stop()
+        self.app.learning_clones.stop()
         self.app.fleet.stop()
         self.app.intel.stop()
         super().server_close()
@@ -1120,6 +1130,7 @@ class Server(ThreadingHTTPServer):
         self.app.boosts.stop_event.set()
         with self.app.asset_locations.lock:self.app.asset_locations.closed=True;self.app.asset_locations.pending.clear()
         self.app.fleet.stop_event.set();self.app.intel.stop_event.set()
+        self.app.learning_clones.stop_event.set();self.app.learning_clones.wake.set()
         super().shutdown()
         self.server_close()
 
@@ -1150,6 +1161,7 @@ def main():
     except OSError:
         raise SystemExit(f'A {args.port} port foglalt. Ha az alkalmazás már fut, nyisd meg: {app.origin}')
     app.fleet.start()
+    app.learning_clones.start()
     if not args.no_browser:
         threading.Timer(.4, lambda: webbrowser.open(app.origin)).start()
     print(f'EVE Műhely: {app.origin}\nAdatok: {args.data_dir}\nLeállítás: a felületen vagy Ctrl+C.', flush=True)

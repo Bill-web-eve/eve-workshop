@@ -7,6 +7,7 @@ globalThis.EveActivity=(()=>{
   const detailText=value=>Array.isArray(value)?value.map(p=>p.raw?p.text:t(p.text,...(p.args||[]))).join(' · '):t(value);
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const labels={
+    "/api/learning-clones":"Tanulóklónok ellenőrzése","/api/learning-clones/refresh":"Tanulóklónok ellenőrzése",
     "/api/locations":"Helynevek feloldása…",
     "/api/market/history":"Piaci forgalom betöltése…","/api/market/history/refresh":"Piaci forgalom frissítése",
     '/api/invention/options':'Invention-adatok betöltése','/api/invention/estimate':'Invention-költség számítása',

@@ -13,6 +13,19 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class ServerTests(unittest.TestCase):
+    def test_learning_clone_routes_are_local_read_only_and_csrf_protected_for_refresh(self):
+        self.assertEqual(self.request('/api/learning-clones',Cookie='')[0],403)
+        self.assertEqual(self.request('/learning-clones.js')[0],200)
+        with patch.object(self.app,'plan',side_effect=AssertionError('Monitoring must not calculate a plan')):
+            status,data,_=self.request('/api/learning-clones')
+        self.assertEqual(status,200);self.assertEqual(data['characters'],[])
+        self.app.learning_clones.request=Mock(return_value={'status':{'running':True}})
+        self.assertEqual(self.request('/api/learning-clones/refresh',{},Origin='https://other.invalid')[0],403)
+        self.app.learning_clones.request.assert_not_called()
+        self.assertEqual(self.request('/api/learning-clones/refresh',{})[0],200)
+        self.app.learning_clones.request.assert_called_once()
+        self.assertEqual(self.request('/api/learning-clones/claim',{})[1]['items'],[])
+
     def test_shared_locations_endpoint_validates_scope_and_ids_without_planning(self):
         self.assertEqual(self.request('/api/locations?ids=30000142',Cookie='')[0],403)
         with patch.object(self.app,'plan',side_effect=AssertionError('Location labels must not calculate a plan')):
