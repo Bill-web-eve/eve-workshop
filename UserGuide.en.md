@@ -741,3 +741,6 @@ Open **Boost counter** in the sidebar. Select the local EVE chat-log folder (the
 
 This is a count of chat declarations, not confirmation of active in-game boosts, fleet membership or boost range.
 \nCopied name/count summary rows are also ignored if pasted back into the channel.\n
+## Resolving location names
+
+In progress output destinations, blueprint instance locations, full inventory, contract start/end locations and inventory-source location chips share the same name resolver. System names resolve locally; station and accessible structure names come from ESI and are cached. Downloaded asset containment is followed to the actual station for items in containers. Names load in the background while preserving filters, sorting and entered values. Hover a name to see the original ID; IDs remain searchable. An inaccessible structure shows an access notice instead of an unexplained number. If needed, authorize structure reading for a character with access under Settings → Data access. Personal and corporation lookups remain separate; a corporation with monitoring disabled causes no new location requests. The editable location filter still accepts IDs.

@@ -62,5 +62,29 @@ class AssetLocationTests(unittest.TestCase):
         self.assertNotIn(10**12,self.resolver.cached({10**12},[1],99))
         self.store.set_corporation_monitoring(99,False);self.assertEqual(self.resolver.readers(99),[])
 
+    def test_shared_lookup_resolves_nested_container_places_from_asset_snapshot(self):
+        self.store.save_snapshots(1,{'assets':{'data':[
+            {'item_id':10**12+2,'location_id':10**12+1},
+            {'item_id':10**12+1,'location_id':60003760}], 'fetched':999,'expires':2000,'etag':None}})
+        self.store.save_universe_cache('stations',60003760,{'name':'Jita IV - Moon 4'},999)
+        data=self.resolver.lookup([10**12+2,60003760])
+        self.assertEqual(data['locations'][str(10**12+2)]['resolved_id'],60003760)
+        self.assertEqual(data['locations'][str(10**12+2)]['name'],'Jita IV - Moon 4')
+        self.assertEqual(data['locations_resolved'],2);self.assertFalse(data['locations_pending'])
+        self.eve.http.request.assert_not_called()
+
+    def test_disabled_corporation_does_not_request_uncached_public_station_names(self):
+        self.store.character_corporation(1,99,'A');self.store.set_corporation_monitoring(99,False)
+        data=self.resolver.lookup([60003760],99)
+        self.assertFalse(data['locations_pending'])
+        self.assertEqual(data['locations']['60003760']['status'],'disabled')
+        self.eve.http.request.assert_not_called()
+
+    def test_personal_container_tree_does_not_use_corporation_assets(self):
+        self.store.character_corporation(1,99,'A')
+        self.store.save_corporation_snapshots(99,1,{'assets':{'data':[{'item_id':10**12+2,'location_id':60003760}],'fetched':999,'expires':2000,'etag':None}})
+        self.assertEqual(self.resolver.roots([10**12+2]),{10**12+2:10**12+2})
+        self.assertEqual(self.resolver.roots([10**12+2],99),{10**12+2:60003760})
+
 
 if __name__=='__main__':unittest.main()

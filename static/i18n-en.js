@@ -1,6 +1,13 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"A hely neve nem érhető el · hozzáférés szükséges": "Location name unavailable · access required",
+"Corporation figyelése kikapcsolva": "Corporation monitoring is disabled",
+"Ismeretlen hely": "Unknown location",
+"A hely neve átmenetileg nem érhető el": "Location name temporarily unavailable",
+"Helynév betöltése…": "Loading location name…",
+"Kimeneti hely": "Output location",
+"Legfeljebb 200 helynév kérhető egyszerre.": "Up to 200 location names can be requested at once.",
 "↻ Frissítés": "↻ Refresh",
 "Piaci forgalom": "Market trading volume",
 "Piaci forgalom betöltése…": "Loading market trading volume…",

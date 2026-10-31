@@ -5,6 +5,7 @@ import time
 
 from .esi import ESI,EsiError
 from . import intel_universe
+from .assets import root_locations
 
 SCOPE='esi-universe.read_structures.v1'
 
@@ -34,12 +35,22 @@ class AssetLocations:
             if lid in self.universe.systems:result[lid]={'name':self.universe.systems[lid]['name'],'expires':float('inf')}
         return result
 
-    def decorate(self,data,corporation_id=None):
-        readers=self.readers(corporation_id);ids={r['location_id'] for r in data['rows'] if r['location_id'] is not None}
-        cached=self.cached(ids,readers,corporation_id);now=self.clock()
-        missing=ids-{lid for lid,value in cached.items() if value['expires']>now}
+    def roots(self,ids,corporation_id=None):
+        # Blueprint/job destinations may be container or ship item IDs. Resolve
+        # these through downloaded assets before treating them as structures.
+        snapshots=[self.store.corporation_snapshot(corporation_id,'assets')] if corporation_id is not None else [self.store.snapshot(c['id'],'assets') for c in self.store.characters()]
+        parents=root_locations([a for s in snapshots if s for a in s['data']])
+        return {lid:parents.get(lid,lid) for lid in ids}
+
+    def lookup(self,ids,corporation_id=None):
+        ids=set(ids);roots=self.roots(ids,corporation_id)
+        targets={lid for lid in roots.values() if lid is not None}
+        readers=self.readers(corporation_id)
+        cached=self.cached(targets,readers,corporation_id);now=self.clock()
+        enabled=corporation_id is None or self.store.corporation_monitored(corporation_id)
+        missing=targets-{lid for lid,value in cached.items() if value['expires']>now}
         with self.lock:
-            if not self.closed:
+            if not self.closed and enabled:
                 for lid in missing:
                     key=(corporation_id,lid)
                     if self.active!=key:self.pending[key]=readers
@@ -47,13 +58,21 @@ class AssetLocations:
                     self.thread=threading.Thread(target=self._work,daemon=True,name='EVE-asset-locations');self.thread.start()
             pending={lid for scope,lid in self.pending if scope==corporation_id}
             if self.active and self.active[0]==corporation_id:pending.add(self.active[1])
+        locations={}
+        for lid,root in roots.items():
+            value=cached.get(root,{})
+            locations[str(lid)]={'id':lid,'resolved_id':root,'name':value.get('name'),
+                'status':'resolved' if value.get('name') else 'pending' if root in pending else 'disabled' if not enabled else value.get('error') or 'unknown'}
+        return {'locations':locations,'locations_pending':bool(targets&pending),
+                'locations_resolved':sum(bool(v['name']) for v in locations.values()),'locations_total':len(ids)}
+
+    def decorate(self,data,corporation_id=None):
+        result=self.lookup({r['location_id'] for r in data['rows'] if r['location_id'] is not None},corporation_id)
         for row in data['rows']:
-            value=cached.get(row['location_id'],{})
+            value=result['locations'].get(str(row['location_id']),{})
             row['location_name']=value.get('name')
-            row['location_status']='resolved' if value.get('name') else 'pending' if row['location_id'] in pending else value.get('error','unknown')
-        data['locations_pending']=bool(ids&pending)
-        data['locations_resolved']=sum(bool(v.get('name')) for v in cached.values())
-        data['locations_total']=len(ids)
+            row['location_status']=value.get('status','unknown')
+        data.update({k:v for k,v in result.items() if k!='locations'})
         return data
 
     def _resolve(self,lid,readers,scope=None):
@@ -86,6 +105,7 @@ class AssetLocations:
                 if self.closed or not self.pending:self.active=None;self.thread=None;return
                 key=next(iter(self.pending));readers=self.pending.pop(key);self.active=key
             try:
+                if key[0] is not None and not self.store.corporation_monitored(key[0]):continue
                 self._resolve(key[1],readers,key[0])
             except Exception:
                 # Preserve any last known name and throttle failed lookups.

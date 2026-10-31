@@ -741,3 +741,6 @@ A **Lista másolása** gomb mind a kilenc játékbeli nevet, mögötte a számá
 
 Ez a funkció a chatben tett bejelentéseket összesíti; a ténylegesen aktív játékbeli boostot, a flottából kilépést vagy az elérési távolságot nem igazolja.
 \nA másolt, számokat tartalmazó összesítő sorokat sem számoljuk új boostbejelentésnek, ha visszakerülnek a csatornára.\n
+## Helynevek feloldása
+
+Az In progress kimeneti helye, a blueprintpéldányok helye, a teljes készlet, a szerződések indulási és érkezési helye, valamint a készletforrás helycímkéi ugyanazt a névfeloldást használják. A rendszer neve helyben, az állomás vagy hozzáférhető struktúra neve ESI-ből, gyorsítótárazva jelenik meg. A tárolókban lévő tételeket a letöltött készlet alapján a tényleges állomásig követjük. A nevek a háttérben töltődnek be, a szűrők, rendezés és mezőértékek megtartásával. Az eredeti ID a név fölé vitt egérnél látható, és továbbra is kereshető. Ha egy struktúrához nincs hozzáférés, ezt a helynév helyén jelöljük; szükség esetén adj struktúraolvasási engedélyt egy hozzáférő karakternek a Beállítások → Adathozzáférések alatt. A személyes és corporation helyek feloldása elkülönül; kikapcsolt corporation figyelésnél nem kérünk új helyadatot. A kézzel szerkeszthető helyszűrő továbbra is azonosítókat fogad.

@@ -13,6 +13,16 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class ServerTests(unittest.TestCase):
+    def test_shared_locations_endpoint_validates_scope_and_ids_without_planning(self):
+        self.assertEqual(self.request('/api/locations?ids=30000142',Cookie='')[0],403)
+        with patch.object(self.app,'plan',side_effect=AssertionError('Location labels must not calculate a plan')):
+            status,data,_=self.request('/api/locations?ids=30000142,30000142')
+        self.assertEqual(status,200);self.assertEqual(data['locations_total'],1)
+        self.assertEqual(data['locations']['30000142']['name'],'Jita')
+        for query in ['ids=0','ids=no','ids=-1','ids=9007199254740992','ids=30000142&corporation_id=999','ids='+','.join(['30000142']*201)]:
+            self.assertEqual(self.request('/api/locations?'+query)[0],400,query)
+        self.assertEqual(self.request('/locations.js')[0],200)
+
     def test_market_history_is_public_esi_but_app_authenticated_region_scoped_and_no_planning(self):
         self.app.market_history.start=Mock()
         self.app.market_history.snapshot=Mock(return_value={'daily':[],'running':False})

@@ -750,7 +750,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/market-history.js', '/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/locations.js', '/market-history.js', '/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -771,6 +771,12 @@ class Handler(BaseHTTPRequestHandler):
             if not self.authorized():
                 return self.send(403, {'error': 'Nyisd meg az alkalmazás kezdőlapját.'})
             if path == '/api/fleet':return self.send(200,self.app.fleet.dashboard())
+            if path == '/api/locations':
+                raw=[v for v in query.get('ids',[''])[0].split(',') if v]
+                if len(raw)>200:raise PlanningError('Legfeljebb 200 helynév kérhető egyszerre.')
+                ids={integer(int(v),'Helyazonosító',2**53-1,1) for v in raw}
+                cid=self.app.scope_id(query.get('corporation_id',[None])[0])
+                return self.send(200,self.app.asset_locations.lookup(ids,cid))
             if path == '/api/jobs':
                 cid=self.app.scope_id(query.get('corporation_id',[None])[0])
                 with self.app.catalog.lock:return self.send(200,job_browser.dashboard(self.app.store,self.app.catalog,cid))

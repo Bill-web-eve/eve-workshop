@@ -13,6 +13,7 @@ async function fixture(){
   if(url.startsWith('/api/state')){const cid=Number(new URL(url,w.location.href).searchParams.get('corporation_id'))||null;value={...state,corporation_id:cid,scope_label:cid?corporations.find(c=>c.id===cid).name:'Personal'};}
   else if(url==='/api/notifications')value={items:[],counts:{data:0},task:{running:false},corporations:[],moons:[],preferences:{os_enabled:false,categories:{intel:true}}};
   else if(url==='/api/intel/alerts')value={enabled:false,items:[]};
+  else if(url.startsWith('/api/locations')){const cid=new URL(url,w.location.href).searchParams.get('corporation_id');value={locations:{999:{name:cid?'Corp station '+cid:'Personal station',status:'resolved'}}};}
   else if(url.startsWith('/api/jobs')){const cid=new URL(url,w.location.href).searchParams.get('corporation_id')||'personal';value=data[cid];if(delayed){const gate=delayed;delayed=null;await gate;}if(fail)return {ok:false,json:async()=>({error:'Try again'})};}
   else throw Error('Unexpected request '+url);
   return {ok:true,json:async()=>value};
@@ -49,4 +50,16 @@ test('late scope responses cannot replace current jobs and failures have a retry
  assert(rows(d)[0].includes('Corp B item'));release();await tick();await tick();assert(rows(d)[0].includes('Corp B item'));
  fail(true);run('jobData=null;jobRevision++;render()');await tick();await tick();assert(d.querySelector('#job-retry'));assert.equal(rows(d).length,0);
  fail(false);d.querySelector('#job-retry').click();await tick();await tick();assert(rows(d)[0].includes('Corp B item'));
+});
+
+test('job output locations resolve to station names and remain scoped after switching corporation',async t=>{
+ const {w,d,run}=await fixture();t.after(()=>w.close());await w.EveLocations.load();await tick();
+ let cell=d.querySelector('#job-results tbody tr td:nth-child(6)');assert.equal(cell.textContent,'Personal station');assert.equal(cell.dataset.sortValue,'Personal station');assert.equal(cell.querySelector('[data-location-id]').title,'Location ID: 999');
+ const scope=d.querySelector('#job-scope');scope.value='99';scope.dispatchEvent(new w.Event('change'));await tick();await tick();await tick();await w.EveLocations.load();
+ cell=d.querySelector('#job-results tbody tr td:nth-child(6)');assert.equal(cell.textContent,'Corp station 99');assert.equal(run('jobCharacter'),'');
+});
+test('blueprint instance details also render location names rather than raw IDs',async t=>{
+ const {w,d,run}=await fixture();t.after(()=>w.close());
+ run(`plan={rows:[{id:590,name:'Ship',parameters:{instances:[{kind:'BPC',count:1,me:3,te:2,runs:2,selected:true,busy:false,character_id:1,location_id:60003760,location_name:'Blueprint station',item_id:1000000000001}],bpo_count:0,bpc_count:1,bpc_runs:2}}]};blueprintDetailId=590;document.body.insertAdjacentHTML('beforeend','<section id="blueprint-detail"></section>');renderBlueprintDetails();`);
+ await tick();const cell=d.querySelector('#blueprint-detail tbody tr td:nth-child(9)');assert.equal(cell.textContent,'Blueprint station');assert.equal(cell.querySelector('[data-location-id]').title,'Location ID: 60003760');
 });

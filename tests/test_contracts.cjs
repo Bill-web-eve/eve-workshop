@@ -11,7 +11,7 @@ function setup(){
  w.state={task:{running:false}};w.render=()=>w.renderContracts(w.$('main'));w.startTask=url=>calls.push({url});w.navigate=next=>{run('view='+JSON.stringify(next));w.render();};
  const row={contract_id:101,owner_id:11,title:'A <safe> contract',type:'item_exchange',status:'outstanding',issuer_id:77,issuer_name:'Issuer',assignee_id:11,assignee_name:'Pilot <safe>',acceptor_id:0,acceptor_name:'–',price:2000,reward:null,owners:[{id:11,name:'Pilot <safe>'}],date_issued:'2026-10-24T10:00:00Z',date_expired:'2026-11-01T10:00:00Z',start_location_id:6001,start_location_name:'Test Station'};
  w.api=async(url,body)=>{calls.push({url,body});if(url.includes('/details'))return {contract:row,history:[{at:1700000000,status:'outstanding',contract:row}],items:[{name:'Tritanium',type_id:34,quantity:100,is_included:true,is_singleton:false}],error:null};return {rows:[row],owners:[{id:11,name:'Pilot <safe>'},{id:22,name:'Other'}],sources:[],characters:[]};};
- for(const name of ['i18n-en.js','i18n.js','tables.js','costs.js','contracts.js','notifications.js'])run(fs.readFileSync(path.join(root,name),'utf8'));
+ for(const name of ['i18n-en.js','i18n.js','tables.js','locations.js','costs.js','contracts.js','notifications.js'])run(fs.readFileSync(path.join(root,name),'utf8'));
  run("let view='contracts',corporationId=999;");
  return {w,run,calls,sent,row};
 }
