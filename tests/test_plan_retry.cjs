@@ -63,3 +63,14 @@ test('completion of the background EVE refresh retries a failed plan and restore
  assert.equal(run('plan.summary.items'),8);assert.equal(run('plan.refresh_error'),undefined);assert(!d.querySelector('#save-plan').disabled);
  w.scheduleTaskPoll();await callback();assert.equal(calls,1);
 });
+test('inventory lag labels the confirmed historical allocation without claiming new live shortages',async t=>{
+ const {w,d,run}=await setup();t.after(()=>w.close());
+ run(`function deliveryRetryTimestamp(){return '1 Nov at 09:16';}`);
+ run(source.slice(source.indexOf('function deliveryPreviewMarkup('),source.indexOf('function renderDeliveryWait(')));
+ w.waitData={frozen_snapshot_at:1700000000,retry_at:1700000900,items:[]};
+ run(`document.querySelector('main').innerHTML=deliveryPreviewMarkup(waitData);`);
+ w.EveI18n.setLanguage('en');w.EveI18n.translate(d.body);
+ assert(d.body.textContent.includes('Showing the last confirmed plan allocation.'));assert(d.body.textContent.includes('Conflicting data is not used to reallocate materials between plans.'));
+ assert(!d.body.textContent.includes('shortfall and production quantities may be overestimated'));
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('main').textContent));
+});

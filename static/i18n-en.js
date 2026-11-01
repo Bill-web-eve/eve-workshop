@@ -1,6 +1,13 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Legkorábbi frissítési próbálkozás:": "Earliest refresh attempt:",
+"Az utolsó igazolt tervkiosztás látható.": "Showing the last confirmed plan allocation.",
+"Az EVE job- és készletadata eltérő időpontról származik. Az ellentmondó adatokból nem osztjuk újra az anyagokat a tervek között.": "EVE job and inventory snapshots are from different times. Conflicting data is not used to reallocate materials between plans.",
+"A meglévő foglalások megmaradnak. Új foglalás és végleges ütemezés friss készletadatra vár.": "Existing reservations are preserved. New reservations and final scheduling await updated inventory.",
+"Utolsó igazolt számítás:": "Last confirmed calculation:",
+"Utolsó igazolt kiosztás · készletfrissítésre vár": "Last confirmed allocation · waiting for inventory",
+
 "Ipari jobok: {0}": "Industry jobs: {0:t}",
 "Blueprintok: {0}": "Blueprints: {0:t}",
 "Készlet: {0}": "Inventory: {0:t}",

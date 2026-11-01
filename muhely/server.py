@@ -41,6 +41,7 @@ from .refresh_policy import RefreshPolicy
 from .asset_locations import AssetLocations
 from .learning_clones import LearningCloneWatch
 from .boosts import BoostCounter,discover as boost_channels
+from . import stable_plans
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -451,6 +452,22 @@ class App:
             calculate_saved=lambda saved,held:self._calculate(saved['product_id'],saved['quantity'],context,held,
                                                             manufacturer_id=saved.get('manufacturer_id'),allow_pending=allow_pending))
 
+    def _stable_key(self,context,plans,product,quantity,saved_id,manufacturer):
+        return stable_plans.key(context,plans,product,quantity,saved_id,manufacturer,self.catalog.meta,self.store.characters())
+
+    def _remember_allocations(self,plans,context,allocation):
+        snapshot=stable_plans.marker(context)
+        for saved in plans:
+            if not saved['reserve_active'] or saved.get('corporation_id')!=context.get('corporation_id'):continue
+            key=self._stable_key(context,plans,saved['product_id'],saved['quantity'],saved['id'],saved.get('manufacturer_id'))
+            if not stable_plans.needs_update(self.store,key,snapshot):continue
+            other,own=except_owner(allocation,saved['id'])
+            plan=self._calculate(saved['product_id'],saved['quantity'],context,other,own,saved.get('manufacturer_id'))
+            plan['saved_plan']={**saved,'preview_changed':False}
+            plan['reservation_summary']={'active_count':allocation['active_count'],'other_plan_count':allocation['active_count']-1,
+                                         'own':allocation['by_plan'].get(saved['id']),'provisional':False}
+            stable_plans.remember(self.store,key,snapshot,plan)
+
     def manufacturer(self,value,corporation_id=None,allow_missing=None):
         if value is None or value in ['', 'auto']:return None
         if value=='manual':return 0
@@ -487,8 +504,14 @@ class App:
                 allocation = self._allocate(preview, context)
                 other, own = except_owner(allocation, saved_plan_id)
                 plan = self._calculate(product_id, quantity, context, other, own,manufacturer_id)
-            except AssetSnapshotPending:
+            except AssetSnapshotPending as error:
                 if not allow_preview:raise
+                cached=stable_plans.load(self.store,self._stable_key(context,plans,product_id,quantity,saved_plan_id,manufacturer_id))
+                if cached:
+                    cached.update(preview_only=True,frozen_snapshot=True,inventory_wait={**error.info,'frozen_snapshot_at':cached['calculated_at']})
+                    cached['reservation_summary']['provisional']=True
+                    cached['saved_plan']=({**saved,'preview_changed':quantity!=saved['quantity'] or (manufacturer_id or 0)!=(saved.get('manufacturer_id') or 0)} if saved else None)
+                    return cached
                 # Read-only preview: keep the exact same cached assets/WIP and
                 # reservation priority. Never invent delivered output or write
                 # provisional holds. All saving/scheduling paths remain strict.
@@ -501,6 +524,8 @@ class App:
             plan['reservation_summary'] = {'active_count': allocation['active_count'],
                 'other_plan_count': allocation['active_count']-int(bool(saved and saved['reserve_active'])),
                 'own': allocation['by_plan'].get(saved_plan_id),'provisional':bool(plan.get('preview_only'))}
+            if not plan.get('preview_only'):
+                stable_plans.remember(self.store,self._stable_key(context,plans,product_id,quantity,saved_plan_id,manufacturer_id),stable_plans.marker(context),plan)
             return plan
 
     def schedule(self,data):
@@ -630,13 +655,23 @@ class App:
         allocation = {'by_plan': {}}
         for cid in dict.fromkeys(p.get('corporation_id') for p in plans if p['reserve_active']):
             try:
-                allocation['by_plan'].update(self._allocate(plans, self._context(cid))['by_plan'])
+                context=self._context(cid)
+                pool_allocation=self._allocate(plans,context)
+                self._remember_allocations(plans,context,pool_allocation)
+                allocation['by_plan'].update(pool_allocation['by_plan'])
             except (PlanningError, EsiError) as error:
                 for p in plans:
                     if p.get('corporation_id')==cid:p['allocation_error']=str(error)
                 if cid==corporation_id:
                     reservation_error = str(error)
                     if isinstance(error,AssetSnapshotPending):delivery_wait=error.info
+                if isinstance(error,AssetSnapshotPending):
+                    for saved in plans:
+                        if saved.get('corporation_id')!=cid or not saved['reserve_active']:continue
+                        cached=stable_plans.load(self.store,self._stable_key(context,plans,saved['product_id'],saved['quantity'],saved['id'],saved.get('manufacturer_id')))
+                        if cached and cached['reservation_summary'].get('own'):
+                            allocation['by_plan'][saved['id']]=cached['reservation_summary']['own']
+                            saved['allocation_frozen_at']=cached['calculated_at']
         for saved in plans:
             saved['activity']=self.catalog.recipes.get(saved['product_id'],{}).get('activity')
             saved['product_name'] = self.catalog.name(saved['product_id'])

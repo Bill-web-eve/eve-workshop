@@ -39,3 +39,10 @@ test('stale drafts and failed saves preserve order intent, and Hungarian/English
  w.$('#reservation-order-cancel').click();w.$('[data-reservation-move=b][data-direction="-1"]').click();w.api=async()=>{throw Error('Changed in another window');};await w.$('#reservation-order-save').onclick();assert.equal(errors.at(-1),'Changed in another window');assert(w.dirty.reservation_order);
  w.EveI18n.setLanguage('en');await tick();assert.match(w.$('main').textContent,/Active reservations/);assert.match(w.$('#reservation-order-save').textContent,/Save order/);assert(!/[áéíóöőúüű]/i.test(w.$('main').textContent),w.$('main').textContent);
 });
+test('the last confirmed allocation is visibly marked while an inventory update is pending',async t=>{
+ const {w}=setup();t.after(()=>w.close());w.state.delivery_wait={retry_at:1800000000};
+ w.state.plans[0].allocation={reserved_types:2};w.state.plans[0].allocation_frozen_at=1700000000;w.render();
+ w.EveI18n.setLanguage('en');await tick();
+ assert(w.$('main').textContent.includes('Last confirmed allocation · waiting for inventory'));
+ assert.equal(w.$('[data-reservation-active=c]').disabled,true);
+});

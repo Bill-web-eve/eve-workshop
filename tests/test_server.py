@@ -356,6 +356,32 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(row['on_hand'],4000);self.assertEqual(row['wip_total'],0)
         self.assertIsNone(self.request('/api/state')[1]['delivery_wait'])
 
+    def test_confirmed_allocations_survive_delivered_job_inventory_lag_for_every_saved_plan(self):
+        from datetime import datetime,timezone
+        now=time.time();self.seed_archon_stock();self.request('/api/settings',{'source':'eve'})
+        ids={}
+        for product,quantity in [(92822,1),(12038,50)]:
+            code,data,_=self.request('/api/plans/save',{'product_id':product,'quantity':quantity})
+            self.assertEqual(code,200);ids[product]=data['id']
+        old=self.request('/api/state')[1]
+        original={p['id']:p['allocation'] for p in old['plans']};before=self.app.store.plans()
+        parts={k:self.app.store.snapshot(123,k) for k in ['assets','blueprints','jobs']}
+        parts['assets']['fetched']=now-300;parts['assets']['expires']=now+3600
+        recipe=self.app.catalog.recipes[16678]
+        parts['jobs']['data']=[{'job_id':19,'product_type_id':16678,'blueprint_type_id':recipe['bp_id'],'activity_id':9,'status':'delivered','runs':10,'output_location_id':6001,'completed_date':datetime.fromtimestamp(now-60,timezone.utc).isoformat()}]
+        self.app.store.save_snapshots(123,parts)
+        state=self.request('/api/state')[1];self.assertIsNotNone(state['delivery_wait'])
+        for saved in state['plans']:
+            self.assertEqual(saved['allocation'],original[saved['id']]);self.assertTrue(saved['allocation_frozen_at'])
+        for product,quantity in [(92822,1),(12038,50)]:
+            code,plan,_=self.request(f'/api/plan?product_id={product}&quantity={quantity}&saved_plan_id={ids[product]}&preview=1')
+            self.assertEqual(code,200);self.assertTrue(plan['frozen_snapshot']);self.assertTrue(plan['preview_only'])
+            self.assertEqual(plan['reservation_summary']['own'],original[ids[product]])
+        self.assertEqual(self.app.store.plans(),before)
+        self.assertEqual(self.request('/api/plans/save',{'id':ids[12038],'product_id':12038,'quantity':50})[0],400)
+        parts['assets']['fetched']=now;self.app.store.save_snapshots(123,parts)
+        fresh=self.request('/api/state')[1];self.assertIsNone(fresh['delivery_wait']);self.assertTrue(all(not p.get('allocation_frozen_at') for p in fresh['plans']))
+
     def test_pending_delivery_allows_previews_for_all_personal_plans_but_never_commits_holds(self):
         from datetime import datetime,timezone
         now=time.time();self.seed_archon_stock();self.request('/api/settings',{'source':'eve'})
