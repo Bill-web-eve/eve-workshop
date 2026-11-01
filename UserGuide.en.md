@@ -543,7 +543,7 @@ Distance uses the shortest route across the full public CCP SDE stargate network
 
 Small cards beside reported systems show pilots, ships and the report age. Each report disappears from its card three minutes after the message timestamp; the card closes when no recent reports remain. The original messages remain in chat and report history, and the configured activity/alert lifetime is unchanged. Larger cards scroll internally. Ship icons use the official CCP image service. A generic “shuttle” or unrecognized ship name does not receive a guessed type ID or a fabricated type icon.
 
-Identified pilot names open the default browser at `https://zkillboard.com/character/<ID>/`. The example for Steve Hluskan is `https://zkillboard.com/character/359618261/`. A name inferred from text remains an inference even when ESI confirms that a character of that name exists. Names without a resolved ID are marked **ID not yet identified**, with no fabricated link.
+Identified pilot names open the default browser at `https://zkillboard.com/character/<ID>/`. A name inferred from text remains an inference even when ESI confirms that a character of that name exists. Names without a resolved ID are marked **ID not yet identified**, with no fabricated link.
 
 Only inferred character names are sent to the public CCP ESI resolver, without authentication tokens; full messages are not sent. Positive name–ID matches are cached locally for 30 days and negative results for one hour. Network failures do not stop log monitoring. **Refresh pilot IDs** starts any necessary lookups while respecting the cache. zKillboard opens only on a click; killboard data is not fetched in the background.
 

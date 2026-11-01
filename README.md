@@ -4,7 +4,7 @@ Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple S
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.6.0**, **Windows 11 x64 1.6.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.7.0**, **Windows 11 x64 1.7.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -21,6 +21,16 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Választható helyi station/struktúra market buy/sell/split árakkal, külön ESI-olvasóval; a privát piac gyorsítótára elkülönül Jitától és más olvasóktól.
 - Kompakt tervenkénti bekerülés/bevétel/profit, független anyag- és eladási árforrással, Accounting/standing alapú NPC-díjakkal, megadható struktúra broker fee-vel és egyéb költségekkel.
 - Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
+
+## Az 1.7.0 kiadás újdonságai
+
+- **Alapanyagfedezet és állomásellenőrzés:** a gyártási terv és az ütemező jelzi a készleten lévő, tényleges EVE-jobból érkező és még hiányzó bemeneteket. A használt BPO/BPC vagy reakcióformula helyéhez képest külön jelöli a szállítandó tételeket; az ismeretlen helyet nem tekinti helyben elérhetőnek. Az idővonalon is láthatóak az állapotok.
+- **Biztosabb foglalási nézet:** eltérő EVE job- és készletpillanatkép esetén a korábban igazolt kiosztás megmarad, jól jelölt, csak olvasható nézetként. Az átvett komponens alapanyagait nem kéri újra más terv rovására. Mentés és végleges ütemezés friss adatra vár.
+- **Offline tanulóklón-figyelés:** ha minden karakter igazoltan offline, karakterenként a jelenleg tanult skillhez leggyorsabb saját jump clone-t keresi. A blokkoló online-jogokat és a következő ellenőrzést név szerint jelzi; a Mac-rendszerértesítés javítva. Új ESI-klónolvasási engedély szükséges.
+- **Piaci forgalom:** az utolsó hét közzétett nap regionális kereskedési mennyisége és a legutolsó publikált nappal záruló 30 nap heti átlaga. Az ESI buy és sell forgalmat együtt ad, nem külön állomásra vagy sell orderre.
+- **Helynevek azonosítók helyett:** közös, hozzáférést és gyártási kört figyelembe vevő feloldás a joboknál, blueprinteknél, contractoknál és a készletben.
+- Átmeneti lekérdezési hibánál az azonos célhoz tartozó megnyitott terv megmarad, figyelmeztetéssel és védett mentéssel. Sikeres háttérfrissítés után újrapróbálja a számítást. Javított magyar–angol hibaüzenetek és frissített kézikönyv.
+- A telepítők saját ablakosak, személyes adatok nélkül készülnek, és megőrzik a korábbi helyi profilt.
 
 ## Az 1.6.0 kiadás újdonságai
 

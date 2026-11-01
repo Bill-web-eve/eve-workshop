@@ -111,3 +111,9 @@ runtime/
 !release-assets/v1.6.0/EVE_Muhely-1.6.0-macOS-AppleSilicon.sha256
 !release-assets/v1.6.0/EVE_Muhely-1.6.0-Windows11-x64.zip
 !release-assets/v1.6.0/EVE_Muhely-1.6.0-Windows11-x64.sha256
+
+# Reviewed 1.7.0 material readiness, clone alerts and coherent reservations release.
+!release-assets/v1.7.0/EVE_Muhely-1.7.0-macOS-AppleSilicon.dmg
+!release-assets/v1.7.0/EVE_Muhely-1.7.0-macOS-AppleSilicon.sha256
+!release-assets/v1.7.0/EVE_Muhely-1.7.0-Windows11-x64.zip
+!release-assets/v1.7.0/EVE_Muhely-1.7.0-Windows11-x64.sha256
