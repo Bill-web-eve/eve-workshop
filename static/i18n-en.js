@@ -2960,6 +2960,14 @@ globalThis.EveEnglish={
   "További költségek és részletek": "Additional costs and details",
   "Szállítás és egyéb": "Hauling and other costs",
   "Marketek és standingek": "Markets and standings",
-  "Az EVE Developer alkalmazás nem engedélyezi az egyik kért scope-ot. Add hozzá a Beállításokban felsorolt kért olvasási engedélyeket a Client ID alkalmazásához, majd lépj be újra.": "The EVE Developer application does not allow a requested scope. Add the requested read permissions listed in Settings to the Client ID application, then authorize again."
+  "Az EVE Developer alkalmazás nem engedélyezi az egyik kért scope-ot. Add hozzá a Beállításokban felsorolt kért olvasási engedélyeket a Client ID alkalmazásához, majd lépj be újra.": "The EVE Developer application does not allow a requested scope. Add the requested read permissions listed in Settings to the Client ID application, then authorize again.",
+  "Hiány": "Shortfall",
+  "Készletből": "From inventory",
+  "Folyamatban lévő kimenetből": "From active-job output",
+  "Bolygón összesen": "Total on planet",
+  "Felhasználható ebből": "Usable from this stock",
+  "Hiány a fedezethez": "Coverage shortfall",
+  "Összes run": "Total runs",
+  "Runok másolása": "Copy runs",
 };
 if(typeof module!=='undefined'&&module.exports)module.exports=globalThis.EveEnglish;
