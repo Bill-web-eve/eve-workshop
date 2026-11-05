@@ -772,3 +772,20 @@ Ha másik karakter hiányzó onlineállapot-engedélye megakadályozza a jelzés
 ## Foglalások eltérő ESI-pillanatképek esetén
 
 Az app megőrzi az utolsó ellentmondásmentes tervkiosztás helyi másolatát. Ha egy átvett komponens a joblistából már eltűnt, de a készlet még az átvétel előtti, a korábban igazolt tervet és foglalást mutatja, jól látható időponttal és figyelmeztetéssel. Nem tervezi ebből újra az átvett komponens alapanyagait a másik terv rovására, és nem ad hozzá feltételezett készletet. Ez csak olvasható korábbi nézet: mentés, új foglalás és végleges ütemezés a frissebb készletig vár. A korábbi nézet kizárólag azonos cél, mennyiség, gyártási kör, paraméterek és foglalási sorrend mellett használható. Új vagy módosított célhoz korábbi igazolt kiosztás hiányában csak a külön jelölt bizonytalan előnézet adható. A valódi anyaghiány a friss adatokban továbbra is látható.
+
+
+## Research agentek és datacore-ok
+
+A bal oldali **Research agentek** menü minden hozzáadott karakter R&D-agentjét egy helyre gyűjti. Az **RP / nap**, **Becsült RP**, **Beváltható**, **Jita-egységár** és **Jita-érték** oszlopokat agentenként, karakterenként vagy datacore-típusonként nézheted. A karakterválasztó szűkíti az összesítést; az időpontmezővel jövőbeli beváltást is tervezhetsz. Az időpontok a géped helyi idejét használják.
+
+Az **esi-characters.read_agents_research.v1** engedélyt az EVE Developer alkalmazásban is engedélyezni kell. Az oldal alján vagy a **Beállítások → Adathozzáférések** részen a **Research hozzáférés engedélyezése** gombbal hagyd jóvá karakterenként. A Minden hozzáférés gomb ezt a scope-ot is kéri; a régi engedélyeket nem vonja vissza.
+
+Az RP-becslés az ESI képletét követi: maradék pont + napi RP × a kezdés óta eltelt napok. A beváltható mennyiség **100 RP/datacore**, karakter–agent páronként külön lefelé kerekítve. A részpontokat nem vonjuk össze másik agenttel vagy karakterrel. A Jita buy/sell/split kapcsoló ugyanazt a mennyiséget árazza újra hálózati kérés nélkül. A beváltási díj **10 000 ISK/datacore**; az összesítő mutatja a bruttó értéket és a beváltás utáni értéket is, eladási adó és broker fee nélkül. A hiányzó típus vagy ár részleges adatként látszik, nem nulla árként.
+
+Az ESI nem ad RP-plafont vagy kutatásleállási jelzést. A jövőbeli mennyiség folyamatos termelést feltételező becslés, nem igazolt játékbeli egyenleg. Beváltás után a külön frissítőgombbal ellenőrizd az új maradékot; az ESI érvényes gyorsítótára akkor is érvényes marad.
+
+Az RP-adatok és a hozzájuk lekért Jita-árak automatikusan **24 óránként** frissülnek. A teljes EVE-frissítés nem kerüli meg ezt az időközt. A research oldal külön frissítőgombja kézi kivétel. A pillanatképek és a frissítési időköz újraindítás után is megmaradnak. CSV export is elérhető.
+
+### Holdadatok napi frissítése
+
+A holdnaptár, holdértesítések és corporation-kitermelési időzítők teljes automatikus frissítése **24 óránként** futhat. A szokásos EVE-frissítőgomb sem indít újra ilyen lekérést naponta többször; az új időközt újraindítás és sikertelen kérés után is megtartjuk. Ha azonnali ellenőrzés kell, a **Beállítások → Adathozzáférések → Holdadatok frissítése** külön gomb kézzel indíthatja. A helyi naptár, a már ismert kitermelési időpontokhoz kapcsolódó figyelmeztetések és a képernyőn megjelenő számítások továbbra is a mentett adatokból működnek. A ritkán változó rendszeradatok meglévő 90 napos gyorsítótára megmarad.

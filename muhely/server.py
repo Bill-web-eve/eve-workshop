@@ -21,7 +21,7 @@ import uuid
 import webbrowser
 
 from . import __version__
-from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe, mining, assets, jobs as job_browser, fleet, contracts, invention
+from . import moons, extractions, moon_calendar, accounts, scheduler, notifications, progress, intel, intel_universe, mining, assets, jobs as job_browser, fleet, contracts, invention, research
 from .market import Market,validate_ids as market_ids
 from .market_history import MarketHistory
 from . import moon_transfer
@@ -101,6 +101,7 @@ class App:
             if any(self.store.snapshot(c['id'],k) for c in self.store.characters() for k in ['moon_calendar','moon_timers','moon_notifications']):domains.append('extractions')
             if any('esi-industry.read_character_mining.v1' in scopes for scopes in self.eve.granted_scopes().values()):domains.append('mining')
             if any(set(CONTRACT_SCOPES)&set(scopes) for scopes in self.eve.granted_scopes().values()):domains.append('contracts')
+            if any(set(research.RESEARCH_SCOPES).issubset(scopes) for scopes in self.eve.granted_scopes().values()):domains.append('research')
             return domains
         return ['industry' if kind=='sync' else 'moon-universe' if kind=='moons' else kind]
 
@@ -110,7 +111,9 @@ class App:
             if self.task['running']:
                 raise PlanningError('Egy frissítés már folyamatban van.')
             domains=self.refresh_domains(kind)
-            allowed=self.refresh_policy.claim(domains,manual=manual)
+            daily=set(domains)&{'research','extractions','moon-universe'}
+            allowed=self.refresh_policy.claim(set(domains)-daily,manual=manual)
+            allowed |= self.refresh_policy.claim(daily,manual=manual and kind not in ['sync','notifications'])
             if not allowed:return False
             self.task = {'id':uuid.uuid4().hex,'running':True,'kind':kind,'message':'Frissítés folyamatban…','results':[],'finished':None,'started':time.time(),'updated':time.time(),'outcome':'running','progress':{}}
         def work():
@@ -134,7 +137,8 @@ class App:
                 include_moons='extractions' in allowed
                 include_mining='mining' in allowed
                 include_contracts='contracts' in allowed
-                phases=sum(d in allowed for d in ['industry','skills','pi'])+int(include_corps)+int(include_moons)+int(include_mining)+int(include_contracts) if kind in ['sync','notifications'] else 1
+                include_research='research' in allowed
+                phases=sum(d in allowed for d in ['industry','skills','pi'])+int(include_corps)+int(include_moons)+int(include_mining)+int(include_contracts)+int(include_research) if kind in ['sync','notifications'] else 1
                 if kind in ['sync','notifications']:
                     if not self.store.characters():
                         raise PlanningError('Előbb adj hozzá egy karaktert az EVE-kapcsolat oldalon.')
@@ -162,6 +166,12 @@ class App:
                     if include_contracts:
                         contract_results=phase('Szerződések',lambda:contracts.sync(self.eve),'contracts')
                         message+=f" Szerződésadatok frissítve: {sum(r['ok'] for r in contract_results)}/{len(contract_results)} forrás."
+                    if include_research:
+                        research_results=phase('Research agentek',lambda:research.sync(self.eve,self.catalog,self.market),'research')
+                        message+=' Research agent adatok frissítve.'
+                elif kind == 'research':
+                    result=phase('Research agentek',lambda:research.sync(self.eve,self.catalog,self.market,manual=manual),'research')
+                    message='Research agent adatok frissítve.'
                 elif kind == 'contracts':
                     result=phase('Szerződések',lambda:contracts.sync(self.eve),'contracts')
                     message=f"Szerződésadatok frissítve: {sum(r['ok'] for r in result)}/{len(result)} forrás."
@@ -191,7 +201,7 @@ class App:
                 else:
                     phase('Receptadatbázis',self.update_catalog)
                     result, message = [], 'Az EVE-receptadatbázis naprakész.'
-                if set(domains)-allowed:message+=' Egyes forrásoknál a 15 perces automatikus frissítési időköz még nem telt le; a mentett adatok láthatók.'
+                if set(domains)-allowed:message+=' Egyes források frissítési időköze még nem telt le; a mentett adatok láthatók.'
                 with self.task_lock:
                     self.task.update(running=False,message=message,results=result,finished=time.time(),updated=time.time(),outcome='warning' if any(not row.get('ok',True) and row.get('warning',True) for row in outcomes) else 'success')
             except Exception as error:
@@ -692,7 +702,7 @@ class App:
                 'locations': locations, 'jobs': [j for j in jobs if j.get('status') in ['active', 'paused', 'ready']],
                 'blueprint_count': len(bps), 'stale_characters': stale, 'sde': self.catalog.meta,
                 'recipe_count': sum(self.catalog.types.get(i, {}).get('published', 0) for i in self.catalog.recipes),
-                'fleet_running':self.fleet.status()['task']['running'],'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,'implant_scopes':IMPLANT_SCOPES,'learning_clone_scopes':LEARNING_CLONE_SCOPES,'contract_scopes':CONTRACT_SCOPES,'market_scopes':self.trade.dashboard()['scopes'],'mining_scopes':mining.MINING_SCOPES,
+                'fleet_running':self.fleet.status()['task']['running'],'task': self.task_snapshot(), 'callback': self.origin+'/callback', 'scopes': SCOPES, 'skill_scopes': SKILL_SCOPES, 'pi_scopes': PI_SCOPES, 'intel_scopes':INTEL_SCOPES,'implant_scopes':IMPLANT_SCOPES,'learning_clone_scopes':LEARNING_CLONE_SCOPES,'contract_scopes':CONTRACT_SCOPES,'market_scopes':self.trade.dashboard()['scopes'],'mining_scopes':mining.MINING_SCOPES,'research_scopes':research.RESEARCH_SCOPES,
                 'crypto_available': crypto_available()}
 
 
@@ -790,7 +800,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/readiness.js', '/learning-clones.js', '/locations.js', '/market-history.js', '/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/research.js', '/readiness.js', '/learning-clones.js', '/locations.js', '/market-history.js', '/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
                                  mimetypes.guess_type(path)[0] or 'application/octet-stream')
             if path.startswith('/desktop/auth/'):
@@ -861,6 +871,9 @@ class Handler(BaseHTTPRequestHandler):
                 if self.app.eve.authorized_feature=='contracts':
                     try:self.app.start_task('contracts')
                     except PlanningError:pass
+                if self.app.eve.authorized_feature=='research':
+                    try:self.app.start_task('research')
+                    except PlanningError:pass
                 if self.app.eve.authorized_feature=='mining':
                     try:self.app.start_task('mining')
                     except PlanningError:pass
@@ -881,6 +894,13 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/corporations':
                 return self.send(200,corporation_dashboard(self.app.store))
             if path == '/api/accounts':return self.send(200,accounts.dashboard(self.app.store))
+            if path == '/api/research':
+                with self.app.catalog.lock:
+                    value=research.dashboard(self.app.store,self.app.catalog,query.get('at',[None])[0],int(query.get('character_id',['0'])[0]),self.app.eve.granted_scopes())
+                ids=sorted({r['datacore_id'] for r in value['rows'] if r['datacore_id']})
+                value['prices']=self.app.market.snapshot(ids)
+                value['next_refresh']=self.app.refresh_policy.next_at(['research'])
+                return self.send(200,value)
             if path == '/api/mining':
                 with self.app.catalog.lock:
                     return self.send(200,mining.dashboard(self.app.store,self.app.catalog,query.get('start',[None])[0],query.get('end',[None])[0],int(query.get('character_id',['0'])[0]),int(query.get('ore_id',['0'])[0]),self.app.eve.granted_scopes()))
@@ -1081,7 +1101,7 @@ class Handler(BaseHTTPRequestHandler):
                     if char_id not in {c['id'] for c in self.app.store.characters()}:
                         raise PlanningError('A karakter már nincs hozzáadva.')
                 feature=data.get('feature')
-                if feature not in [None,'skills','pi','corporations','moons','intel','mining','markets','implants','learning_clones','contracts','all']:raise PlanningError('Ismeretlen engedélyezési cél.')
+                if feature not in [None,'skills','pi','corporations','moons','intel','mining','markets','implants','learning_clones','contracts','research','all']:raise PlanningError('Ismeretlen engedélyezési cél.')
                 url = self.app.eve.start(self.app.cookie, self.app.origin+'/callback',char_id,feature)
                 return self.send(200,self.app.desktop_auth_start(url) if data.get('desktop') is True else {'url':url})
             elif path == '/api/characters/remove':
@@ -1117,8 +1137,8 @@ class Handler(BaseHTTPRequestHandler):
                 with self.app.task_lock:
                     started=False if self.app.task['running'] else self.app.start_task('notifications',manual=data.get('manual') is True)
                 return self.send(200,{'ok':True,'started':started,'next_sync_at':self.app.refresh_policy.next_at(self.app.refresh_domains('notifications'))})
-            elif path in ['/api/sync','/api/contracts/sync','/api/skills/sync','/api/mining/sync','/api/pi/sync','/api/corporations/sync']:
-                kind={'/api/contracts/sync':'contracts','/api/sync':'sync','/api/skills/sync':'skills','/api/mining/sync':'mining','/api/pi/sync':'pi','/api/corporations/sync':'corporations'}[path]
+            elif path in ['/api/research/sync','/api/sync','/api/contracts/sync','/api/skills/sync','/api/mining/sync','/api/pi/sync','/api/corporations/sync']:
+                kind={'/api/research/sync':'research','/api/contracts/sync':'contracts','/api/sync':'sync','/api/skills/sync':'skills','/api/mining/sync':'mining','/api/pi/sync':'pi','/api/corporations/sync':'corporations'}[path]
                 self.app.start_task(kind,manual=data.get('manual') is True)
             elif path == '/api/sde/update':
                 self.app.start_task('sde')

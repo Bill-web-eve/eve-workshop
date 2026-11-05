@@ -27,6 +27,12 @@ class ExtractionTests(unittest.TestCase):
         parts={'moon_timers':snap({'corporation_id':98,'rows':[self.timer] if rows is None else rows})}
         if event:parts['moon_calendar']=snap([self.event])
         self.s.save_snapshots(1,parts,domain='moon_timers')
+    def test_known_moon_times_follow_daily_freshness_not_short_http_cache(self):
+        self.seed()
+        self.assertFalse(report(self.s,self.c,self.now+3600)['events'][0]['stale'])
+        self.assertTrue(report(self.s,self.c,self.now+86401)['events'][0]['stale'])
+        self.s.resource_error(1,'moon_timers','Unavailable')
+        self.assertTrue(next(r for r in report(self.s,self.c,self.now)['access'] if r['id']==1)['moon_timers']['stale'])
     def calendar_completion(self,moon_id=None,**updates):
         return dict(self.event,title='Moon extraction for RP2-OQ - Private - 0',
             text='The moon chunk extraction for <a href="showinfo:35835//900001">RP2-OQ - Private drill</a> at '

@@ -772,3 +772,20 @@ After a temporary ESI or network failure, the already-open last successful calcu
 ## Reservations across mismatched ESI snapshots
 
 The app retains a local copy of the last coherent plan allocation. If a delivered component has disappeared from running jobs but inventory still predates delivery, it displays the previously confirmed plan and reservation with a timestamp and warning. It does not regenerate that component’s inputs at another plan’s expense or add presumed inventory. This is a read-only historical view: saving, new reservations and final scheduling await newer inventory. Reuse requires the same target, quantity, production scope, parameters and reservation order. New or changed targets without a confirmed view can only use the separately marked uncertain preview. Real shortages remain visible once fresh data arrives.
+
+
+## Research agents and datacores
+
+**Research agents** in the sidebar combines R&D agents from every added character. Switch between **By agent**, **By character**, and **By datacore**, filter a character, or choose a future redemption time. Dates use your computer's local time. CSV export is available.
+
+Enable **esi-characters.read_agents_research.v1** in your EVE Developer application, then use **Authorize research access** at the bottom of the page or under **Settings → Data access** for each character. **Authorize all access** includes this scope and preserves previously granted permissions.
+
+Estimated RP follows ESI's formula: remainder points + points per day × elapsed days since the start. Each character–agent pair is rounded down separately at **100 RP per datacore**; leftover RP cannot be pooled. Choose **Jita buy**, **Jita sell**, or **Jita split** without another market request. The overview shows gross value, the **10,000 ISK/datacore redemption fee**, and value after redemption, before sales tax and broker fee. Missing item mappings or prices are shown as incomplete data rather than zero value.
+
+ESI does not provide a halt flag or RP cap. Forecasts assume continuous production and are estimates, not confirmed in-game balances. Refresh after redemption to obtain the new remainder; valid ESI cache entries are still respected.
+
+Research data and the Jita prices fetched for this view refresh automatically **once every 24 hours**, including during general EVE checks. The dedicated research refresh button is a manual exception. Cached snapshots and attempt spacing survive app restarts.
+
+### Daily moon-data refresh
+
+Automatic moon calendar, notification and corporation extraction timer refreshes run **once every 24 hours**. A general EVE refresh does not bypass this interval. Attempts remain spaced after failures and app restarts. Use the dedicated **Settings → Data access → Refresh moon data** button for a manual check. Local calendar exports, countdowns and alerts for already known extraction times continue using the saved data. The existing 90-day cache for static system metadata remains in effect.

@@ -2,6 +2,14 @@
 import time
 
 AUTO_SECONDS=15*60
+DAILY_SECONDS=24*60*60
+
+def interval(domain):
+    return DAILY_SECONDS if domain in ['research','extractions','moon-universe'] else AUTO_SECONDS
+
+def fresh_until(snapshot,domain):
+    """Presentation freshness follows our polling cadence, not HTTP cache TTL."""
+    return max(snapshot['expires'],snapshot['fetched']+interval(domain))
 
 class RefreshPolicy:
     def __init__(self,store):
@@ -15,7 +23,7 @@ class RefreshPolicy:
             db.execute('BEGIN IMMEDIATE')
             for domain in set(domains):
                 row=db.execute('SELECT attempted FROM refresh_attempts WHERE domain=?',(domain,)).fetchone()
-                if manual or row is None or now>=row['attempted']+AUTO_SECONDS:
+                if manual or row is None or now>=row['attempted']+interval(domain):
                     db.execute('INSERT OR REPLACE INTO refresh_attempts VALUES(?,?)',(domain,now));allowed.add(domain)
         return allowed
 
@@ -24,5 +32,5 @@ class RefreshPolicy:
             values=[]
             for domain in domains:
                 row=db.execute('SELECT attempted FROM refresh_attempts WHERE domain=?',(domain,)).fetchone()
-                values.append(row['attempted']+AUTO_SECONDS if row else 0)
+                values.append(row['attempted']+interval(domain) if row else 0)
         return min(values,default=0)

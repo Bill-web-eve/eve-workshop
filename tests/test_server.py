@@ -683,6 +683,9 @@ class ServerTests(unittest.TestCase):
             self.app.eve.sync_skills=Mock(return_value=[]);self.app.eve.sync_pi=Mock(return_value=[])
             self.app.store.save_snapshots(1,{'moon_calendar':{'data':[],'fetched':time.time(),'expires':time.time()+600,'etag':None}},domain='moon_calendar')
             for fail in [False,True]:
+                # Each scenario exercises a real request; daily spacing itself
+                # is covered separately by the refresh-policy tests.
+                with self.app.store.db() as db:db.execute("DELETE FROM refresh_attempts WHERE domain='extractions'")
                 rows=optional+[{'id':1,'kind':'calendar','ok':False,'error':'offline'}] if fail else optional
                 with self.subTest(kind=kind,fail=fail),patch('muhely.server.extractions.sync',return_value=rows):
                     self.app.start_task(kind)

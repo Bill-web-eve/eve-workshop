@@ -6,6 +6,7 @@ from decimal import Decimal,InvalidOperation
 import json
 import math
 import re
+from .refresh_policy import fresh_until
 
 SCOPE='esi-characters.read_notifications.v1'
 TYPES={'MoonminingExtractionStarted','MoonminingExtractionFinished','MoonminingAutomaticFracture','MoonminingLaserFired','MoonminingExtractionCancelled'}
@@ -94,7 +95,7 @@ def cycles(store,catalog,now):
         snap=store.snapshot(char['id'],'moon_notifications')
         if not snap:continue
         status=store.resource_status(char['id'],'moon_notifications') or {}
-        stale=snap['expires']<=now or bool(status.get('error'))
+        stale=fresh_until(snap,'extractions')<=now or bool(status.get('error'))
         for row in snap['data']['notifications']:
             if row['notification_id'] in observed and (observed[row['notification_id']]['checked']>snap['fetched'] or observed[row['notification_id']]['checked']==snap['fetched'] and (not observed[row['notification_id']]['stale'] or stale)):continue
             try:

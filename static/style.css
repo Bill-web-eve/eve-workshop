@@ -313,3 +313,10 @@ html[data-theme=dark] .badge.input-stock{background:#203f35;color:#9bddb9}html[d
 .queue-table .table-filters :is(input,select){min-width:45px;max-width:100%;padding:5px 4px}
 .copy-run-count{border:0;background:transparent;color:inherit;font:inherit;font-weight:650;padding:3px 0;cursor:copy;white-space:nowrap}
 .copy-run-count:hover{color:var(--blue);text-decoration:underline}
+
+.research-controls{display:flex;align-items:end;flex-wrap:wrap;gap:12px;margin-bottom:12px;padding:12px 16px}
+.research-controls form{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:0}
+.research-controls label{display:grid;gap:4px;margin:0}.research-controls :is(input,select){padding:6px 8px;max-width:240px}
+.research-controls small{font-size:10px;color:var(--muted)}.research-metrics{gap:10px;margin-bottom:10px}.research-metrics .metric{padding:12px 14px}.research-metrics strong{font-size:19px}
+.research-agents .copy-item-name{white-space:normal}.research-agents td{max-width:220px}.research-agents .table-sort{white-space:normal}
+@media(max-width:1100px){.research-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}

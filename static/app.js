@@ -222,8 +222,9 @@ function scheduleTaskPoll() {
       if(!state.task.running && state.task.finished!==lastTaskFinished) {
         lastTaskFinished=state.task.finished;if(state.task.kind!=='notifications')toast(state.task.message);
         if(view==='settings'&&settingsTab==='access')void loadSettingsAccess();
-        if(!['skills','pi','notifications','mining'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
-        if(view==='contracts'){await loadContracts(true);}
+        if(!['research','skills','pi','notifications','mining'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
+        if(view==='research'){await refreshResearch();}
+        else if(view==='contracts'){await loadContracts(true);}
         else if(state.task.kind==='contracts'){void refreshNotifications();render();}
         else if(view==='jobs'){render();}
         else if(state.task.kind==='notifications'){skillData=null;piData=null;moonData=null;settingsAccessData=null;void refreshNotifications();if(view==='mining')await refreshMining();else if(view==='skills')await refreshSkills();else if(view==='pi')await refreshPI();else if(view==='moons')await refreshMoons();else if(productId&&(!plan||plan.refresh_error)&&['queue','graph','shopping','inventory','blueprints','schedule'].includes(view))await calculate(false);}
@@ -309,9 +310,9 @@ function navigate(next) {
   syncMoonNavigation();
   clearTimeout(skillTimer);
   clearTimeout(piTimer);
-  if(['reservations','contracts','fleet','mining','intel','skills','pi','notifications'].includes(next))error('');
+  if(['reservations','contracts','fleet','research','mining','intel','skills','pi','notifications'].includes(next))error('');
   $$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
-  const names={boosts:'Boost számláló',invention:'Invention és BPC-költség',reservations:'Foglalások',contracts:'Szerződések',fleet:'Flottatevékenység',mining:'Bányászati napló',intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
+  const names={boosts:'Boost számláló',invention:'Invention és BPC-költség',reservations:'Foglalások',contracts:'Szerződések',fleet:'Flottatevékenység',research:'Research agentek',mining:'Bányászati napló',intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
   $('#breadcrumb').textContent='Műhely / '+names[view]; render();return true;
 }
 function render() {
@@ -328,10 +329,11 @@ function render() {
   const content=$('#view-content'); actions();
   const finance=$('#production-finance');if(finance)finance.hidden=true;
   document.body.classList.toggle('manual-view',view==='documentation');
-  $('.plan-selector').hidden=['reservations','contracts','fleet','jobs','mining','intel','boosts','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures')||(view==='inventory'&&inventoryMode!=='plan');
+  $('.plan-selector').hidden=['reservations','contracts','fleet','jobs','research','mining','intel','boosts','notifications','skills','pi','corporations','moons','documentation'].includes(view)||(view==='settings'&&settingsTab!=='structures')||(view==='inventory'&&inventoryMode!=='plan');
   $('#plan-status').hidden=view==='jobs'||!plan?.stale_characters.length;
   if(view==='contracts'){ $('#plan-status').hidden=true;return renderContracts(content); }
   if(view==='fleet'){ $('#plan-status').hidden=true;return renderFleet(content); }
+  if(view==='research'){ $('#plan-status').hidden=true;return renderResearch(content); }
   if(view==='mining'){ $('#plan-status').hidden=true;return renderMining(content); }
   if(view==='intel')return renderIntel(content);
   if(view==='boosts'){ $('#plan-status').hidden=true;return renderBoosts(content); }
@@ -706,12 +708,13 @@ async function startTask(path,manual=true) {
     if(Object.keys(dirty).length) throw new Error('A frissítés előtt alkalmazd a megadott módosításokat.');
     await api(path,{manual}); await reloadState();
     if(!manual&&!state.task.running)return;
-    if(['contracts','jobs','mining','skills','pi','corporations','moons','settings'].includes(view))render();
+    if(['research','contracts','jobs','mining','skills','pi','corporations','moons','settings'].includes(view))render();
     if(!state.task.running) {
       if(manual)toast(state.task.message);
       if(view==='settings'&&settingsTab==='access')void loadSettingsAccess();
-      if(!['skills','pi','notifications','mining'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
-      if(view==='contracts'){await loadContracts(true);}
+      if(!['research','skills','pi','notifications','mining'].includes(state.task.kind) && state.task.results.some(r=>!r.ok)) error(state.task.message);
+      if(view==='research'){await refreshResearch();}
+        else if(view==='contracts'){await loadContracts(true);}
       else if(state.task.kind==='contracts'){void refreshNotifications();render();}
       else if(view==='jobs'){render();}
       else if(state.task.kind==='corporations'){corporationData=null;if(view==='corporations')await refreshCorporations();else if(view==='settings')render();else await calculate(false);}
@@ -786,6 +789,6 @@ document.addEventListener('click',event=>{if(!event.target.closest('.search-wrap
     if(saved?.id && saved?.quantity){productId=saved.id;productName=saved.name;activePlanId=saved.saved_plan_id||null;EveNumbers.set($('#target-quantity'),saved.quantity);}
   }catch{}
   $('#product-search').value=productName;
-  try {if(intelWindowMode){await reloadState();view='intel';render();startIntelMonitor();return;}await reloadState();scheduleNotificationMonitor();startIntelMonitor();void refreshNotifications();if(productId)await calculate(false);else render();if(new URLSearchParams(location.search).has('connected')){history.replaceState(null,'','/');const back=sessionStorage.getItem('eve-muhely-auth-return');sessionStorage.removeItem('eve-muhely-auth-return');if(back?.startsWith('settings:'))openSettingsTab(back.split(':')[1]);else navigate(['mining','skills','pi','corporations','moons'].includes(back)?back:'connection');if(back==='corporations')void startTask('/api/corporations/sync');toast(back==='moons'?'Holdadatok engedélyezve. A betöltés automatikusan elindult.':'Karakter engedélyezve. Frissítsd az EVE-adatokat.');}}
+  try {if(intelWindowMode){await reloadState();view='intel';render();startIntelMonitor();return;}await reloadState();scheduleNotificationMonitor();startIntelMonitor();void refreshNotifications();if(productId)await calculate(false);else render();if(new URLSearchParams(location.search).has('connected')){history.replaceState(null,'','/');const back=sessionStorage.getItem('eve-muhely-auth-return');sessionStorage.removeItem('eve-muhely-auth-return');if(back?.startsWith('settings:'))openSettingsTab(back.split(':')[1]);else navigate(['research','mining','skills','pi','corporations','moons'].includes(back)?back:'connection');if(back==='corporations')void startTask('/api/corporations/sync');toast(back==='moons'?'Holdadatok engedélyezve. A betöltés automatikusan elindult.':'Karakter engedélyezve. Frissítsd az EVE-adatokat.');}}
   catch(e){error(e.message);}
 })();

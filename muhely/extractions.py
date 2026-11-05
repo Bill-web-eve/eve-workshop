@@ -10,6 +10,7 @@ import time
 from .esi import ESI, EsiError, AuthenticationError, MoonScopeError
 from . import moon_notifications as notices
 from . import progress
+from .refresh_policy import fresh_until
 
 CALENDAR_SCOPE='esi-calendar.read_calendar_events.v1'
 MINING_SCOPE='esi-industry.read_corporation_mining.v1'
@@ -288,7 +289,7 @@ def report(store,catalog,now=None,access_scopes=None):
         entry={'id':char['id'],'name':char['name']}
         for kind in ['moon_calendar','moon_timers','moon_notifications']:
             snap=store.snapshot(char['id'],kind);status=store.resource_status(char['id'],kind) or {}
-            entry[kind]={'fetched':(snap or {}).get('fetched'),'expires':(snap or {}).get('expires'),'error':status.get('error'),'needs_auth':bool(status.get('needs_auth')),'stale':not snap or snap['expires']<=now or bool(status.get('error'))}
+            entry[kind]={'fetched':(snap or {}).get('fetched'),'expires':(snap or {}).get('expires'),'next_refresh':fresh_until(snap,'extractions') if snap else None,'error':status.get('error'),'needs_auth':bool(status.get('needs_auth')),'stale':not snap or fresh_until(snap,'extractions')<=now or bool(status.get('error'))}
             scope={'moon_calendar':CALENDAR_SCOPE,'moon_timers':MINING_SCOPE,'moon_notifications':notices.SCOPE}[kind]
             entry[kind]['scope_granted']=scope in access_scopes.get(char['id'],[]) if access_scopes is not None else None
             entry[kind]['optional_unavailable']=kind=='moon_timers' and not snap and status.get('error')==TIMER_ROLE_ERROR
