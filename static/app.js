@@ -313,7 +313,7 @@ function navigate(next) {
   if(['reservations','contracts','fleet','research','mining','intel','skills','pi','notifications'].includes(next))error('');
   $$('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));
   const names={boosts:'Boost számláló',invention:'Invention és BPC-költség',reservations:'Foglalások',contracts:'Szerződések',fleet:'Flottatevékenység',research:'Research agentek',mining:'Bányászati napló',intel:'Inteltérkép',notifications:'Értesítések',schedule:'Gyártásütemező',queue:'Gyártási terv',graph:'Gyártási gráf',shopping:'Alapanyaghiány',inventory:'Készlet',blueprints:'Blueprint',jobs:'Folyamatban',skills:'Skillek és tanulás',pi:'Bolygók és PI',moons:'Holdak és kitermelés',corporations:'Corporationok',settings:'Beállítások',connection:'EVE-kapcsolat',saved:'Mentett tervek',documentation:'Dokumentáció'};
-  $('#breadcrumb').textContent='Műhely / '+names[view]; render();return true;
+  $('#breadcrumb').textContent='Műhely / '+names[view]; render();if(next==='research')void refreshResearch();return true;
 }
 function render() {
   if(!state) return;

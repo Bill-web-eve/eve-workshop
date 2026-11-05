@@ -53,3 +53,13 @@ test('per-character authorization requests only the research feature and preserv
  assert.deepEqual(JSON.parse(JSON.stringify(w.calls[0])),{path:'/api/auth/start',body:{character_id:2,feature:'research'}});
  assert.equal(w.sessionStorage.getItem('eve-muhely-auth-return'),'research');
 });
+test('reopening research reloads locally cached data after permissions or snapshots change',async t=>{
+ const f=await fixture();t.after(f.close);const {d,w,run}=f;
+ d.body.insertAdjacentHTML('beforeend','<div id="breadcrumb"></div>');
+ run(`let dirty={},settingsTab='appearance',skillTimer=null,piTimer=null;function syncSettingsNavigation(){}function syncMoonNavigation(){}`);
+ const app=fs.readFileSync(__dirname+'/../static/app.js','utf8');run(app.slice(app.indexOf('function navigate(next)'),app.indexOf('function render()')));
+ run('researchData={...DATA,rows:[],quantity:0};view="settings";navigate("research");');
+ await tick();await tick();
+ assert(w.calls.some(c=>c.path.startsWith('/api/research?')));assert(d.querySelector('.research-agents').textContent.includes('Agent <script>'));
+ assert(!w.calls.some(c=>c.path.includes('/sync')||c.path.includes('/prices')));
+});

@@ -40,6 +40,7 @@ globalThis.EveDesktop=(()=>{
       if(back?.startsWith('settings:'))openSettingsTab(back.split(':')[1]);
       if(back==='settings:notifications'&&typeof refreshNotifications==='function')await refreshNotifications(false);
       if(back==='mining'){navigate('mining');void refreshMining();}
+      if(back==='research'){navigate('research');void refreshResearch();}
       render();
       preferences();await send('activate');toast('Karakter engedélyezve. Frissítsd az EVE-adatokat.');return;
     }

@@ -28,6 +28,13 @@ test('native authorization returns to the requested Settings section without nav
  assert.equal(w.location.pathname,'/');assert.equal(w.returnedTab,'access');assert.equal(w.sessionStorage.getItem('eve-muhely-auth-return'),null);
  assert.equal(messages.find(m=>m.action==='external').url,'http://127.0.0.1:8765/desktop/auth/test-ticket');assert(messages.some(m=>m.action==='activate'));
 });
+test('research authorization returns to research and rereads the local snapshot',async t=>{
+ const {w,run}=fixture();t.after(()=>w.close());const timer=w.setTimeout;w.setTimeout=(cb,ms)=>timer(cb,ms===2000?0:ms);
+ run("globalThis.toast=()=>{};globalThis.api=async()=>({status:'complete'});globalThis.reloadState=async()=>{};globalThis.render=()=>{};globalThis.navigate=v=>globalThis.returnedView=v;globalThis.refreshResearch=async()=>globalThis.researchReloaded=true;");
+ w.sessionStorage.setItem('eve-muhely-auth-return','research');
+ await w.EveDesktop.authorize({url:'http://127.0.0.1:8765/desktop/auth/test-ticket',ticket:'test-ticket'});
+ assert.equal(w.returnedView,'research');assert.equal(w.researchReloaded,true);
+});
 test('quit checks pending work and shuts down with the current CSRF token',async t=>{
  const {w,messages,run}=fixture();t.after(()=>w.close());const requests=[];
  run('let dirty={stock:true};');
