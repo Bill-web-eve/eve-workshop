@@ -813,7 +813,7 @@ The **Shortcuts received** counter confirms that a configured combination reache
 
 In **eve-preview → Mining alerts**, enable or disable local **Gamelogs** monitoring and set its folder path. The default is EVE's standard folder, or the Gamelogs sibling of the configured Intel chat folder. No new ESI permission or request is needed. Badges match the original EVE character name, regardless of custom preview labels.
 
-New log messages add separate icons in the upper-right corner for **cargo full**, **crystal destroyed** and **asteroid depleted**. Hover to see the time and named module/crystal. Existing history is skipped when monitoring starts; a new game-log session starts with fresh alerts. **Acknowledge** removes the events already shown. Mining by another laser does not clear a broken crystal or depleted asteroid event.
+New log messages add separate icons at the right end of the character-name bar for **cargo full**, **crystal destroyed** and **asteroid depleted**. Hover to see the time and named module/crystal. Existing history is skipped when monitoring starts; a new game-log session starts with fresh alerts. **Acknowledge** removes the events already shown. Mining by another laser does not clear a broken crystal or depleted asteroid event.
 
 Crystal replacement/loading is not reliably logged. **Click the crystal icon** to mark it replaced: it becomes a **pause icon**. The next new successful mining event clears pause automatically; clicking pause also clears it. This confirms mining has resumed for the character, not for each laser: the log does not identify individual module slots. Icon clicks also select the EVE window; they never activate in-game modules.
 

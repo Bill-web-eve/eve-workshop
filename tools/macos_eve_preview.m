@@ -23,6 +23,8 @@
 @property NSPoint dragStart;
 @property NSRect initialFrame;
 @property BOOL resizing,dragging;
+- (NSRect)miningBadgeRect:(NSUInteger)index;
+- (NSRect)captionRect;
 @end
 
 API_AVAILABLE(macos(12.3))
@@ -370,16 +372,18 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
 
 @implementation EvePreviewTile
 - (BOOL)isFlipped{return YES;}
+- (NSRect)miningBadgeRect:(NSUInteger)index {return NSMakeRect(self.bounds.size.width-22*(self.miningAlerts.count-index)-4,2,20,20);}
+- (NSRect)captionRect {CGFloat right=self.miningAlerts.count?NSMinX([self miningBadgeRect:0])-6:self.bounds.size.width-7;return NSMakeRect(7,4,MAX(0,right-7),17);}
 - (void)drawRect:(NSRect)dirty {
     NSColor *paper=self.light?[NSColor colorWithWhite:.95 alpha:1]:[NSColor colorWithSRGBRed:.07 green:.13 blue:.18 alpha:1],*ink=self.light?NSColor.labelColor:[NSColor colorWithWhite:.9 alpha:1];[paper setFill];NSRectFill(self.bounds);
     if(self.image)[self.image drawInRect:NSInsetRect(NSMakeRect(0,24,self.bounds.size.width,self.bounds.size.height-24),2,2) fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1 respectFlipped:YES hints:nil];
-    NSString *caption=[self.caption stringByAppendingString:self.editing?@" · ↔":@""];[caption drawInRect:NSMakeRect(7,4,self.bounds.size.width-14,18) withAttributes:@{NSFontAttributeName:[NSFont systemFontOfSize:11 weight:NSFontWeightSemibold],NSForegroundColorAttributeName:ink}];
+    NSString *caption=[self.caption stringByAppendingString:self.editing?@" · ↔":@""];NSMutableParagraphStyle *paragraph=[NSMutableParagraphStyle new];paragraph.lineBreakMode=NSLineBreakByTruncatingTail;[caption drawInRect:[self captionRect] withAttributes:@{NSFontAttributeName:[NSFont systemFontOfSize:11 weight:NSFontWeightSemibold],NSForegroundColorAttributeName:ink,NSParagraphStyleAttributeName:paragraph}];
     NSDictionary *symbols=@{@"cargo_full":@"shippingbox.fill",@"crystal_broken":@"diamond.fill",@"rock_depleted":@"mountain.2.fill",@"module_stopped":@"pause.fill"};
     for(NSUInteger i=0;i<self.miningAlerts.count;i++){
-        NSDictionary *alert=self.miningAlerts[i];NSRect badge=NSMakeRect(self.bounds.size.width-29*(self.miningAlerts.count-i)-4,29,26,26);
+        NSDictionary *alert=self.miningAlerts[i];NSRect badge=[self miningBadgeRect:i];
         NSColor *color=[alert[@"kind"] isEqual:@"rock_depleted"]?[NSColor colorWithSRGBRed:.28 green:.37 blue:.45 alpha:.96]:[alert[@"kind"] isEqual:@"module_stopped"]?[NSColor colorWithSRGBRed:.15 green:.42 blue:.6 alpha:.96]:[alert[@"kind"] isEqual:@"cargo_full"]?[NSColor colorWithSRGBRed:.75 green:.19 blue:.18 alpha:.96]:[NSColor colorWithSRGBRed:.64 green:.38 blue:.10 alpha:.96];[color setFill];[[NSBezierPath bezierPathWithRoundedRect:badge xRadius:5 yRadius:5] fill];
         NSImage *symbol=[NSImage imageWithSystemSymbolName:symbols[alert[@"kind"]] accessibilityDescription:alert[@"kind"]];if(!symbol)symbol=[NSImage imageWithSystemSymbolName:@"triangle.fill" accessibilityDescription:alert[@"kind"]];
-        [NSGraphicsContext saveGraphicsState];[[NSColor whiteColor] set];NSImage *white=[NSImage imageWithSize:NSMakeSize(16,16) flipped:NO drawingHandler:^BOOL(NSRect rect){[symbol drawInRect:rect];[NSColor.whiteColor setFill];NSRectFillUsingOperation(rect,NSCompositingOperationSourceAtop);return YES;}];[white drawInRect:NSInsetRect(badge,5,5) fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1 respectFlipped:YES hints:nil];
+        [NSGraphicsContext saveGraphicsState];[[NSColor whiteColor] set];NSImage *white=[NSImage imageWithSize:NSMakeSize(16,16) flipped:NO drawingHandler:^BOOL(NSRect rect){[symbol drawInRect:rect];[NSColor.whiteColor setFill];NSRectFillUsingOperation(rect,NSCompositingOperationSourceAtop);return YES;}];[white drawInRect:NSInsetRect(badge,3,3) fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1 respectFlipped:YES hints:nil];
         if([@[@"crystal_broken",@"rock_depleted"] containsObject:alert[@"kind"]]){NSBezierPath *slash=[NSBezierPath bezierPath];slash.lineWidth=2;[slash moveToPoint:NSMakePoint(NSMinX(badge)+5,NSMaxY(badge)-5)];[slash lineToPoint:NSMakePoint(NSMaxX(badge)-5,NSMinY(badge)+5)];[slash stroke];}[NSGraphicsContext restoreGraphicsState];
     }
     if(self.message.length)[self.message drawInRect:NSMakeRect(8,32,self.bounds.size.width-16,20) withAttributes:@{NSFontAttributeName:[NSFont systemFontOfSize:10],NSForegroundColorAttributeName:ink}];
@@ -389,7 +393,7 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
 - (void)mouseDown:(NSEvent *)event {
     if(!self.editing){
         NSPoint at=[self convertPoint:event.locationInWindow fromView:nil];
-        for(NSUInteger i=0;i<self.miningAlerts.count;i++)if(NSPointInRect(at,NSMakeRect(self.bounds.size.width-29*(self.miningAlerts.count-i)-4,29,26,26))){
+        for(NSUInteger i=0;i<self.miningAlerts.count;i++)if(NSPointInRect(at,[self miningBadgeRect:i])){
             NSDictionary *alert=self.miningAlerts[i];if([@[@"crystal_broken",@"module_stopped"] containsObject:alert[@"kind"]]&&self.owner.miningAction){
                 NSDictionary *slot=nil;for(NSDictionary *row in self.owner.slots)if([row[@"key"] isEqual:self.slotID])slot=row;
                 NSString *title=slot[@"title"];NSString *name=[title hasPrefix:@"EVE - "]?[title substringFromIndex:6]:title;
