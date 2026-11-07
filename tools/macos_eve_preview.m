@@ -77,6 +77,13 @@ API_AVAILABLE(macos(12.3))
 
 static BOOL EvePreviewBoolean(id value){return [value isKindOfClass:NSNumber.class]&&CFGetTypeID((__bridge CFTypeRef)value)==CFBooleanGetTypeID();}
 static BOOL EvePreviewShortcut(id value){return [value isKindOfClass:NSDictionary.class]&&[value[@"code"] isKindOfClass:NSNumber.class]&&[value[@"modifiers"] isKindOfClass:NSNumber.class]&&!EvePreviewBoolean(value[@"code"])&&!EvePreviewBoolean(value[@"modifiers"])&&[value[@"modifiers"] doubleValue]==[value[@"modifiers"] integerValue]&&[value[@"code"] integerValue]>=0&&[value[@"code"] integerValue]<=126&&[value[@"code"] doubleValue]==[value[@"code"] integerValue]&&[value[@"modifiers"] integerValue]>0&&([value[@"modifiers"] unsignedIntValue]&~(cmdKey|optionKey|controlKey|shiftKey))==0;}
+// Public compatibility APIs for EVE clients whose AppKit process ID is -1.
+// These are used only after validating the window owner's EVE bundle identity.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+static BOOL EvePreviewLegacyActivate(pid_t pid){ProcessSerialNumber psn;return GetProcessForPID(pid,&psn)==noErr&&SetFrontProcessWithOptions(&psn,kSetFrontProcessFrontWindowOnly|kSetFrontProcessCausedByUser)==noErr;}
+static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1;if(GetFrontProcess(&psn)==noErr)GetProcessPID(&psn,&pid);return pid;}
+#pragma clang diagnostic pop
 static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void *context){
     EventHotKeyID key;if(GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key)!=noErr)return eventNotHandledErr;
     if(key.signature!='EVEP')return eventNotHandledErr;
@@ -121,7 +128,7 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
         AXUIElementRef system=AXUIElementCreateSystemWide();CFTypeRef focused=NULL;
         AXUIElementSetMessagingTimeout(system,.35);
         if(AXUIElementCopyAttributeValue(system,kAXFocusedApplicationAttribute,&focused)==kAXErrorSuccess){AXUIElementGetPid((AXUIElementRef)focused,&pid);CFRelease(focused);}CFRelease(system);
-    }return pid;
+    }if(pid<=0)pid=EvePreviewLegacyFrontPID();return pid;
 }
 - (NSRunningApplication *)applicationForPID:(pid_t)pid{return [NSRunningApplication runningApplicationWithProcessIdentifier:pid];}
 - (BOOL)captureAllowed{return CGPreflightScreenCaptureAccess();}
@@ -243,6 +250,7 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
     // Some EVE clients expose no AX windows. Activating the verified game
     // process still focuses that client; AX raising is an optional refinement.
     BOOL ok=game.processIdentifier>0?[game activateWithOptions:0]:NO;
+    if(!ok)ok=EvePreviewLegacyActivate(pid);
     // Never use game.processIdentifier here: it is -1 for some real EVE clients.
     AXUIElementRef app=AXUIElementCreateApplication(pid);AXUIElementSetMessagingTimeout(app,.35);
     if(AXUIElementSetAttributeValue(app,kAXFrontmostAttribute,kCFBooleanTrue)==kAXErrorSuccess)ok=YES;
