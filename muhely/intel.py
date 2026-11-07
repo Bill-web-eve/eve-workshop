@@ -16,10 +16,11 @@ LINE=re.compile(r'^\ufeff*\[\s*(\d{4}\.\d\d\.\d\d \d\d:\d\d:\d\d)\s*\]\s*([^>]{1
 LINK=re.compile(r'<url=["\']?showinfo:(137[3-9]|138[0-6])//(\d+)["\']?>(.*?)</url>',re.I)
 WEB_URL=re.compile(r"(?<![\w@])(?:https?://|www\.)[^\s<>\"']+|(?<![\w@])(?:[a-z0-9-]+\.)+[a-z]{2,}/[^\s<>\"']*",re.I)
 MARKUP_LINK=re.compile(r'<(url|a)\b[^>]*>.*?</\1\s*>',re.I|re.S)
-PARSER_VERSION=4
+PARSER_VERSION=5
 NAME_LOOKUP_DELAY=2
 COUNTED_GROUP=re.compile(r'(?<![\w-])([1-9]\d{0,4})\s*(?:x\s*)?(?:frat(?:ernity)?|goons?|horde|pandemic horde|init(?:iative)?|neuts?|hostiles?|reds?|pilots?|people|ships?|interceptors?|ceptors?|frigates?|frigs?|destroyers?|cruisers?|battlecruisers?|battleships?|caps(?:itals)?|bombers?)(?![\w-])',re.I)
-STOP=re.compile(r'\b(?:on|at|in|to|from|towards|gate|gates|out|of|with|and|plus|jumped|jumping|jump|left|leaving|reported|seen|was|is|are|no|visual|nv|ni|onlined|docked|undocked|likely|maybe|possibly|spike|spiked|spiking|clear|clr|cleared|loc|pls|please|status|check|checkin|check-in|help|scan|scanned|reported|still|just|now|local|heading|destination|need|needle|red|reds|new|ago|minutes?|minute|min|camp|camping|for|the|a|an|cloaked|cloak|suspect|scout|unknown|neut|neuts|neutral|hostile|hostiles|fleets?|tackled)\b',re.I)
+CHUNK_SEPARATOR=re.compile(r'[|,;:()\[\]<>/]|\s{2,}|(?:\s+[+\-]\s*)|(?:->|→|=>)')
+STOP=re.compile(r'\b(?:on|at|in|to|from|towards|gate|gates|out|of|with|and|or|his alts|her alts|their alts|but have|plus|jumped|jumping|jump|left|leaving|reported|seen|was|is|are|no|visual|nv|ni|onlined|docked|undocked|likely|maybe|possibly|spike|spiked|spiking|clear|clr|cleared|loc|pls|please|status|check|checkin|check-in|help|scan|scanned|reported|still|just|now|local|heading|destination|need|needle|red|reds|new|ago|minutes?|minute|min|camp|camping|for|the|a|an|cloaked|cloak|suspect|scout|unknown|neut|neuts|neutral|hostile|hostiles|fleets?|tackled)\b',re.I)
 
 
 def schema(store):
@@ -96,7 +97,21 @@ def scan_links(body):
     return links
 
 
-def parse_message(line,universe,channel,channel_id,now=None,regions=()):
+def name_chunks(text,universe):
+    start=0;result=[]
+    def add(first,last):
+        name=re.sub(r'\s+',' ',text[first:last]).strip(' .!*+"\t-')
+        if 3<=len(name)<=64 and len(name.split())<=8 and re.search('[A-Za-zÀ-ž]',name) and re.fullmatch(r"[\w .’'\-]+",name) and not re.match(r'^\d+(?:\s|$)',name) and not STOP.fullmatch(name) and not universe.ship_pattern.fullmatch(name):result.append((first,last,name))
+    for end,following in [(m.start(),m.end()) for m in CHUNK_SEPARATOR.finditer(text)]+[(len(text),len(text))]:
+        add(start,end)
+        for ship in universe.ship_pattern.finditer(text[start:end]):
+            tail=STOP.sub(' ',universe.ship_pattern.sub(' ',text[start+ship.start():end]))
+            if not re.search('[A-Za-zÀ-ž]',tail):add(start,start+ship.start())
+        start=following
+    return list(dict.fromkeys(result))[:24]
+
+
+def parse_message(line,universe,channel,channel_id,now=None,regions=(),known_names=()):
     match=LINE.match(line.strip());now=time.time() if now is None else now
     if not match:return None
     date,reporter,body=match.groups();reporter=reporter.strip();body=body[:4000]
@@ -122,22 +137,30 @@ def parse_message(line,universe,channel,channel_id,now=None,regions=()):
     for _,(start,end),_ in reversed(mentions):
         text=text[:start]+' '*max(1,end-start)+text[end:]
         remaining=remaining[:start]+' '*max(1,end-start)+remaining[end:]
+    chunks=name_chunks(remaining,universe);known={name.casefold() for name in known_names};trusted=[];ship_text=plain
+    occupied=[]
+    for start,end,name in sorted(chunks,key=lambda c:-len(c[2])):
+        if name.casefold() in known and not any(start<b and end>a for a,b in occupied):
+            occupied.append((start,end))
+            trusted.append({'name':name,'id':None,'verified':False})
+            text=text[:start]+' '*(end-start)+text[end:]
+            ship_text=ship_text[:start]+' '*(end-start)+ship_text[end:]
     text=universe.pattern.sub(' ',text);text=universe.ship_pattern.sub(' ',text)
-    ships=universe.reported_ships(plain)
+    ships=universe.reported_ships(ship_text)
     # Ordinary links are informational; recognized scans have their own visible reference.
     if state=='contact' and had_web_links and not scans and not linked and not ships and not re.search(r'\w',remaining):state='unparsed'
     text=re.sub(r'(?:\+\s*\d+|\b(?:\d+\s*x|x\s*\d+)\b)',' ',text,flags=re.I)
     candidates=[]
-    for chunk in re.split(r'[|,;:()\[\]<>/]|\s{2,}|(?:\s+[+\-]\s*)|(?:->|→|=>)',text):
+    for chunk in CHUNK_SEPARATOR.split(text):
         parts=STOP.split(chunk)
         for part in parts:
             name=re.sub(r'\s+',' ',part).strip(' .!*+"\t-')
             if 2<=len(name)<=64 and len(name.split())<=4 and re.search('[A-Za-zÀ-ž]',name) and re.fullmatch(r"[\w .’'\-]+",name) and not name.isdigit():
-                if name.casefold() not in {p['name'].casefold() for p in linked}:candidates.append({'name':name,'id':None,'verified':False})
-    pilots=list({p['name'].casefold():p for p in linked+candidates}.values())[:12] if state=='contact' else []
+                if name.casefold() not in {p['name'].casefold() for p in linked+trusted}:candidates.append({'name':name,'id':None,'verified':False})
+    pilots=list({p['name'].casefold():p for p in linked+trusted+candidates}.values())[:12] if state=='contact' else []
     count=re.search(r'(?:\+|\bspike\s+)(\d{1,5})\b',plain,re.I) or COUNTED_GROUP.search(plain)
     key='\0'.join([channel_id or channel.casefold(),date,reporter,body]);identity=hashlib.sha256(key.encode()).hexdigest()
-    return {'id':identity,'timestamp':at,'channel':channel,'reporter':reporter,'message':body,'systems':ids,'pilots':pilots,'ships':ships,'scan_links':scans,'state':state,'count':min(10000,int(count[1])) if count else len(pilots) or None,'ambiguous':len(ids)>1,'abbreviated':any(short for _,_,short in mentions),'parser_version':PARSER_VERSION}
+    return {'id':identity,'timestamp':at,'channel':channel,'reporter':reporter,'message':body,'systems':ids,'pilots':pilots,'ships':ships,'scan_links':scans,'name_chunks':[name for _,_,name in chunks],'state':state,'count':min(10000,int(count[1])) if count else len(pilots) or None,'ambiguous':len(ids)>1,'abbreviated':any(short for _,_,short in mentions),'parser_version':PARSER_VERSION}
 
 
 def enrich_reports(store,universe,reports):
@@ -153,6 +176,29 @@ def enrich_reports(store,universe,reports):
             if not pilot.get('id') and (entry or char):pilot['id']=entry['id'] if entry else char['id'];pilot['identified']=True
             pilot['zkill_url']=f"https://zkillboard.com/character/{pilot['id']}/" if type(pilot.get('id')) is int and pilot['id']>0 else None
     return reports
+
+
+def preload_character_cache(store,reports=(),now=None):
+    """Reuse character identities already downloaded elsewhere, without network requests."""
+    now=time.time() if now is None else now;entries={}
+    with store.db() as db:
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='fleet_sources'").fetchone():
+            row=db.execute("SELECT data,checked FROM fleet_sources WHERE key='battle-names'").fetchone()
+            if row:
+                try:values=json.loads(row['data'])
+                except (ValueError,TypeError):values={}
+                for ident,value in (values.items() if isinstance(values,dict) else []):
+                    if isinstance(value,dict) and value.get('category')=='character' and str(ident).isdigit() and int(ident)>0 and isinstance(value.get('name'),str) and 3<=len(value['name'])<=64:
+                        entries[value['name'].casefold()]=(int(ident),value['name'],min(now,row['checked'] or 0))
+        for report in reports:
+            for pilot in report['pilots']:
+                if pilot.get('verified') and type(pilot.get('id')) is int and pilot['id']>0 and 3<=len(pilot['name'])<=64:
+                    entries[pilot['name'].casefold()]=(pilot['id'],pilot['name'],report['timestamp'])
+        db.executemany('''INSERT INTO intel_characters(name,id,canonical,checked,retry_at) VALUES(?,?,?,?,?)
+            ON CONFLICT(name) DO UPDATE SET id=excluded.id,canonical=excluded.canonical,checked=excluded.checked,retry_at=excluded.retry_at
+            WHERE intel_characters.id IS NULL OR (intel_characters.id=excluded.id AND intel_characters.checked<excluded.checked)''',
+            [(name,ident,canonical,checked,checked+30*86400) for name,(ident,canonical,checked) in entries.items()])
+        return db.execute('SELECT count(*) FROM intel_characters WHERE id IS NOT NULL').fetchone()[0]
 
 
 def selected_characters(store,p):return [c for c in store.characters() if p['character_ids'] is None or c['id'] in p['character_ids']]
@@ -177,15 +223,17 @@ def positions(store,universe,p,now):
 
 
 @lru_cache(maxsize=4096)
-def reparse_report(message,timestamp,reporter,channel,universe,regions):
+def reparse_report(message,timestamp,reporter,channel,universe,regions,known_names=()):
     date=datetime.fromtimestamp(timestamp,timezone.utc).strftime('%Y.%m.%d %H:%M:%S')
-    parsed=parse_message(f'[ {date} ] {reporter} > {message}',universe,channel,'',timestamp,regions)
+    parsed=parse_message(f'[ {date} ] {reporter} > {message}',universe,channel,'',timestamp,regions,known_names)
     return json.dumps(parsed) if parsed else None
 
 
 def read_reports(store,p,now,universe=None):
     channels={s.casefold() for s in p['channels']}
-    with store.db() as db:rows=db.execute('SELECT data FROM intel_reports WHERE ts>=? AND ts<=? ORDER BY ts DESC LIMIT 3000',(now-86400,now+60)).fetchall()
+    with store.db() as db:
+        rows=db.execute('SELECT data FROM intel_reports WHERE ts>=? AND ts<=? ORDER BY ts DESC LIMIT 3000',(now-86400,now+60)).fetchall()
+        known={r[0] for r in db.execute('SELECT name FROM intel_characters WHERE id IS NOT NULL')}
     reports=[]
     for raw in rows:
         row=json.loads(raw['data'])
@@ -194,6 +242,11 @@ def read_reports(store,p,now,universe=None):
         if row.get('parser_version',0)<PARSER_VERSION:
             universe=universe or intel_universe.load(store)
             parsed=reparse_report(row['message'],row['timestamp'],row['reporter'],row['channel'],universe,tuple(p['region_ids']))
+            if parsed:row={**row,**json.loads(parsed),'id':row['id']}
+        trusted=tuple(name for name in row.get('name_chunks',[]) if name.casefold() in known)
+        if trusted:
+            universe=universe or intel_universe.load(store)
+            parsed=reparse_report(row['message'],row['timestamp'],row['reporter'],row['channel'],universe,tuple(p['region_ids']),trusted)
             if parsed:row={**row,**json.loads(parsed),'id':row['id']}
         reports.append(row)
     return reports
@@ -256,8 +309,9 @@ class IntelMonitor:
         if catalog and isinstance(getattr(catalog,'types',None),dict):
             self.universe.ship_types.update({t['name'].casefold():t['id'] for t in catalog.types.values() if t['name'].casefold() in self.universe.ship_names})
         self.lock=threading.RLock();self.stop_event=threading.Event();self.refresh_event=threading.Event();self.thread=None;self.headers={};self.started=time.time();self.last_locations=0;self.location_thread=None;self.closed=False;self.names_thread=None;self.last_names=0;self.names_due=None;self.names_next_attempt=0
-        self.status={'running':False,'scanning':False,'checked':None,'files':0,'done':0,'new_messages':0,'error':None,'file_errors':0}
+        self.status={'running':False,'scanning':False,'checked':None,'files':0,'done':0,'new_messages':0,'error':None,'file_errors':0};self.preload_pending=False
         schema(store)
+        self.status['known_characters']=preload_character_cache(store)
         with store.db() as db:previous=db.execute('SELECT data FROM intel_status WHERE id=1').fetchone()
         if previous:
             retry=json.loads(previous['data']).get('names_retry_at',0)
@@ -266,7 +320,7 @@ class IntelMonitor:
     def start(self):
         with self.lock:
             if self.thread and self.thread.is_alive():return
-            self.stop_event.clear();self.started=time.time();self.thread=threading.Thread(target=self._work,daemon=True,name='EVE-intel');self.thread.start()
+            self.stop_event.clear();self.started=time.time();self.preload_pending=True;self.thread=threading.Thread(target=self._work,daemon=True,name='EVE-intel');self.thread.start()
     def stop(self,permanent=True):
         if permanent:self.closed=True
         self.stop_event.set()
@@ -288,26 +342,36 @@ class IntelMonitor:
         if now-self.last_names>=AUTO_SECONDS or new_messages:
             self.last_names=now;self.queue_characters()
         if self.names_due is not None and now>=self.names_due:self.request_characters()
-    def request_characters(self,manual=False):
+    def request_characters(self,manual=False,preload=False):
         with self.lock:
+            if preload:self.preload_pending=True
             now=time.time()
             if self.names_thread and self.names_thread.is_alive() or self.closed or now<max(self.names_next_attempt,self.status.get('names_retry_at',0)):return
             if not manual and self.names_due is not None and now<self.names_due:return
             self.names_due=None
             self.status['resolving_characters']=True;self.status['names_done']=0;self.status['names_total']=0
             def work():
-                try:self.resolve_characters()
+                try:self.resolve_characters(preload=self.preload_pending)
                 finally:
                     with self.lock:self.status['resolving_characters']=False
                     self._write_status()
             self.names_thread=threading.Thread(target=work,daemon=True,name='EVE-intel-names');self.names_thread.start()
-    def resolve_characters(self,now=None):
+    def resolve_characters(self,now=None,preload=False):
         now=time.time() if now is None else now;p=preferences(self.store);reports=read_reports(self.store,p,now,self.universe)
+        known_count=preload_character_cache(self.store,reports,now)
         own={c['name'].casefold() for c in self.store.characters()}
-        names={pilot['name'].casefold():pilot['name'] for row in reports for pilot in row['pilots'] if not pilot.get('id') and 3<=len(pilot['name'])<=64 and pilot['name'].casefold() not in own}
+        names={}
+        for row in reports:
+            candidates=(row.get('name_chunks',[]) if preload and row['state']=='contact' else [])+[pilot['name'] for pilot in row['pilots'] if not pilot.get('id')]
+            for name in candidates:
+                if 3<=len(name)<=64 and name.casefold() not in own:names.setdefault(name.casefold(),name)
+        if preload:
+            for row in reports:
+                name=row['reporter']
+                if 3<=len(name)<=64 and name.casefold() not in own:names.setdefault(name.casefold(),name)
         with self.store.db() as db:cache={r['name']:dict(r) for r in db.execute('SELECT * FROM intel_characters')}
         names=[name for key,name in names.items() if key not in cache or cache[key]['retry_at']<=now]
-        with self.lock:self.status.update(names_total=len(names),names_done=0,names_error=None,names_retry_at=0)
+        with self.lock:self.status.update(names_total=len(names),names_done=0,names_error=None,names_retry_at=0,known_characters=known_count)
         for start in range(0,len(names),100):
             if self.closed:return
             if start and self.stop_event.wait(NAME_LOOKUP_DELAY):return
@@ -328,6 +392,7 @@ class IntelMonitor:
                             db.execute('UPDATE intel_characters SET retry_at=? WHERE name=?',(now+3600,name.casefold()))
                         else:db.execute('INSERT OR REPLACE INTO intel_characters VALUES(?,?,?,?,?)',(name.casefold(),entry['id'] if entry else None,entry['name'] if entry else name,now,now+(30*86400 if entry else 3600)))
                 with self.lock:self.status['names_done']=min(start+100,len(names))
+                if preload and start+100<len(names):self.queue_characters();return
             except EsiError:
                 blocked=getattr(self.eve.http,'blocked_until',0)
                 retry=max(time.time()+60,blocked if isinstance(blocked,(int,float)) else 0)
@@ -335,6 +400,10 @@ class IntelMonitor:
                     self.status.update(names_error='A pilótaazonosítók most nem ellenőrizhetők.',names_retry_at=retry)
                     self.names_due=retry
                 return
+        if preload:
+            with self.lock:self.preload_pending=False
+        with self.store.db() as db:known_count=db.execute('SELECT count(*) FROM intel_characters WHERE id IS NOT NULL').fetchone()[0]
+        with self.lock:self.status['known_characters']=known_count
     def _start_locations(self,p,manual=False):
         with self.lock:
             if self.location_thread and self.location_thread.is_alive():return
@@ -356,6 +425,7 @@ class IntelMonitor:
                 p=preferences(self.store)
                 if not p['enabled']:break
                 self.scan(p)
+                if self.status['new_messages']:self.preload_pending=True
                 self.poll_characters(self.status['new_messages'])
                 if time.time()-self.last_locations>=AUTO_SECONDS or self.refresh_event.is_set():
                     self.refresh_event.clear();self.last_locations=time.time();self._start_locations(p)

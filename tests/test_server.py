@@ -149,7 +149,7 @@ class ServerTests(unittest.TestCase):
     def test_pilot_lookup_trigger_is_local_and_ship_images_use_only_the_ccp_cdn(self):
         self.app.intel.request_characters=Mock()
         self.assertEqual(self.request('/api/intel/characters',{},Origin='https://other.invalid')[0],403);self.app.intel.request_characters.assert_not_called()
-        self.assertEqual(self.request('/api/intel/characters',{})[0],200);self.app.intel.request_characters.assert_called_once()
+        self.assertEqual(self.request('/api/intel/characters',{})[0],200);self.app.intel.request_characters.assert_called_once_with(manual=True,preload=True)
         _,_,headers=self.request('/');self.assertIn("img-src 'self' data: https://images.evetech.net",headers['Content-Security-Policy']);self.assertIn("script-src 'self'",headers['Content-Security-Policy'])
         self.assertEqual(self.request('/api/intel?region=999')[0],400)
 

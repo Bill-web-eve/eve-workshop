@@ -32,7 +32,7 @@ class Universe:
         self.pattern=re.compile(r'(?<![\w-])(?:'+('|'.join(re.escape(r['name']) for r in sorted(self.systems.values(),key=lambda r:-len(r['name']))))+r')(?![\w-])',re.I)
         self.ship_names={name.casefold():name for name in data.get('ships',[])}
         self.ship_types={name.casefold():tid for name,tid in data.get('ship_types',{}).items()}
-        self.ship_aliases={'caracal ni':'Caracal Navy Issue','caracal navy':'Caracal Navy Issue','carcacal':'Caracal','carcacal ni':'Caracal Navy Issue','vni':'Vexor Navy Issue','cheeta':'Cheetah','drek':'Drekavac','hecates':'Hecate',"hecate's":'Hecate','pod':'Capsule','lach':'Lachesis','lachi':'Lachesis','maled':'Malediction','maledi':'Malediction','stabb':'Stabber'}
+        self.ship_aliases={'caracal ni':'Caracal Navy Issue','caracal navy':'Caracal Navy Issue','carcacal':'Caracal','carcacal ni':'Caracal Navy Issue','vni':'Vexor Navy Issue','cheeta':'Cheetah','drek':'Drekavac','hecates':'Hecate',"hecate's":'Hecate','pod':'Capsule','lach':'Lachesis','lachi':'Lachesis','maled':'Malediction','maledi':'Malediction','stabb':'Stabber','crusifier':'Crucifier','cruci':'Crucifier','crucy':'Crucifier','retri':'Retribution','exeq ni':'Exequror Navy Issue','exeq':'Exequror'}
         for key,name in list({**self.ship_names,**self.ship_aliases}.items()):
             self.ship_aliases.setdefault(key+'s',name)
             self.ship_aliases.setdefault(key+"'s",name)

@@ -931,6 +931,8 @@ globalThis.EveEnglish={
   "Jelölt körzet:": "Highlighted range:",
   "A jelölés kaputávolságot mutat, nem geometriai kört. A teljes régió látható; a távolság a teljes kapuhálózaton számolódik.": "The highlight shows stargate distance, not a geometric circle. The full region is shown; distances use the entire stargate network.",
   "Pilótaazonosítók frissítése": "Refresh pilot IDs",
+  "Pilótanevek előtöltése": "Preload pilot IDs",
+  "Ismert pilóták:": "Known pilots:",
   "Pilótaazonosítók ellenőrzése…": "Checking pilot IDs…",
   "A pilótaazonosítók most nem ellenőrizhetők.": "Pilot IDs cannot be checked right now.",
   "Azonosító még nem ismert": "ID not yet identified",

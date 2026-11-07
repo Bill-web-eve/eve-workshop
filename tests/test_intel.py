@@ -48,6 +48,12 @@ class ParserTests(unittest.TestCase):
         self.assertEqual([x['name'] for x in self.parse('J5A-IX FRAT Runner')['pilots']],['FRAT Runner'])
         self.assertEqual([x['name'] for x in self.parse('J5A-IX MaledictionMan')['pilots']],['MaledictionMan'])
         self.assertEqual(self.parse('J5A-IX <url=showinfo:1373//999>John Lach</url>')['pilots'],[{'name':'John Lach','id':999,'verified':True}])
+    def test_ship_typos_and_chat_descriptions_do_not_hide_real_pilot_names(self):
+        p=self.parse('L-A5XP EclipseStalker  xingyueling2 Crusifier 3 Retris')
+        self.assertEqual([x['name'] for x in p['pilots']],['EclipseStalker','xingyueling2'])
+        self.assertEqual({s['name'] for s in p['ships']},{'Crucifier','Retribution'})
+        p=self.parse('L-A5XP Margarite Main and his alts in Exeq NI but have docked')
+        self.assertEqual([x['name'] for x in p['pilots']],['Margarite Main']);self.assertEqual([s['name'] for s in p['ships']],['Exequror Navy Issue'])
     def test_scan_link_is_a_scan_reference_without_fake_pilots(self):
         for url in ['https://dscan.info/v/4d25dfc8e96d','http://dscan.info/v/4d25dfc8e96d','www.dscan.info/v/4d25dfc8e96d','dscan.info/v/4d25dfc8e96d']:
             body=url+' J5A-IX';p=self.parse(body)
@@ -227,6 +233,64 @@ class IntelStoreTests(unittest.TestCase):
         row=self.monitor.dashboard(now=NOW)['reports'][0];self.assertEqual(row['pilots'][0]['zkill_url'],'https://zkillboard.com/character/359618261/');self.assertFalse(row['pilots'][0]['verified'])
         self.monitor.resolve_characters(NOW+10);self.assertEqual(self.eve.http.request.call_count,1)
         with self.store.db() as db:self.assertEqual(db.execute('SELECT count(*) FROM intel_characters').fetchone()[0],1)
+    def test_fleet_character_ids_are_preloaded_without_network_and_do_not_replace_conflicting_known_ids(self):
+        from muhely import fleet
+        fleet.schema(self.store)
+        names={'123':{'name':'New Visitor','category':'character'},'456':{'name':'Example Corp','category':'corporation'},'789':{'name':'Known Pilot','category':'character'},'invalid':{'name':'Invalid Pilot','category':'character'}}
+        with self.store.db() as db:
+            db.execute('INSERT INTO fleet_sources VALUES(?,?,?,?,?)',('battle-names',json.dumps(names),NOW,NOW+1000,None))
+            db.execute('INSERT INTO intel_characters VALUES(?,?,?,?,?)',('new visitor',None,'New Visitor',NOW-10,NOW+1000))
+            db.execute('INSERT INTO intel_characters VALUES(?,?,?,?,?)',('known pilot',999,'Known Pilot',NOW-10,NOW+1000))
+        with patch('muhely.intel.time.time',return_value=NOW):
+            fresh=i.IntelMonitor(self.store,None,self.eve,self.u);self.addCleanup(fresh.stop)
+        self.assertEqual(fresh.status['known_characters'],2)
+        self.write_log(line('L-A5XP New Visitor')+'\n');self.scan()
+        self.assertEqual(fresh.dashboard(now=NOW)['reports'][0]['pilots'][0]['id'],123)
+        self.eve.http.request.assert_not_called()
+        with self.store.db() as db:
+            self.assertEqual(db.execute("SELECT id FROM intel_characters WHERE name='known pilot'").fetchone()[0],999)
+            self.assertIsNone(db.execute("SELECT id FROM intel_characters WHERE name='example corp'").fetchone())
+    def test_linked_character_is_saved_for_future_plain_text_reports(self):
+        self.write_log(line('L-A5XP <url=showinfo:1373//777>Linked Visitor</url>')+'\n');self.scan()
+        self.monitor.resolve_characters(NOW)
+        self.write_log(line('L-A5XP Linked Visitor')+'\n');self.scan()
+        rows=self.monitor.dashboard(now=NOW)['reports'];self.assertTrue(all(r['pilots'][0]['id']==777 for r in rows))
+        self.monitor.resolve_characters(NOW+2);self.eve.http.request.assert_not_called()
+    def test_preloading_full_names_preserves_stop_words_and_does_not_guess_a_longer_name_from_a_prefix(self):
+        self.write_log(line('L-A5XP YumiYa the lineager')+'\n');self.scan()
+        self.eve.http.request.return_value=({'characters':[{'name':'YumiYa the lineager','id':555},{'name':'YumiYa','id':556}]},{})
+        self.monitor.resolve_characters(NOW,preload=True)
+        self.assertIn('YumiYa the lineager',self.eve.http.request.call_args.kwargs['json_body'])
+        row=self.monitor.dashboard(now=NOW)['reports'][0]
+        self.assertEqual([(p['name'],p['id']) for p in row['pilots']],[('YumiYa the lineager',555)])
+        self.write_log(line('L-A5XP YumiYa the lineager Smith')+'\n',suffix='130000');self.scan()
+        row=next(r for r in self.monitor.dashboard(now=NOW)['reports'] if r['message'].endswith('Smith'))
+        self.assertFalse(any(p['id']==555 for p in row['pilots']))
+    def test_cached_full_name_is_preserved_when_it_contains_a_ship_abbreviation(self):
+        with self.store.db() as db:
+            db.executemany('INSERT INTO intel_characters VALUES(?,?,?,?,?)',[(name.casefold(),ident,name,NOW,NOW+1000) for name,ident in [('John',111),('John Lach',222)]])
+        self.write_log(line('L-A5XP John Lach Buzzard')+'\n');self.scan()
+        row=self.monitor.dashboard(now=NOW)['reports'][0]
+        self.assertEqual([(p['name'],p['id']) for p in row['pilots']],[('John Lach',222)])
+        self.assertEqual([s['name'] for s in row['ships']],['Buzzard'])
+    def test_preloading_chat_reporters_yields_between_batches_and_prioritizes_new_intel(self):
+        self.write_log('\n'.join(line('L-A5XP',speaker='Reporter '+str(n)) for n in range(105))+'\n');self.scan()
+        def lookup(url,*,json_body):
+            return {'characters':[{'name':name,'id':777 if name=='Urgent Pilot' else 1000+int(name.split()[-1])} for name in json_body]},{}
+        self.eve.http.request.side_effect=lookup
+        with patch('muhely.intel.time.time',return_value=NOW):
+            self.monitor.request_characters(manual=True,preload=True);self.monitor.names_thread.join(timeout=3)
+        self.assertEqual(self.eve.http.request.call_count,1);self.assertEqual(len(self.eve.http.request.call_args.kwargs['json_body']),100)
+        self.assertTrue(self.monitor.preload_pending)
+        self.write_log('\n'.join(line('L-A5XP',speaker='Reporter '+str(n)) for n in range(105))+'\n'+line('L-A5XP Urgent Pilot',at=NOW+1,speaker='Reporter 0')+'\n');self.scan()
+        with patch('muhely.intel.time.time',return_value=NOW+1):self.monitor.poll_characters(new_messages=True)
+        self.eve.http.request.assert_called_once()
+        with patch('muhely.intel.time.time',return_value=NOW+2):
+            self.monitor.poll_characters();self.monitor.names_thread.join(timeout=3)
+        self.assertEqual(self.eve.http.request.call_count,2);self.assertEqual(self.eve.http.request.call_args.kwargs['json_body'][0],'Urgent Pilot')
+        self.assertFalse(self.monitor.preload_pending)
+        urgent=next(r for r in self.monitor.dashboard(now=NOW+2)['reports'] if 'Urgent Pilot' in r['message'])
+        self.assertEqual(urgent['pilots'][0]['id'],777)
     def test_new_names_resolve_in_one_batch_without_waiting_for_general_esi_interval(self):
         self.write_log(line('L-A5XP longgu q2q  longgu qwq')+'\n');self.scan()
         self.write_log(line('L-A5XP longgu q2q  longgu qwq')+'\n',cid=22);self.scan()

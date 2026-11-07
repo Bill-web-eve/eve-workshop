@@ -995,7 +995,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == '/api/fleet/refresh':return self.send(200,self.app.fleet.start_refresh(data.get('character_id'),data.get('session_id')))
             elif path == '/api/intel/preferences':return self.send(200,self.app.intel.configure(data))
             elif path == '/api/intel/characters':
-                self.app.intel.request_characters(manual=True);return self.send(200,{'intel':dict(self.app.intel.status)})
+                self.app.intel.request_characters(manual=True,preload=True);return self.send(200,{'intel':dict(self.app.intel.status)})
             elif path == '/api/intel/locations':
                 self.app.intel.request_locations();return self.send(200,{'intel':dict(self.app.intel.status)})
             elif path == '/api/intel/claim':return self.send(200,{'items':notifications.claim(self.app.store,intel.collect_alerts(self.app.store,self.app.intel.universe))})

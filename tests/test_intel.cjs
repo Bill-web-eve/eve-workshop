@@ -33,6 +33,14 @@ test('intel settings preserve dirty inputs and support selectable systems and ch
  d.querySelector('#intel-discover').click();await tick();d.querySelector('[data-intel-add="Other Intel"]').click();assert(form.elements.channels.value.includes('Other Intel'));
  form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();assert(calls.includes('/api/intel/preferences'));assert.equal(run('intelData.preferences.jumps'),3);assert.equal(run('Object.keys(dirty).length'),0);
 });
+test('preloaded identity count is visible and updates without changing the selected map',async t=>{
+ const {w,d,run,intel}=await fixture();t.after(()=>w.close());
+ intel.status.known_characters=2766;await run('refreshIntel(true)');
+ assert.equal(d.querySelector('#intel-resolve').textContent,'Preload pilot IDs');
+ assert(d.querySelector('.intel-map-controls').textContent.includes('Known pilots:'));assert(d.querySelector('.intel-map-controls').textContent.includes('2766'));
+ intel.status.known_characters=2767;await run('refreshIntel(true)');
+ assert(d.querySelector('.intel-map-controls').textContent.includes('2767'));assert.equal(run('intelCenter'),null);
+});
 test('nearby intel delivery uses durable claim, character and distance; notification opens intel',async t=>{
  const {w,d,run,intel,notifications:n,calls}=await fixture();t.after(()=>w.close());
  intel.alerts=[{id:'intel:1:300001:x',category:'intel',kind:'intel_near',subject:'J5A-IX · Reported Pilot',character_name:'Own Pilot',jumps:2,corporation_id:null,when:1800000000,receipt:'receipt',notification_id:'id',sound:true}];n.preferences.os_enabled=true;
