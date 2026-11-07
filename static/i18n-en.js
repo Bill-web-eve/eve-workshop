@@ -777,7 +777,7 @@ globalThis.EveEnglish={
   "Intelértesítések: kikapcsolva": "Intel notifications: off",
   "Intelértesítések: bekapcsolva": "Intel notifications: on",
   "Intelértesítések beállítása mentve.": "Intel notification setting saved.",
-  "Az ESI-helyzeteket és pilótaazonosítókat automatikusan legfeljebb 15 percenként kérjük le. A helyi chatlog olvasása folyamatos marad; a kézi frissítés külön indítható.": "ESI locations and pilot IDs are requested automatically at most every 15 minutes. Local chat log monitoring continues; you can refresh manually.",
+  "Az ESI-helyzeteket automatikusan legfeljebb 15 percenként kérjük le. Az új pilótaneveket néhány másodpercen belül, összevont kérésben oldjuk fel; az ismert neveknél helyi gyorsítótárat használunk.": "ESI locations are requested automatically at most every 15 minutes. New pilot names are resolved within a few seconds in batches; known names use the local cache.",
   "Az automatikus árlekérés 15 perces időköze még nem telt le.": "The 15-minute automatic price refresh interval has not elapsed.",
   "Helyi gyár termelésétől függ": "Depends on local factory production",
   "Kitermelő bolygó": "Extraction planet",

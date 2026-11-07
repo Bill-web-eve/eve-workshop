@@ -53,6 +53,19 @@ test('activity cards display exact zKillboard links, ship icons and range highli
  const card=d.querySelector('.intel-activity-card');assert(card);assert.equal(card.querySelector('a').href,'https://zkillboard.com/character/359618261/');assert.equal(card.querySelector('img').src,'https://images.evetech.net/types/11192/icon?size=32');
  assert(d.querySelector('.intel-range-halo'));assert.equal(d.querySelector('#intel-radius'),null);assert(d.querySelector('[data-intel-window=map]'));assert(d.querySelector('[data-intel-window=chat]'));
 });
+test('resolved pilot IDs update contact links automatically without a manual refresh',async t=>{
+ const {w,d,run,intel}=await fixture();t.after(()=>w.close());
+ intel.nodes[0].contacts[0].pilots=[{name:'New Pilot',id:null}];
+ intel.reports[0].pilots=[{name:'New Pilot',id:null}];
+ await run('refreshIntel(true)');
+ assert(d.querySelector('.intel-activity-card').textContent.includes('ID not yet identified'));
+ intel.nodes[0].contacts[0].pilots=[{name:'New Pilot',id:2124261111}];
+ intel.reports[0].pilots=[{name:'New Pilot',id:2124261111}];
+ await run('refreshIntel(true)');
+ const card=d.querySelector('.intel-activity-card');
+ assert.equal(card.querySelector('a').href,'https://zkillboard.com/character/2124261111/');
+ assert(!card.textContent.includes('ID not yet identified'));
+});
 test('detached chat aggregates selected channels, keeps source text safe and does not send OS alerts',async t=>{
  const {w,d,run,intel,calls}=await fixture('chat');t.after(()=>w.close());
  assert.equal(d.documentElement.dataset.intelWindow,'chat');assert.equal(d.querySelector('#page-title').textContent,'Combined intel chat');assert(!d.querySelector('#intel-chat-feed script'));assert.equal(d.querySelectorAll('.intel-chat-line').length,1);

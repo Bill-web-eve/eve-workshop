@@ -2,7 +2,7 @@ from datetime import datetime,timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock,patch
-import json,os,tempfile,unittest
+import json,os,tempfile,threading,unittest
 from muhely import intel as i,intel_universe as u,notifications as n
 from muhely.store import Store
 from muhely.esi import AuthenticationError,INTEL_SCOPES,SCOPES,MOON_SCOPES,Vault,EveConnection,LocationScopeError
@@ -190,6 +190,78 @@ class IntelStoreTests(unittest.TestCase):
         row=self.monitor.dashboard(now=NOW)['reports'][0];self.assertEqual(row['pilots'][0]['zkill_url'],'https://zkillboard.com/character/359618261/');self.assertFalse(row['pilots'][0]['verified'])
         self.monitor.resolve_characters(NOW+10);self.assertEqual(self.eve.http.request.call_count,1)
         with self.store.db() as db:self.assertEqual(db.execute('SELECT count(*) FROM intel_characters').fetchone()[0],1)
+    def test_new_names_resolve_in_one_batch_without_waiting_for_general_esi_interval(self):
+        self.write_log(line('L-A5XP longgu q2q  longgu qwq')+'\n');self.scan()
+        self.write_log(line('L-A5XP longgu q2q  longgu qwq')+'\n',cid=22);self.scan()
+        self.monitor.refresh_policy.claim(['intel-names','intel-locations','skills'],now=NOW)
+        self.eve.http.request.return_value=({'characters':[{'id':2124261111,'name':'longgu q2q'},{'id':2124261249,'name':'longgu qwq'}]}, {})
+        with patch('muhely.intel.time.time',return_value=NOW):self.monitor.poll_characters(new_messages=True)
+        with patch('muhely.intel.time.time',return_value=NOW+1):self.monitor.poll_characters(new_messages=True)
+        self.eve.http.request.assert_not_called()
+        with patch('muhely.intel.time.time',return_value=NOW+2):
+            self.monitor.poll_characters(new_messages=True);self.monitor.names_thread.join(timeout=3)
+        self.assertFalse(self.monitor.names_thread.is_alive())
+        self.eve.http.request.assert_called_once_with(i.ESI+'/universe/ids/',json_body=['longgu q2q','longgu qwq'])
+        pilots=self.monitor.dashboard(now=NOW+2)['reports'][0]['pilots']
+        self.assertEqual({p['id'] for p in pilots},{2124261111,2124261249});self.assertTrue(all(p['zkill_url'] for p in pilots))
+        with patch('muhely.intel.time.time',return_value=NOW+3):self.monitor.poll_characters(new_messages=True)
+        with patch('muhely.intel.time.time',return_value=NOW+5):
+            self.monitor.poll_characters();self.monitor.names_thread.join(timeout=3)
+        self.eve.http.request.assert_called_once()
+        self.assertEqual(self.monitor.refresh_policy.claim(['intel-locations','skills'],now=NOW+5),set())
+    def test_names_arriving_during_lookup_are_not_lost_and_workers_do_not_overlap(self):
+        self.write_log(line('L-A5XP Pilot One')+'\n');self.scan()
+        entered=threading.Event();release=threading.Event();self.addCleanup(release.set)
+        def lookup(url,*,json_body):
+            if json_body==['Pilot One']:
+                entered.set();self.assertTrue(release.wait(timeout=3))
+            return {'characters':[{'name':name,'id':1000+index} for index,name in enumerate(json_body)]},{}
+        self.eve.http.request.side_effect=lookup
+        with patch('muhely.intel.time.time',return_value=NOW):self.monitor.poll_characters(new_messages=True)
+        with patch('muhely.intel.time.time',return_value=NOW+2):
+            self.monitor.poll_characters();self.assertTrue(entered.wait(timeout=3))
+            self.write_log(line('L-A5XP Pilot One')+'\n'+line('Jita Pilot Two',NOW+2)+'\n');self.scan()
+            self.monitor.poll_characters(new_messages=True)
+            worker=self.monitor.names_thread;self.monitor.request_characters(manual=True);self.assertIs(self.monitor.names_thread,worker)
+            release.set();worker.join(timeout=3)
+        with patch('muhely.intel.time.time',return_value=NOW+4):
+            self.monitor.poll_characters();self.monitor.names_thread.join(timeout=3)
+        self.assertEqual(self.eve.http.request.call_count,2)
+        self.assertEqual(self.eve.http.request.call_args.kwargs['json_body'],['Pilot Two'])
+        self.assertTrue(all(p.get('id') for r in self.monitor.dashboard(now=NOW+4)['reports'] for p in r['pilots']))
+    def test_many_names_use_bounded_batches_with_spacing(self):
+        self.write_log('\n'.join(line('L-A5XP Visitor '+str(n)) for n in range(105))+'\n');self.scan()
+        self.eve.http.request.side_effect=lambda url,*,json_body:({'characters':[{'name':name,'id':1000+int(name.split()[-1])} for name in json_body]}, {})
+        with patch.object(self.monitor.stop_event,'wait',return_value=False) as wait:
+            self.monitor.resolve_characters(NOW)
+        self.assertEqual([len(call.kwargs['json_body']) for call in self.eve.http.request.call_args_list],[100,5]);wait.assert_called_once_with(2)
+        self.assertTrue(all(p.get('id') for r in self.monitor.dashboard(now=NOW)['reports'] for p in r['pilots']))
+    def test_lookup_failure_retries_automatically_and_honors_rate_limit_across_restart(self):
+        self.write_log(line('L-A5XP Pilot One')+'\n');self.scan()
+        self.eve.http.blocked_until=NOW+120;self.eve.http.request.side_effect=i.EsiError('rate limited')
+        with patch('muhely.intel.time.time',return_value=NOW):self.monitor.poll_characters(new_messages=True)
+        with patch('muhely.intel.time.time',return_value=NOW+2):
+            self.monitor.poll_characters();self.monitor.names_thread.join(timeout=3)
+        self.assertEqual(self.monitor.names_due,NOW+120)
+        with patch('muhely.intel.time.time',return_value=NOW+3):
+            restarted=i.IntelMonitor(self.store,None,self.eve,self.u);self.addCleanup(restarted.stop)
+            restarted.poll_characters(new_messages=True);restarted.request_characters(manual=True)
+        self.eve.http.request.assert_called_once()
+        self.eve.http.request.side_effect=None;self.eve.http.request.return_value=({'characters':[{'id':123,'name':'Pilot One'}]}, {})
+        with patch('muhely.intel.time.time',return_value=NOW+120):
+            restarted.poll_characters();restarted.names_thread.join(timeout=3)
+        self.assertEqual(self.eve.http.request.call_count,2);self.assertIsNone(restarted.status['names_error'])
+        self.assertEqual(restarted.dashboard(now=NOW+120)['reports'][0]['pilots'][0]['id'],123)
+    def test_unknown_names_are_not_retried_on_every_new_report_and_failed_refresh_keeps_known_id(self):
+        self.write_log(line('L-A5XP Visitor One')+'\n');self.scan()
+        self.eve.http.request.return_value=({'characters':[]},{})
+        self.monitor.resolve_characters(NOW);self.monitor.resolve_characters(NOW+2)
+        self.eve.http.request.assert_called_once()
+        with self.store.db() as db:db.execute('INSERT OR REPLACE INTO intel_characters VALUES(?,?,?,?,?)',('visitor one',123,'Visitor One',NOW-31*86400,NOW-1))
+        self.eve.http.request.side_effect=i.EsiError('offline');self.monitor.resolve_characters(NOW+3)
+        self.assertEqual(self.monitor.dashboard(now=NOW+3)['reports'][0]['pilots'][0]['id'],123)
+        self.eve.http.request.side_effect=None;self.monitor.resolve_characters(NOW+4)
+        self.assertEqual(self.monitor.dashboard(now=NOW+4)['reports'][0]['pilots'][0]['id'],123)
     def test_failed_lookup_keeps_intel_and_unknown_names_have_no_fake_link(self):
         self.write_log(line('L-A5XP Unknown Pilot')+'\n');self.scan();self.eve.http.request.side_effect=i.EsiError('offline');self.monitor.resolve_characters(NOW)
         data=self.monitor.dashboard(now=NOW);self.assertEqual(len(data['reports']),1);self.assertIsNone(data['reports'][0]['pilots'][0]['zkill_url']);self.assertIsNotNone(data['status']['names_error']);self.assertIsNone(data['status']['error'])

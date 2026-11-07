@@ -15,6 +15,7 @@ LINK=re.compile(r'<url=["\']?showinfo:(137[3-9]|138[0-6])//(\d+)["\']?>(.*?)</ur
 WEB_URL=re.compile(r"(?<![\w@])(?:https?://|www\.)[^\s<>\"']+|(?<![\w@])(?:[a-z0-9-]+\.)+[a-z]{2,}/[^\s<>\"']*",re.I)
 MARKUP_LINK=re.compile(r'<(url|a)\b[^>]*>.*?</\1\s*>',re.I|re.S)
 PARSER_VERSION=2
+NAME_LOOKUP_DELAY=2
 STOP=re.compile(r'\b(?:on|at|in|to|from|towards|gate|gates|out|of|with|and|plus|jumped|jumping|jump|left|leaving|reported|seen|was|is|are|no|visual|nv|ni|onlined|docked|undocked|likely|maybe|possibly|spike|spiked|spiking|clear|clr|cleared|loc|pls|please|status|check|checkin|check-in|help|scan|scanned|reported|still|just|now|local|heading|destination|need|needle|red|reds|new|ago|minutes?|minute|min|camp|camping|for|the|a|an|cloaked|cloak|suspect|scout|unknown|neut|neuts|neutral|hostile|hostiles|fleets?|tackled)\b',re.I)
 
 
@@ -228,9 +229,13 @@ class IntelMonitor:
         self.store=store;self.catalog=catalog;self.eve=eve;self.universe=universe or intel_universe.load(store)
         if catalog and isinstance(getattr(catalog,'types',None),dict):
             self.universe.ship_types.update({t['name'].casefold():t['id'] for t in catalog.types.values() if t['name'].casefold() in self.universe.ship_names})
-        self.lock=threading.RLock();self.stop_event=threading.Event();self.refresh_event=threading.Event();self.thread=None;self.headers={};self.started=time.time();self.last_locations=0;self.location_thread=None;self.closed=False;self.names_thread=None;self.last_names=0
+        self.lock=threading.RLock();self.stop_event=threading.Event();self.refresh_event=threading.Event();self.thread=None;self.headers={};self.started=time.time();self.last_locations=0;self.location_thread=None;self.closed=False;self.names_thread=None;self.last_names=0;self.names_due=None;self.names_next_attempt=0
         self.status={'running':False,'scanning':False,'checked':None,'files':0,'done':0,'new_messages':0,'error':None,'file_errors':0}
         schema(store)
+        with store.db() as db:previous=db.execute('SELECT data FROM intel_status WHERE id=1').fetchone()
+        if previous:
+            retry=json.loads(previous['data']).get('names_retry_at',0)
+            if isinstance(retry,(int,float)) and retry>time.time():self.status['names_retry_at']=retry;self.names_due=retry
         if preferences(store)['enabled']:self.start()
     def start(self):
         with self.lock:
@@ -249,16 +254,26 @@ class IntelMonitor:
         return p
     def request_locations(self):
         self.refresh_event.set();self._start_locations(preferences(self.store),manual=True)
+    def queue_characters(self):
+        with self.lock:
+            if self.names_due is None:self.names_due=time.time()+NAME_LOOKUP_DELAY
+    def poll_characters(self,new_messages=False):
+        now=time.time()
+        if now-self.last_names>=AUTO_SECONDS or new_messages:
+            self.last_names=now;self.queue_characters()
+        if self.names_due is not None and now>=self.names_due:self.request_characters()
     def request_characters(self,manual=False):
         with self.lock:
-            if self.names_thread and self.names_thread.is_alive() or self.closed or time.time()<self.status.get('names_retry_at',0):return
-            if not self.refresh_policy.claim(['intel-names'],manual):return
+            now=time.time()
+            if self.names_thread and self.names_thread.is_alive() or self.closed or now<max(self.names_next_attempt,self.status.get('names_retry_at',0)):return
+            if not manual and self.names_due is not None and now<self.names_due:return
+            self.names_due=None;self.names_next_attempt=now+NAME_LOOKUP_DELAY
             self.status['resolving_characters']=True;self.status['names_done']=0;self.status['names_total']=0
             def work():
                 try:self.resolve_characters()
                 finally:
-                    self.refresh_policy.claim(['intel-names'],manual=True)
                     with self.lock:self.status['resolving_characters']=False
+                    self._write_status()
             self.names_thread=threading.Thread(target=work,daemon=True,name='EVE-intel-names');self.names_thread.start()
     def resolve_characters(self,now=None):
         now=time.time() if now is None else now;p=preferences(self.store);reports=read_reports(self.store,p,now,self.universe)
@@ -266,9 +281,10 @@ class IntelMonitor:
         names={pilot['name'].casefold():pilot['name'] for row in reports for pilot in row['pilots'] if not pilot.get('id') and 3<=len(pilot['name'])<=64 and pilot['name'].casefold() not in own}
         with self.store.db() as db:cache={r['name']:dict(r) for r in db.execute('SELECT * FROM intel_characters')}
         names=[name for key,name in names.items() if key not in cache or cache[key]['retry_at']<=now]
-        with self.lock:self.status.update(names_total=len(names),names_done=0,names_error=None)
+        with self.lock:self.status.update(names_total=len(names),names_done=0,names_error=None,names_retry_at=0)
         for start in range(0,len(names),100):
             if self.closed:return
+            if start and self.stop_event.wait(NAME_LOOKUP_DELAY):return
             batch=names[start:start+100]
             try:
                 result,_=self.eve.http.request(ESI+'/universe/ids/',json_body=batch)
@@ -279,10 +295,18 @@ class IntelMonitor:
                 if self.closed:return
                 with self.store.db() as db:
                     for name in batch:
-                        entry=found.get(name.casefold());db.execute('INSERT OR REPLACE INTO intel_characters VALUES(?,?,?,?,?)',(name.casefold(),entry['id'] if entry else None,entry['name'] if entry else name,now,now+(30*86400 if entry else 3600)))
+                        entry=found.get(name.casefold());previous=cache.get(name.casefold())
+                        if not entry and previous and previous['id']:
+                            # An empty response does not invalidate an already identified pilot.
+                            db.execute('UPDATE intel_characters SET retry_at=? WHERE name=?',(now+3600,name.casefold()))
+                        else:db.execute('INSERT OR REPLACE INTO intel_characters VALUES(?,?,?,?,?)',(name.casefold(),entry['id'] if entry else None,entry['name'] if entry else name,now,now+(30*86400 if entry else 3600)))
                 with self.lock:self.status['names_done']=min(start+100,len(names))
             except EsiError:
-                with self.lock:self.status.update(names_error='A pilótaazonosítók most nem ellenőrizhetők.',names_retry_at=now+60)
+                blocked=getattr(self.eve.http,'blocked_until',0)
+                retry=max(time.time()+60,blocked if isinstance(blocked,(int,float)) else 0)
+                with self.lock:
+                    self.status.update(names_error='A pilótaazonosítók most nem ellenőrizhetők.',names_retry_at=retry)
+                    self.names_due=retry
                 return
     def _start_locations(self,p,manual=False):
         with self.lock:
@@ -305,8 +329,7 @@ class IntelMonitor:
                 p=preferences(self.store)
                 if not p['enabled']:break
                 self.scan(p)
-                if time.time()-self.last_names>=AUTO_SECONDS or self.status['new_messages']:
-                    self.last_names=time.time();self.request_characters()
+                self.poll_characters(self.status['new_messages'])
                 if time.time()-self.last_locations>=AUTO_SECONDS or self.refresh_event.is_set():
                     self.refresh_event.clear();self.last_locations=time.time();self._start_locations(p)
             except Exception as error:
