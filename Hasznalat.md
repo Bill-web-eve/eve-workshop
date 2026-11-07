@@ -541,6 +541,8 @@ A bejelentett aktivitás mellett kis kártya mutatja a jelentett pilótákat, ha
 
 Az ismert karakterazonosítóval rendelkező pilótanév kattintható: az alapértelmezett böngészőben a `https://zkillboard.com/character/<azonosító>/` oldal nyílik meg. A szabad szövegből felismert név továbbra is következtetés, akkor is, ha az ESI ilyen nevű karaktert igazolt. A még fel nem oldott nevet **Azonosító még nem ismert** jelzés kíséri; ehhez nem készül kitalált link.
 
+A webes linkekből és feliratukból nem lesz pilóta, hajó vagy rendszer. Ha az üzenet csak egy scanlink és egy rendszernév, a chatelőzményben megmarad, de nem hoz létre kontaktkártyát vagy riasztást. A link mellett szereplő valódi intel továbbra is feldolgozható; a hivatkozott scant az app nem tölti le.
+
 A háttérben csak a felismert karakternevek mennek a CCP nyilvános ESI névfeloldásához, bejelentkezési token nélkül. A teljes chatüzenet nem. A név–azonosító találatok helyben, 30 napra gyorsítótárazódnak, a nem talált nevek egy óráig nem kérődnek újra. Hálózati hiba nem állítja le a chatlogfigyelést vagy a térképet. A **Pilótaazonosítók frissítése** gomb elindítja a szükséges ellenőrzéseket, a gyorsítótár figyelembevételével. A zKillboard csak kattintáskor nyílik meg; az app nem tölt le killboard-adatokat.
 
 Több pilóta és több hajó közös bejelentésénél az app nem állít biztos pilóta–hajó párosítást. A kártyán ez **Több pilóta · közös hajójelentés** jelzést kap. A hajófelismerés a nyilvános EVE-adatokban szereplő nevekre és néhány szokásos rövidítésre épül. Az eredeti üzenet ellenőrizhető.

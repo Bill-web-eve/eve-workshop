@@ -545,6 +545,8 @@ Small cards beside reported systems show pilots, ships and the report age. Each 
 
 Identified pilot names open the default browser at `https://zkillboard.com/character/<ID>/`. A name inferred from text remains an inference even when ESI confirms that a character of that name exists. Names without a resolved ID are marked **ID not yet identified**, with no fabricated link.
 
+Web links and their captions are excluded from pilot, ship and system recognition. A scan link followed only by a system name stays in the chat history without creating a contact card or alert. Genuine intel beside a link is still processed; the app does not fetch the linked scan.
+
 Only inferred character names are sent to the public CCP ESI resolver, without authentication tokens; full messages are not sent. Positive name–ID matches are cached locally for 30 days and negative results for one hour. Network failures do not stop log monitoring. **Refresh pilot IDs** starts any necessary lookups while respecting the cache. zKillboard opens only on a click; killboard data is not fetched in the background.
 
 A report listing multiple pilots and ships is labelled **Multiple pilots · shared ship report**; the app does not invent a certain pilot-to-ship pairing. Ship recognition uses public EVE names and a small set of common abbreviations. Original messages remain available for verification.

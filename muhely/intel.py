@@ -12,6 +12,9 @@ DEFAULTS={'enabled':False,'killfeed_enabled':True,'kill_region_ids':[],'folder':
 FILE=re.compile(r'^(?P<channel>.+)_(?P<date>\d{8})_(?P<time>\d{6})_(?P<character>\d+)\.txt$',re.I)
 LINE=re.compile(r'^\ufeff*\[\s*(\d{4}\.\d\d\.\d\d \d\d:\d\d:\d\d)\s*\]\s*([^>]{1,100})>\s*(.*)$')
 LINK=re.compile(r'<url=["\']?showinfo:(137[3-9]|138[0-6])//(\d+)["\']?>(.*?)</url>',re.I)
+WEB_URL=re.compile(r"(?<![\w@])(?:https?://|www\.)[^\s<>\"']+|(?<![\w@])(?:[a-z0-9-]+\.)+[a-z]{2,}/[^\s<>\"']*",re.I)
+MARKUP_LINK=re.compile(r'<(url|a)\b[^>]*>.*?</\1\s*>',re.I|re.S)
+PARSER_VERSION=2
 STOP=re.compile(r'\b(?:on|at|in|to|from|towards|gate|gates|out|of|with|and|plus|jumped|jumping|jump|left|leaving|reported|seen|was|is|are|no|visual|nv|ni|onlined|docked|undocked|likely|maybe|possibly|spike|spiked|spiking|clear|clr|cleared|loc|pls|please|status|check|checkin|check-in|help|scan|scanned|reported|still|just|now|local|heading|destination|need|needle|red|reds|new|ago|minutes?|minute|min|camp|camping|for|the|a|an|cloaked|cloak|suspect|scout|unknown|neut|neuts|neutral|hostile|hostiles|fleets?|tackled)\b',re.I)
 
 
@@ -65,6 +68,14 @@ def save_preferences(store,data,universe):
     return p
 
 
+def without_web_links(body):
+    """Keep original chat separately; external URLs and their captions are not intel."""
+    text=html.unescape(body)
+    text=MARKUP_LINK.sub(lambda m:' ' if WEB_URL.search(m.group().split('>',1)[0]) else m.group(),text)
+    text=WEB_URL.sub(' ',text)
+    return text,text!=html.unescape(body)
+
+
 def parse_message(line,universe,channel,channel_id,now=None,regions=()):
     match=LINE.match(line.strip());now=time.time() if now is None else now
     if not match:return None
@@ -73,10 +84,11 @@ def parse_message(line,universe,channel,channel_id,now=None,regions=()):
     try:at=datetime.strptime(date,'%Y.%m.%d %H:%M:%S').replace(tzinfo=timezone.utc).timestamp()
     except ValueError:return None
     if at>now+60:return None
-    linked=[{'name':html.unescape(re.sub('<[^>]+>','',m[3])).strip(),'id':int(m[2]),'verified':True} for m in LINK.finditer(body)]
-    plain=html.unescape(re.sub('<[^>]+>','',body))
+    cleaned,had_web_links=without_web_links(body)
+    linked=[{'name':re.sub('<[^>]+>','',m[3]).strip(),'id':int(m[2]),'verified':True} for m in LINK.finditer(cleaned)]
+    plain=re.sub('<[^>]+>','',LINK.sub(' ',cleaned))
     # A linked character can be named after a system. Do not parse their name as a location.
-    searching=LINK.sub(lambda m:' '*len(m.group()),body)
+    searching=plain
     # Racial ship names such as Amarr Shuttle also contain real system names.
     searching=universe.ship_pattern.sub(lambda m:' '*len(m.group()),searching)
     mentions=universe.mentions(searching,regions)
@@ -86,13 +98,14 @@ def parse_message(line,universe,channel,channel_id,now=None,regions=()):
     question='?' in plain
     is_clear=bool(re.search(r'(?<!\w)(?:clr|clear|cleared|tiszta)(?!\w)',plain,re.I)) and not re.search(r'\b(?:not|no|nem)\s+(?:clr|clear|cleared|tiszta)\b',plain,re.I)
     state='query' if question else 'clear' if is_clear else 'contact' if ids else 'unparsed'
-    text=plain
+    text=searching;remaining=plain
     for _,(start,end),_ in reversed(mentions):
-        # Linked markup can change offsets; full-name removal below also handles that case.
-        if '<' not in body:text=text[:start]+' '*max(1,end-start)+text[end:]
+        text=text[:start]+' '*max(1,end-start)+text[end:]
+        remaining=remaining[:start]+' '*max(1,end-start)+remaining[end:]
     text=universe.pattern.sub(' ',text);text=universe.ship_pattern.sub(' ',text)
-    text=LINK.sub(' ',text)
-    for pilot in linked:text=text.replace(pilot['name'],' ')
+    ships=universe.reported_ships(plain)
+    # A scan link with only a location is informational, not an unnamed hostile.
+    if state=='contact' and had_web_links and not linked and not ships and not re.search(r'\w',remaining):state='unparsed'
     text=re.sub(r'(?:\+\s*\d+|\b(?:\d+\s*x|x\s*\d+)\b)',' ',text,flags=re.I)
     candidates=[]
     for chunk in re.split(r'[|,;:()\[\]<>/]|\s{2,}|(?:\s+[+\-]\s*)|(?:->|→|=>)',text):
@@ -104,7 +117,7 @@ def parse_message(line,universe,channel,channel_id,now=None,regions=()):
     pilots=list({p['name'].casefold():p for p in linked+candidates}.values())[:12] if state=='contact' else []
     count=re.search(r'(?:\+|\bspike\s+)(\d{1,5})\b',plain,re.I)
     key='\0'.join([channel_id or channel.casefold(),date,reporter,body]);identity=hashlib.sha256(key.encode()).hexdigest()
-    return {'id':identity,'timestamp':at,'channel':channel,'reporter':reporter,'message':body,'systems':ids,'pilots':pilots,'ships':universe.reported_ships(html.unescape(re.sub('<[^>]+>','',LINK.sub(' ',body)))),'state':state,'count':min(10000,int(count[1])) if count else len(pilots) or None,'ambiguous':len(ids)>1,'abbreviated':any(short for _,_,short in mentions)}
+    return {'id':identity,'timestamp':at,'channel':channel,'reporter':reporter,'message':body,'systems':ids,'pilots':pilots,'ships':ships,'state':state,'count':min(10000,int(count[1])) if count else len(pilots) or None,'ambiguous':len(ids)>1,'abbreviated':any(short for _,_,short in mentions),'parser_version':PARSER_VERSION}
 
 
 def enrich_reports(store,universe,reports):
@@ -143,10 +156,21 @@ def positions(store,universe,p,now):
     return result
 
 
-def read_reports(store,p,now):
+def read_reports(store,p,now,universe=None):
     channels={s.casefold() for s in p['channels']}
     with store.db() as db:rows=db.execute('SELECT data FROM intel_reports WHERE ts>=? AND ts<=? ORDER BY ts DESC LIMIT 3000',(now-86400,now+60)).fetchall()
-    return [r for raw in rows if (r:=json.loads(raw['data']))['channel'].casefold() in channels]
+    reports=[]
+    for raw in rows:
+        row=json.loads(raw['data'])
+        if row['channel'].casefold() not in channels:continue
+        # Reinterpret old URL reports on read, without deleting history or changing IDs.
+        if row.get('parser_version',0)<PARSER_VERSION and without_web_links(row['message'])[1]:
+            universe=universe or intel_universe.load(store)
+            date=datetime.fromtimestamp(row['timestamp'],timezone.utc).strftime('%Y.%m.%d %H:%M:%S')
+            parsed=parse_message(f"[ {date} ] {row['reporter']} > {row['message']}",universe,row['channel'],'',now,p['region_ids'])
+            if parsed:row={**row,**parsed,'id':row['id']}
+        reports.append(row)
+    return reports
 
 
 def active_state(reports,now,ttl,owned=()):
@@ -175,7 +199,7 @@ def collect_alerts(store,universe=None,now=None):
     status=json.loads(row['data']) if row else {}
     from . import intel_kills
     chat_ready=p['enabled'] and not status.get('error') and now-(status.get('checked') or 0)<=10
-    pos=positions(store,universe,p,now);reports=read_reports(store,p,now);owned={c['name'].casefold() for c in store.characters()}
+    pos=positions(store,universe,p,now);reports=read_reports(store,p,now,universe);owned={c['name'].casefold() for c in store.characters()}
     active,cleared=active_state(reports,now,p['ttl_minutes']*60,owned);items=[];domains=[]
     by_system=defaultdict(list)
     for r in active:
@@ -237,7 +261,7 @@ class IntelMonitor:
                     with self.lock:self.status['resolving_characters']=False
             self.names_thread=threading.Thread(target=work,daemon=True,name='EVE-intel-names');self.names_thread.start()
     def resolve_characters(self,now=None):
-        now=time.time() if now is None else now;p=preferences(self.store);reports=read_reports(self.store,p,now)
+        now=time.time() if now is None else now;p=preferences(self.store);reports=read_reports(self.store,p,now,self.universe)
         own={c['name'].casefold() for c in self.store.characters()}
         names={pilot['name'].casefold():pilot['name'] for row in reports for pilot in row['pilots'] if not pilot.get('id') and 3<=len(pilot['name'])<=64 and pilot['name'].casefold() not in own}
         with self.store.db() as db:cache={r['name']:dict(r) for r in db.execute('SELECT * FROM intel_characters')}
@@ -393,7 +417,7 @@ class IntelMonitor:
                 if not self.closed:self.store.save_snapshots(char['id'],parts,domain='intel_location')
             except (EsiError,ValueError) as error:self.store.resource_error(char['id'],'intel_location',str(error) if isinstance(error,EsiError) else 'Hiányos EVE-helyzetadat.',isinstance(error,AuthenticationError))
     def dashboard(self,center=None,radius=5,history=False,now=None,region=None,character_id=None):
-        now=time.time() if now is None else now;p=preferences(self.store);universe=self.universe;pos=positions(self.store,universe,p,now);reports=enrich_reports(self.store,universe,read_reports(self.store,p,now))
+        now=time.time() if now is None else now;p=preferences(self.store);universe=self.universe;pos=positions(self.store,universe,p,now);reports=enrich_reports(self.store,universe,read_reports(self.store,p,now,universe))
         active,cleared=active_state(reports,now,p['ttl_minutes']*60,{c['name'].casefold() for c in self.store.characters()})
         reference=next((c for c in pos if c['id']==character_id),None) or next((c for c in pos if c['alertable']),None) or next((c for c in pos if c['system_id'] in universe.systems),None) or next(iter(pos),None)
         origin=reference['system_id'] if reference else None
