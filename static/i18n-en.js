@@ -1,6 +1,8 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Feljebb": "Move up",
+"Lejjebb": "Move down",
 "Előnézet indítása…": "Starting preview…",
 "KLIENSABLAKOK": "CLIENT WINDOWS",
 "Élő EVE-előnézetek, kattintásos ablakváltás és mentett elrendezés.": "Live EVE previews, click to switch windows and saved layouts.",
@@ -14,7 +16,7 @@ globalThis.EveEnglish={
 "Képernyő-hozzáférés engedélyezése": "Authorize screen access",
 "Akadálymentesítés": "Accessibility",
 "Ablakváltás engedélyezése": "Authorize window switching",
-"macOS: System Settings → Privacy & Security → Screen & System Audio Recording / Accessibility. Engedélyezd az EVE Műhely alkalmazást; a képernyőengedély módosítása után újraindításra is szükség lehet.": "macOS: System Settings → Privacy & Security → Screen & System Audio Recording / Accessibility. Enable EVE Műhely; changing screen permission may require restarting the app.",
+"macOS: System Settings → Privacy & Security → Screen & System Audio Recording / Device Control and Data Access (Accessibility). Engedélyezd az EVE Műhely alkalmazást; a képernyőengedély módosítása után újraindításra is szükség lehet.": "macOS: System Settings → Privacy & Security → Screen & System Audio Recording / Device Control and Data Access (Accessibility). Enable EVE Műhely; changing screen permission may require restarting the app.",
 "Előnézet és ablakváltás": "Previews and window switching",
 "Előnézetek bekapcsolása": "Enable previews",
 "Csak az EVE előtt jelenjen meg": "Show only over EVE",

@@ -114,11 +114,21 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
         if(self.enabled)[self refresh:nil];
     }return self;
 }
+- (pid_t)frontPID {
+    pid_t pid=NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;
+    // EVE can have a valid window owner but an NSRunningApplication PID of -1.
+    if(pid<=0&&[self accessibilityAllowed]){
+        AXUIElementRef system=AXUIElementCreateSystemWide();CFTypeRef focused=NULL;
+        AXUIElementSetMessagingTimeout(system,.35);
+        if(AXUIElementCopyAttributeValue(system,kAXFocusedApplicationAttribute,&focused)==kAXErrorSuccess){AXUIElementGetPid((AXUIElementRef)focused,&pid);CFRelease(focused);}CFRelease(system);
+    }return pid;
+}
+- (NSRunningApplication *)applicationForPID:(pid_t)pid{return [NSRunningApplication runningApplicationWithProcessIdentifier:pid];}
 - (BOOL)captureAllowed{return CGPreflightScreenCaptureAccess();}
 - (BOOL)accessibilityAllowed{return AXIsProcessTrusted();}
 - (void)persist {[self.defaults setObject:@{@"enabled":@(self.enabled),@"only_eve":@(self.onlyEVE),@"fps":@(self.fps),@"next_key":self.nextKey,@"previous_key":self.previousKey,@"slots":self.slots} forKey:@"EVEPreview"];}
 - (NSDictionary *)status {
-    NSMutableArray *rows=[NSMutableArray new];pid_t front=NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;
+    NSMutableArray *rows=[NSMutableArray new];pid_t front=[self frontPID];
     for(NSDictionary *slot in self.slots){NSDictionary *source=self.sources[slot[@"key"]];id capture=self.captures[slot[@"key"]];BOOL hasFrame=[(EvePreviewTile *)self.panels[slot[@"key"]].contentView image]!=nil;[rows addObject:@{@"key":slot[@"key"],@"title":slot[@"title"],@"label":slot[@"label"]?:@"",@"enabled":slot[@"enabled"]?:@YES,@"online":@(source!=nil),@"active":@(source&&[source[@"pid"] intValue]==front),@"width":slot[@"width"]?:@260,@"screen":slot[@"screen"]?:@"",@"has_frame":@(hasFrame),@"capturing":@(capture!=nil)}];}
     BOOL supported=NO;if(@available(macOS 12.3,*))supported=YES;
     return @{@"supported":@(supported),@"enabled":@(self.enabled),@"editing":@(self.editing),@"only_eve":@(self.onlyEVE),@"fps":@(self.fps),@"screen_permission":@([self captureAllowed]),@"accessibility_permission":@([self accessibilityAllowed]),@"refreshing":@(self.busy),@"error":self.error?:@"",@"next_key":self.nextKey,@"previous_key":self.previousKey,@"hotkeys_active":@(self.nextRef&&self.previousRef),@"windows":rows};
@@ -163,10 +173,12 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
         [SCShareableContent getShareableContentExcludingDesktopWindows:YES onScreenWindowsOnly:NO completionHandler:^(SCShareableContent *content,NSError *error){dispatch_async(dispatch_get_main_queue(),^{
             self.busy=NO;if(self.closed){if(done)done();return;}
             if(error){self.error=@"capture_failed";if(done)done();return;}
-            NSMutableDictionary *found=[NSMutableDictionary new];NSMutableDictionary *counts=[NSMutableDictionary new];
+            NSMutableDictionary *found=[NSMutableDictionary new];NSMutableDictionary *counts=[NSMutableDictionary new];NSMutableSet *namedClients=[NSMutableSet new];
+            for(SCWindow *window in content.windows)if([window.owningApplication.bundleIdentifier isEqual:@"com.ccpgames.eveonline"]&&[window.title hasPrefix:@"EVE - "]&&window.frame.size.width>=160&&window.frame.size.height>=100)[namedClients addObject:@(window.owningApplication.processID)];
             for(SCWindow *window in content.windows)if([window.owningApplication.bundleIdentifier isEqual:@"com.ccpgames.eveonline"]&&window.frame.size.width>=160&&window.frame.size.height>=100){NSString *title=window.title?:@"";counts[title]=@([counts[title] integerValue]+1);}
             for(SCWindow *window in content.windows){
                 if(![window.owningApplication.bundleIdentifier isEqual:@"com.ccpgames.eveonline"]||window.frame.size.width<160||window.frame.size.height<100)continue;
+                if([namedClients containsObject:@(window.owningApplication.processID)]&&![window.title hasPrefix:@"EVE - "])continue;
                 NSString *title=window.title.length?window.title:@"EVE";BOOL ambiguous=[counts[window.title?:@""] integerValue]>1||[title isEqual:@"EVE"];
                 NSString *identity=ambiguous?[NSString stringWithFormat:@"%@ · PID %d",title,window.owningApplication.processID]:title;
                 NSMutableDictionary *slot=nil;for(NSMutableDictionary *candidate in self.slots)if([candidate[@"title"] isEqual:identity])slot=candidate;
@@ -174,6 +186,9 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
                 found[slot[@"key"]]=@{@"window":window,@"pid":@(window.owningApplication.processID),@"id":@(window.windowID),@"ratio":@(window.frame.size.height/window.frame.size.width),@"ambiguous":@(ambiguous)};
             }
             for(NSString *key in self.captures.allKeys)if(![self.sources[key][@"id"] isEqual:found[key][@"id"]]){[self.captures[key] stopFeed];[self.captures removeObjectForKey:key];}
+            // Discard only untouched anonymous helper-window entries superseded by
+            // the named client in the same process. User-labelled layouts survive.
+            for(NSMutableDictionary *slot in [self.slots copy])if(![slot[@"label"] length]&&[slot[@"title"] hasPrefix:@"EVE · PID "]){NSString *suffix=[slot[@"title"] substringFromIndex:[@"EVE · PID " length]];if([namedClients containsObject:@(suffix.intValue)]){[self.panels[slot[@"key"]] orderOut:nil];[self.panels removeObjectForKey:slot[@"key"]];[self.slots removeObject:slot];}}
             self.sources=found;self.error=nil;[self persist];if(![self registerKeys])self.error=@"hotkey_conflict";[self renderPanels];if(done)done();
         });}];
     }else if(done)done();
@@ -191,7 +206,7 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
 - (void)windowDidMove:(NSNotification *)note {[self savePanel:note.object];}
 - (void)windowDidResize:(NSNotification *)note {[self savePanel:note.object];}
 - (void)renderPanels {
-    BOOL visible=self.enabled&&[self captureAllowed];pid_t front=NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;BOOL game=NO;
+    BOOL visible=self.enabled&&[self captureAllowed];pid_t front=[self frontPID];BOOL game=NO;
     for(NSDictionary *source in self.sources.allValues)if([source[@"pid"] intValue]==front)game=YES;
     for(NSUInteger index=0;index<self.slots.count;index++){
         NSMutableDictionary *slot=self.slots[index];NSString *key=slot[@"key"];NSDictionary *source=self.sources[key];EvePreviewPanel *panel=self.panels[key];
@@ -217,25 +232,32 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
     }
 }
 - (BOOL)activate:(NSString *)key {
-    NSDictionary *source=self.sources[key];if(!source||![self accessibilityAllowed])return NO;
-    NSRunningApplication *game=[NSRunningApplication runningApplicationWithProcessIdentifier:[source[@"pid"] intValue]];
+    NSDictionary *source=self.sources[key];pid_t pid=[source[@"pid"] intValue];if(!source||pid<=0||![self accessibilityAllowed])return NO;
+    NSRunningApplication *game=[self applicationForPID:pid];
     if(![game.bundleIdentifier isEqual:@"com.ccpgames.eveonline"])return NO;
+    NSString *title=nil;if(@available(macOS 12.3,*))title=[source[@"window"] title];
+    BOOL ok=[self activateApplication:game ownerPID:pid title:title];
+    self.error=ok?nil:@"activate_failed";[self renderPanels];return ok;
+}
+- (BOOL)activateApplication:(NSRunningApplication *)game ownerPID:(pid_t)pid title:(NSString *)title {
     // Some EVE clients expose no AX windows. Activating the verified game
     // process still focuses that client; AX raising is an optional refinement.
-    BOOL ok=[game activateWithOptions:NSApplicationActivateIgnoringOtherApps];
-    AXUIElementRef app=AXUIElementCreateApplication(game.processIdentifier);AXUIElementSetMessagingTimeout(app,.35);
+    BOOL ok=game.processIdentifier>0?[game activateWithOptions:0]:NO;
+    // Never use game.processIdentifier here: it is -1 for some real EVE clients.
+    AXUIElementRef app=AXUIElementCreateApplication(pid);AXUIElementSetMessagingTimeout(app,.35);
+    if(AXUIElementSetAttributeValue(app,kAXFrontmostAttribute,kCFBooleanTrue)==kAXErrorSuccess)ok=YES;
     CFTypeRef value=NULL;AXUIElementRef target=NULL;
     if(AXUIElementCopyAttributeValue(app,kAXWindowsAttribute,&value)==kAXErrorSuccess){
-        NSArray *windows=CFBridgingRelease(value);NSString *title=nil;if(@available(macOS 12.3,*))title=[source[@"window"] title];
+        NSArray *windows=CFBridgingRelease(value);
         for(id item in windows){CFTypeRef candidate=NULL;AXUIElementSetMessagingTimeout((__bridge AXUIElementRef)item,.35);if(AXUIElementCopyAttributeValue((__bridge AXUIElementRef)item,kAXTitleAttribute,&candidate)==kAXErrorSuccess){NSString *name=CFBridgingRelease(candidate);if([name isEqual:title]){if(target){CFRelease(target);target=NULL;break;}target=(AXUIElementRef)CFRetain((__bridge CFTypeRef)item);}}}
         if(!target&&windows.count==1)target=(AXUIElementRef)CFRetain((__bridge CFTypeRef)windows.firstObject);
     }
     if(target){AXUIElementSetAttributeValue(target,kAXMinimizedAttribute,kCFBooleanFalse);if(AXUIElementPerformAction(target,kAXRaiseAction)==kAXErrorSuccess)ok=YES;CFRelease(target);}CFRelease(app);
-    self.error=ok?nil:@"activate_failed";[self renderPanels];return ok;
+    return ok;
 }
 - (BOOL)cycle:(NSInteger)direction {
     NSMutableArray *online=[NSMutableArray new];for(NSDictionary *slot in self.slots)if([slot[@"enabled"] boolValue]&&self.sources[slot[@"key"]])[online addObject:slot];if(!online.count)return NO;
-    pid_t front=NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;NSInteger current=NSNotFound;
+    pid_t front=[self frontPID];NSInteger current=NSNotFound;
     for(NSUInteger i=0;i<online.count;i++)if([self.sources[online[i][@"key"]][@"pid"] intValue]==front)current=i;
     NSInteger next=current==NSNotFound?(direction>0?0:online.count-1):(current+direction+online.count)%online.count;
     return [self activate:online[next][@"key"]];

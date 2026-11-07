@@ -804,3 +804,5 @@ Automatic moon calendar, notification and corporation extraction timer refreshes
 Unique window titles containing character names allow layouts to be restored. Identical or empty titles are distinguished by process ID and may create new entries after restarting clients. Covered clients can continue updating; minimized clients may pause. Disconnecting a monitor moves affected previews to an available screen.
 
 The feature runs locally, requires no ESI scope, records no video and sends no game input. Disabling previews stops capture streams and releases shortcuts. Quitting the app stops every preview.
+
+Recent macOS versions may label the Accessibility permission list **Device Control and Data Access**. After a native update of the unsigned local test app, an enabled permission may still refer to an older build. Remove EVE Muhely from both lists and add the current **/Users/…/Applications/EVE Muhely.app** again using the plus button. Toggling an old entry off and on may not refresh it.

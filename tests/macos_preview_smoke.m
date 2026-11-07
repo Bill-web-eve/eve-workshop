@@ -11,6 +11,24 @@ static void require(BOOL ok,NSString *message){if(!ok){fprintf(stderr,"Preview t
 - (void)startCapture:(NSString *)key {}
 - (BOOL)activate:(NSString *)key {self.selected=key;return self.sources[key]!=nil;}
 @end
+// Regression: NSRunningApplication reports -1 for real EVE clients while
+// ScreenCaptureKit correctly identifies the window owner process.
+@interface PreviewApplicationStub : NSObject
+@property NSString *bundleIdentifier;
+@property pid_t processIdentifier;
+@end
+@implementation PreviewApplicationStub
+@end
+@interface PreviewOwnerTest : EvePreview
+@property PreviewApplicationStub *application;
+@property pid_t requestedPID;
+@end
+@implementation PreviewOwnerTest
+- (BOOL)captureAllowed{return NO;}
+- (BOOL)accessibilityAllowed{return YES;}
+- (NSRunningApplication *)applicationForPID:(pid_t)pid{return (id)self.application;}
+- (BOOL)activateApplication:(NSRunningApplication *)app ownerPID:(pid_t)pid title:(NSString *)title {self.requestedPID=pid;return app.processIdentifier==-1&&pid==11903;}
+@end
 int main(int argc,const char *argv[]){@autoreleasepool{
  [NSApplication sharedApplication];[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
  NSString *suite=[@"EVEPreviewTest-" stringByAppendingString:NSUUID.UUID.UUIDString];NSUserDefaults *defaults=[[NSUserDefaults alloc] initWithSuiteName:suite];
@@ -40,5 +58,8 @@ int main(int argc,const char *argv[]){@autoreleasepool{
  [restored stop];[p stop];require(!p.timer.valid&&p.observers.count==0,@"shutdown cleanup");
  [defaults setObject:@{@"slots":@[@{@"key":@"bad",@"title":@"EVE",@"width":@"invalid",@"label":@42}],@"fps":@"invalid",@"enabled":@"invalid"} forKey:@"EVEPreview"];
  PreviewTest *safe=[[PreviewTest alloc] initWithDefaults:defaults];require(!safe.enabled&&safe.fps==5&&[safe.slots[0][@"width"] intValue]==260,@"malformed saved data");[safe stop];
+ PreviewOwnerTest *owner=[[PreviewOwnerTest alloc] initWithDefaults:defaults];owner.application=[PreviewApplicationStub new];owner.application.bundleIdentifier=@"com.ccpgames.eveonline";owner.application.processIdentifier=-1;
+ owner.sources[@"game"]=@{@"pid":@11903};require([owner activate:@"game"]&&owner.requestedPID==11903,@"activation must use the real window owner, not the invalid application PID");
+ owner.requestedPID=0;owner.application.bundleIdentifier=@"unrelated.app";require(![owner activate:@"game"]&&owner.requestedPID==0,@"unrelated application activation");[owner stop];
  [defaults removePersistentDomainForName:suite];puts("eve-preview: settings validation, ordered cycling, native panels, geometry, persistence and shutdown passed.");
 }return 0;}
