@@ -320,3 +320,11 @@ html[data-theme=dark] .badge.input-stock{background:#203f35;color:#9bddb9}html[d
 .research-controls small{font-size:10px;color:var(--muted)}.research-metrics{gap:10px;margin-bottom:10px}.research-metrics .metric{padding:12px 14px}.research-metrics strong{font-size:19px}
 .research-agents .copy-item-name{white-space:normal}.research-agents td{max-width:220px}.research-agents .table-sort{white-space:normal}
 @media(max-width:1100px){.research-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Compact Mac client preview controls. Native thumbnails use the same palette. */
+.preview-permissions,.preview-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.preview-permissions>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.preview-permissions span{color:var(--muted)}
+.preview-note{margin:8px 20px 14px}.preview-options{display:flex;gap:24px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.preview-options label{display:flex;align-items:center;gap:8px}.preview-options input[type=number]{width:75px}
+.preview-shortcut{border:1px solid var(--line);border-radius:7px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 12px}.preview-shortcut label{display:flex;align-items:center;gap:5px}.preview-shortcut select{width:95px}
+.preview-table-wrap{overflow:auto}.preview-table{width:100%;min-width:640px}.preview-table td:first-child{width:32%}.preview-table strong{display:block;margin-bottom:5px}.preview-table [data-width]{width:84px}.preview-table [data-label]{width:100%;max-width:320px}.preview-table td{padding:9px 12px}
+@media(max-width:1000px){.preview-permissions,.preview-shortcuts{grid-template-columns:1fr}.preview-table td{padding:7px}}

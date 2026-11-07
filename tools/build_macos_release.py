@@ -70,13 +70,13 @@ def install_window_shell(app):
     if backend.exists():raise RuntimeError('Native shell already installed')
     executable.rename(backend)
     subprocess.run(['xcrun','clang','-fobjc-arc','-arch','arm64','-framework','Cocoa',
-                    '-framework','WebKit','-framework','UserNotifications','-mmacosx-version-min=11.0',
+                    '-framework','WebKit','-framework','UserNotifications','-weak_framework','ScreenCaptureKit','-framework','ApplicationServices','-framework','Carbon','-framework','CoreImage','-framework','CoreMedia','-mmacosx-version-min=11.0',
                     str(SOURCE/'tools/macos_launcher.m'),'-o',str(executable)],check=True)
     executable.chmod(0o755)
     shutil.copy2(SOURCE/'static/app-window.icns',contents/'Resources/app-window.icns')
     info=plistlib.loads((contents/'Info.plist').read_bytes())
     info.update(LSUIElement=False,CFBundleIconFile='app-window.icns',
-                NSAppTransportSecurity={'NSAllowsLocalNetworking':True})
+                NSAppTransportSecurity={'NSAllowsLocalNetworking':True},NSScreenCaptureUsageDescription='eve-preview displays live thumbnails of the EVE Online windows you select.')
     (contents/'Info.plist').write_bytes(plistlib.dumps(info))
     subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(backend)],check=True)
     subprocess.run(['/usr/bin/codesign','--force','--sign','-',str(app)],check=True)

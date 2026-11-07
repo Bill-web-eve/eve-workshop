@@ -24,11 +24,11 @@ def build_app(application):
             'CFBundleVersion': runpy.run_path(str(SOURCE/'muhely/__init__.py'))['__version__'], 'LSMinimumSystemVersion': '11.0', 'LSUIElement': False,
             'CFBundleIconFile': 'app-window.icns',
             'NSAppTransportSecurity': {'NSAllowsLocalNetworking': True},
-            'NSHighResolutionCapable': True}
+            'NSHighResolutionCapable': True, 'NSScreenCaptureUsageDescription': 'eve-preview displays live thumbnails of the EVE Online windows you select.'}
     shutil.copy2(SOURCE/'static/app-window.icns',bundle/'Resources/app-window.icns')
     (bundle/'Info.plist').write_bytes(plistlib.dumps(info))
     executable = bundle/'MacOS/EVE Muhely'
-    subprocess.run(['xcrun', 'clang', '-fobjc-arc', '-framework', 'Cocoa', '-framework', 'WebKit', '-framework', 'UserNotifications',
+    subprocess.run(['xcrun', 'clang', '-fobjc-arc', '-framework', 'Cocoa', '-framework', 'WebKit', '-framework', 'UserNotifications', '-weak_framework', 'ScreenCaptureKit', '-framework', 'ApplicationServices', '-framework', 'Carbon', '-framework', 'CoreImage', '-framework', 'CoreMedia',
                     '-mmacosx-version-min=11.0', str(SOURCE/'tools/macos_launcher.m'),
                     '-o', str(executable)], check=True)
     executable.chmod(0o755)

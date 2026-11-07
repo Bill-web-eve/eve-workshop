@@ -1,0 +1,44 @@
+#import <Cocoa/Cocoa.h>
+#import "../tools/macos_eve_preview.m"
+static void require(BOOL ok,NSString *message){if(!ok){fprintf(stderr,"Preview test failed: %s\n",message.UTF8String);exit(1);}}
+@interface PreviewTest : EvePreview
+@property NSString *selected;
+@end
+@implementation PreviewTest
+- (BOOL)captureAllowed{return YES;}
+- (BOOL)accessibilityAllowed{return NO;}
+- (void)refresh:(void(^)(void))done {if(done)done();}
+- (void)startCapture:(NSString *)key {}
+- (BOOL)activate:(NSString *)key {self.selected=key;return self.sources[key]!=nil;}
+@end
+int main(int argc,const char *argv[]){@autoreleasepool{
+ [NSApplication sharedApplication];[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+ NSString *suite=[@"EVEPreviewTest-" stringByAppendingString:NSUUID.UUID.UUIDString];NSUserDefaults *defaults=[[NSUserDefaults alloc] initWithSuiteName:suite];
+ PreviewTest *p=[[PreviewTest alloc] initWithDefaults:defaults];p.english=YES;
+ require(!p.enabled&&p.onlyEVE&&p.fps==5,@"safe disabled defaults");
+ require(![p configure:@{@"enabled":@1}],@"numeric boolean accepted");
+ require(![p configure:@{@"fps":@0}]&&![p configure:@{@"fps":@11}]&&![p configure:@{@"fps":@1.5}],@"invalid frame rates");
+ require(![p configure:@{@"next_key":@{@"code":@124,@"modifiers":@0}}],@"modifier-less shortcut");
+ require(![p configure:@{@"next_key":p.previousKey}],@"identical shortcuts");
+ require(![p configure:@{@"unrecognized":@YES}],@"unknown fields");
+ p.slots=[@[[ @{@"key":@"a",@"title":@"EVE - Pilot A",@"label":@"A",@"enabled":@YES,@"width":@260} mutableCopy],[@{@"key":@"b",@"title":@"EVE - Pilot B",@"label":@"B",@"enabled":@YES,@"width":@260} mutableCopy],[@{@"key":@"c",@"title":@"EVE - Offline",@"label":@"",@"enabled":@YES,@"width":@260} mutableCopy]] mutableCopy];
+ p.sources=[@{@"a":@{@"pid":@(-101),@"id":@1,@"ratio":@.5625},@"b":@{@"pid":@(-102),@"id":@2,@"ratio":@.75}} mutableCopy];
+ require([p configure:@{@"enabled":@YES,@"editing":@YES}],@"valid enable");
+ require(p.panels.count==2&&p.panels[@"a"].visible&&p.panels[@"b"].visible,@"enabled online clients only");
+ EvePreviewPanel *panel=p.panels[@"a"];
+ require(!panel.canBecomeKeyWindow&&!panel.canBecomeMainWindow&&!panel.hidesOnDeactivate&&panel.floatingPanel,@"preview must not steal focus");
+ require(!(panel.styleMask&NSWindowStyleMaskTitled)&&panel.level>=NSScreenSaverWindowLevel&&(panel.collectionBehavior&NSWindowCollectionBehaviorFullScreenAuxiliary),@"fullscreen frameless panel");
+ require([p cycle:1]&&[p.selected isEqual:@"a"],@"next starts with first online slot");require([p cycle:-1]&&[p.selected isEqual:@"b"],@"previous starts with last online slot");
+ NSRect frame=panel.frame;frame.origin.x+=30;frame.size.width=330;[panel setFrame:frame display:YES];[p savePanel:panel];require([p.slots[0][@"width"] intValue]==330,@"drag/resize not saved");
+ NSMutableArray *ordered=[NSMutableArray new];for(NSDictionary *slot in @[p.slots[1],p.slots[0],p.slots[2]])[ordered addObject:@{@"key":slot[@"key"],@"label":slot[@"label"],@"enabled":slot[@"enabled"],@"width":slot[@"width"]}];
+ require([p configure:@{@"slots":ordered}],@"reorder rejected");[p cycle:1];require([p.selected isEqual:@"b"],@"cycle ignored configured order");
+ NSMutableDictionary *bad=[ordered[0] mutableCopy];bad[@"width"]=@999;require(![p configure:@{@"slots":@[bad,ordered[1],ordered[2]]}],@"invalid width accepted");
+ p.slots[0][@"screen"]=@"disconnected";p.slots[0][@"x"]=@1e8;p.slots[0][@"y"]=@1e8;[p renderPanels];require(NSContainsRect(NSScreen.mainScreen.visibleFrame,p.panels[@"b"].frame),@"disconnected monitor fallback outside screen");
+ if(argc>1){EvePreviewTile *tile=(id)panel.contentView;[tile display];NSBitmapImageRep *image=[tile bitmapImageRepForCachingDisplayInRect:tile.bounds];[tile cacheDisplayInRect:tile.bounds toBitmapImageRep:image];[[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:@(argv[1]) atomically:YES];}
+ require([p configure:@{@"enabled":@NO}],@"disable failed");require(!panel.visible&&!p.editing&&p.captures.count==0&&!p.nextRef&&!p.previousRef,@"disable did not clean up");
+ PreviewTest *restored=[[PreviewTest alloc] initWithDefaults:defaults];require(restored.slots.count==3&&[restored.slots[0][@"key"] isEqual:@"b"]&&[restored.slots[1][@"width"] intValue]==330,@"layout/order persistence");
+ [restored stop];[p stop];require(!p.timer.valid&&p.observers.count==0,@"shutdown cleanup");
+ [defaults setObject:@{@"slots":@[@{@"key":@"bad",@"title":@"EVE",@"width":@"invalid",@"label":@42}],@"fps":@"invalid",@"enabled":@"invalid"} forKey:@"EVEPreview"];
+ PreviewTest *safe=[[PreviewTest alloc] initWithDefaults:defaults];require(!safe.enabled&&safe.fps==5&&[safe.slots[0][@"width"] intValue]==260,@"malformed saved data");[safe stop];
+ [defaults removePersistentDomainForName:suite];puts("eve-preview: settings validation, ordered cycling, native panels, geometry, persistence and shutdown passed.");
+}return 0;}

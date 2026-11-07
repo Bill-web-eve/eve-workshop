@@ -3,6 +3,7 @@
 #import <UserNotifications/UserNotifications.h>
 #include <sys/stat.h>
 #import "macos_intel_overlay.m"
+#import "macos_eve_preview.m"
 
 // macOS-only window shell. The Python service and shared UI remain portable.
 @interface EveWindow : NSObject <NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandlerWithReply, UNUserNotificationCenterDelegate>
@@ -18,6 +19,7 @@
 @property NSTimer *intelMonitor;
 @property NSDictionary *pendingNotification;
 @property EveIntelOverlay *intelOverlay;
+@property EvePreview *preview;
 @property NSMutableDictionary<NSString *,NSWindow *> *intelWindows;
 @property NSMutableDictionary<NSString *,WKWebView *> *intelViews;
 - (BOOL)localURL:(NSURL *)url;
@@ -173,6 +175,7 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
     self.origin = [NSURL URLWithString:@"http://127.0.0.1:8765"];
     NSString *savedLanguage=[NSUserDefaults.standardUserDefaults stringForKey:@"EVEUILanguage"];
     self.language=savedLanguage?:([NSLocale.preferredLanguages.firstObject hasPrefix:@"en"]?@"en":@"hu");
+    self.preview=[[EvePreview alloc] initWithDefaults:NSUserDefaults.standardUserDefaults];self.preview.english=[self english];
     // Bare CLI smoke tests have no application identity; the installed app does.
     if(NSBundle.mainBundle.bundleIdentifier){self.notificationCenter=UNUserNotificationCenter.currentNotificationCenter;self.notificationCenter.delegate=self;}
     __weak EveWindow *weakSelf=self;
@@ -262,6 +265,21 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
     if (!message.frameInfo.mainFrame || ![self localURL:message.frameInfo.request.URL] || ![self managedWeb:message.webView] || ![message.body isKindOfClass:NSDictionary.class]) {reply(nil,([self english]?@"Untrusted origin":@"Nem megbízható eredet."));return;}
     NSDictionary *body=message.body;NSString *action=body[@"action"];
     if(message.webView!=self.web && ![@[@"clipboard",@"preferences",@"external",@"activate",@"openIntelWindow"] containsObject:action]){reply(nil,([self english]?@"Main window action required":@"Ez a művelet csak a főablakból érhető el."));return;}
+    if([@[@"previewStatus",@"previewRefresh",@"previewConfigure",@"previewPermission",@"previewActivate",@"previewCycle"] containsObject:action]){
+        self.preview.english=[self english];self.preview.light=[self.window.appearance.name isEqual:NSAppearanceNameAqua];
+        if([action isEqual:@"previewPermission"]){
+            if([body[@"kind"] isEqual:@"screen"])CGRequestScreenCaptureAccess();
+            else if([body[@"kind"] isEqual:@"accessibility"])AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)@{(__bridge NSString *)kAXTrustedCheckOptionPrompt:@YES});
+            else{reply(nil,([self english]?@"Invalid permission":@"Érvénytelen engedély"));return;}
+            reply([self.preview status],nil);return;
+        }
+        if([action isEqual:@"previewRefresh"]){[self.preview refresh:^{reply([self.preview status],nil);}];return;}
+        BOOL ok=YES;
+        if([action isEqual:@"previewConfigure"])ok=[self.preview configure:body[@"options"]];
+        if([action isEqual:@"previewActivate"])ok=[body[@"key"] isKindOfClass:NSString.class]&&[self.preview activate:body[@"key"]];
+        if([action isEqual:@"previewCycle"])ok=[@[@(-1),@1] containsObject:body[@"direction"]]&&[self.preview cycle:[body[@"direction"] integerValue]];
+        reply(ok?[self.preview status]:nil,ok?nil:([self english]?@"eve-preview: check permissions, window availability and shortcut conflicts.":@"eve-preview: ellenőrizd az engedélyeket, az ablakot és a gyorsbillentyűk ütközését."));return;
+    }
     if([@[@"intelOverlayStatus",@"configureIntelOverlay",@"syncIntelOverlay"] containsObject:action]){
         if(!self.intelOverlay)self.intelOverlay=[[EveIntelOverlay alloc] initWithDefaults:NSUserDefaults.standardUserDefaults];
         self.intelOverlay.english=[self english];self.intelOverlay.light=[self.window.appearance.name isEqual:NSAppearanceNameAqua];
@@ -286,6 +304,7 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
         self.windowRoot.title=[self english]?@"Window":@"Ablak";NSApp.windowsMenu.title=self.windowRoot.title;
         self.minimizeItem.title=[self english]?@"Minimize":@"Kis méret";self.zoomItem.title=[self english]?@"Zoom":@"Nagyítás";self.frontItem.title=[self english]?@"Bring All to Front":@"Összes ablak előre";
         self.intelOverlay.english=[self english];self.intelOverlay.light=[self.window.appearance.name isEqual:NSAppearanceNameAqua];[self.intelOverlay refresh];
+        self.preview.english=[self english];self.preview.light=[self.window.appearance.name isEqual:NSAppearanceNameAqua];[self.preview renderPanels];
         self.editRoot.title=[self english]?@"Edit":@"Szerkesztés";self.viewRoot.title=[self english]?@"View":@"Nézet";
         NSArray *labels=[self english]?@[@"Undo",@"Cut",@"Copy",@"Paste",@"Select All"]:@[@"Visszavonás",@"Kivágás",@"Másolás",@"Beillesztés",@"Összes kijelölése"];
         for(NSUInteger i=0;i<labels.count;i++)[self.editMenu itemAtIndex:i].title=labels[i];
@@ -333,6 +352,7 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
     self.stopping=NO;
     if(!success.boolValue){BOOL pending=self.quitting;self.quitting=NO;if(pending)[NSApp replyToApplicationShouldTerminate:NO];NSAlert *alert=[NSAlert new];alert.messageText=[self english]?@"Could not stop the local service. Try again.":@"A helyi szolgáltatás nem állt le. Próbáld újra.";[alert runModal];return;}
     self.stopped=YES;[self.notificationMonitor invalidate];[self.intelMonitor invalidate];[self.intelOverlay.timer invalidate];[self.intelOverlay.panel orderOut:nil];
+    [self.preview stop];
     for(NSWindow *window in [self.intelWindows.allValues copy])[window close];
     [self.web stopLoading];
     if(self.quitting)[NSApp replyToApplicationShouldTerminate:YES];else[NSApp terminate:nil];

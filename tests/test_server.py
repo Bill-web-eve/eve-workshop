@@ -13,6 +13,14 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class ServerTests(unittest.TestCase):
+    def test_preview_script_is_served_without_running_production_or_esi(self):
+        with patch.object(self.app,'plan',side_effect=AssertionError('Preview must not calculate production')):
+            status,body,headers=self.request('/preview.js')
+        self.assertEqual(status,200)
+        self.assertIn('javascript',headers['Content-Type'])
+        self.assertIn(b'function renderPreview',body)
+        self.assertIn(b'/preview.js',self.request('/')[1])
+
     def test_learning_clone_routes_are_local_read_only_and_csrf_protected_for_refresh(self):
         self.assertEqual(self.request('/api/learning-clones',Cookie='')[0],403)
         self.assertEqual(self.request('/learning-clones.js')[0],200)

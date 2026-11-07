@@ -791,3 +791,16 @@ Research data and the Jita prices fetched for this view refresh automatically **
 ### Daily moon-data refresh
 
 Automatic moon calendar, notification and corporation extraction timer refreshes run **once every 24 hours**. A general EVE refresh does not bypass this interval. Attempts remain spaced after failures and app restarts. Use the dedicated **Settings → Data access → Refresh moon data** button for a manual check. Local calendar exports, countdowns and alerts for already known extraction times continue using the saved data. The existing 90-day cache for static system metadata remains in effect.
+
+## eve-preview – EVE client previews (Mac)
+
+**eve-preview** in the sidebar displays small live thumbnails of running EVE clients. This first version supports the Mac desktop app on macOS 12.3 or later. The browser and Windows views explain their current availability.
+
+1. Start the EVE clients. Use the two permission buttons on the eve-preview page to request macOS **Screen & System Audio Recording** and **Accessibility** access. Enable EVE Muhely under **System Settings → Privacy & Security**. Changing screen permission may require restarting the app.
+2. **Refresh window list**, enable previews and save settings. By default they appear only over EVE, at 5 frames per second. The rate is adjustable from 1 to 10.
+3. In **Edit layout**, drag thumbnails to the desired monitor and resize using the lower-right corner. Position and size are saved automatically. After **Finish layout**, clicking a thumbnail activates its original EVE client window.
+4. Set custom labels, 160–900 px widths and individual visibility in the list. Use the up/down buttons to set cycling order, then save. Defaults are **Control + Option + →** for next and **Control + Option + ←** for previous. Keys and modifiers are configurable; choose another combination if a shortcut is already in use. Cycling wraps around and skips disabled or offline entries.
+
+Unique window titles containing character names allow layouts to be restored. Identical or empty titles are distinguished by process ID and may create new entries after restarting clients. Covered clients can continue updating; minimized clients may pause. Disconnecting a monitor moves affected previews to an available screen.
+
+The feature runs locally, requires no ESI scope, records no video and sends no game input. Disabling previews stops capture streams and releases shortcuts. Quitting the app stops every preview.

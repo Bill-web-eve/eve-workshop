@@ -99,6 +99,9 @@ class CleanReleaseTests(unittest.TestCase):
             self.assertEqual((contents/'MacOS/eve-backend').read_bytes(),b'frozen-backend')
             info=plistlib.loads((contents/'Info.plist').read_bytes())
             self.assertFalse(info['LSUIElement']);self.assertEqual(info['CFBundleIconFile'],'app-window.icns')
+            self.assertIn('eve-preview',info['NSScreenCaptureUsageDescription'])
+            self.assertIn('ScreenCaptureKit',run.call_args_list[0].args[0])
+            self.assertIn('ApplicationServices',run.call_args_list[0].args[0])
             self.assertEqual(run.call_args_list[0].args[0][:5],['xcrun','clang','-fobjc-arc','-arch','arm64'])
             self.assertEqual(len(run.call_args_list),3)
 

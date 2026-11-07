@@ -791,3 +791,16 @@ Az RP-adatok és a hozzájuk lekért Jita-árak automatikusan **24 óránként**
 ### Holdadatok napi frissítése
 
 A holdnaptár, holdértesítések és corporation-kitermelési időzítők teljes automatikus frissítése **24 óránként** futhat. A szokásos EVE-frissítőgomb sem indít újra ilyen lekérést naponta többször; az új időközt újraindítás és sikertelen kérés után is megtartjuk. Ha azonnali ellenőrzés kell, a **Beállítások → Adathozzáférések → Holdadatok frissítése** külön gomb kézzel indíthatja. A helyi naptár, a már ismert kitermelési időpontokhoz kapcsolódó figyelmeztetések és a képernyőn megjelenő számítások továbbra is a mentett adatokból működnek. A ritkán változó rendszeradatok meglévő 90 napos gyorsítótára megmarad.
+
+## eve-preview – EVE-kliensek előnézete (Mac)
+
+Az **eve-preview** menüpont kis élő képeket jelenít meg a futó EVE-kliensekről. Ez az első, Macre készült változat; macOS 12.3 vagy újabb rendszer kell hozzá. Böngészőben és Windowson az oldal a támogatás állapotát jelzi.
+
+1. Indítsd el az EVE-klienseket. Az eve-preview oldalon a két engedélygombbal kérd a macOS **Screen & System Audio Recording** és **Accessibility** hozzáférését. A **System Settings → Privacy & Security** alatt az EVE Muhely alkalmazást engedélyezd. A képernyőengedély változtatása után a Mac kérhet alkalmazás-újraindítást.
+2. Kattints az **Ablaklista frissítése** gombra, kapcsold be az előnézeteket és mentsd a beállításokat. Alapértelmezés szerint csak az EVE előtt látszanak, 5 kép/másodperces frissítéssel. A frissítés 1–10 között állítható.
+3. Az **Elrendezés szerkesztése** módban húzd az előnézeteket a megfelelő monitorra; a jobb alsó sarkukkal méretezheted őket. A hely és méret automatikusan mentődik. Az **Elrendezés kész** után a képre kattintás az eredeti kliensablakot választja ki.
+4. A listában saját nevet, 160–900 px szélességet és egyedi ki-/bekapcsolást adhatsz meg. A fel/le gombokkal állítsd a váltási sorrendet, majd ments. Alapból **Control + Option + →** a következő, **Control + Option + ←** az előző kliens. A billentyűk és módosítóik állíthatók; ütközésnél más kombináció szükséges. A váltás körbeér, a kikapcsolt és offline bejegyzéseket kihagyja.
+
+A karakter nevét tartalmazó egyedi ablakcím segít a mentett elrendezés visszaállításában. Azonos vagy üres ablakcímek esetén a folyamat azonosítója különbözteti meg a klienseket; ilyenkor újraindítás után új bejegyzés jelenhet meg. A kitakart kliens képe frissülhet, a minimalizálté szünetelhet. A monitor lecsatlakoztatásakor az előnézet a rendelkezésre álló képernyőre kerül.
+
+A funkció helyben működik, nem kér ESI-jogot, nem ment videót és nem küld játékbeli műveleteket. A kikapcsolás leállítja a képrögzítési folyamokat és felszabadítja a gyorsbillentyűket; az alkalmazás bezárása minden előnézetet leállít.
