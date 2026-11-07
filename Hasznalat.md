@@ -806,3 +806,5 @@ A karakter nevét tartalmazó egyedi ablakcím segít a mentett elrendezés viss
 A funkció helyben működik, nem kér ESI-jogot, nem ment videót és nem küld játékbeli műveleteket. A kikapcsolás leállítja a képrögzítési folyamokat és felszabadítja a gyorsbillentyűket; az alkalmazás bezárása minden előnézetet leállít.
 
 A legújabb macOS-verziók az Accessibility engedélylistát **Device Control and Data Access** néven mutathatják. Az aláírás nélküli helyi tesztapp natív frissítése után előfordulhat, hogy a bekapcsolt engedély a régi változatra vonatkozik. Ilyenkor mindkét listából távolítsd el az EVE Muhely bejegyzést, majd a plusz gombbal add hozzá újra a **/Users/…/Applications/EVE Muhely.app** alkalmazást. A puszta ki-/bekapcsolás nem mindig frissíti a régi bejegyzést.
+
+A **Felismert gyorsbillentyűk** számláló jelzi, hogy a beállított kombináció megérkezett az apphoz. Nyomva tartáskor csak egyszer vált; újabb váltáshoz engedd fel, majd nyomd meg újra. Az Fn és a Caps Lock nem változtatja meg a beállított kombinációt. A váltóbillentyűket az app az EVE előtt kezeli, a többi leütés a megszokott módon működik. Ha a fogadás nem indult el, külön hiba jelenik meg.

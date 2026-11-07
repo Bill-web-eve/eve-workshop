@@ -37,3 +37,7 @@ test('Mac bridge exposes only the intended preview messages',async t=>{
 test('capture status waits for the first actual frame before calling a preview live',async t=>{
  const {w,d,run,data}=await fixture();t.after(()=>w.close());data.windows[0].capturing=true;await run('loadPreview()');assert.equal(d.querySelector('[data-preview-state]').textContent,'Starting preview…');data.windows[0].has_frame=true;await run('loadPreview()');assert.equal(d.querySelector('[data-preview-state]').textContent,'Live preview');
 });
+
+test('shortcut delivery count updates without replacing edited fields',async t=>{
+ const {w,d,run,data}=await fixture();t.after(()=>w.close());const form=d.querySelector('#preview-settings');form.querySelector('[data-label]').value='Keep label';form.dispatchEvent(new w.Event('input',{bubbles:true}));data.shortcut_count=4;await run('loadPreview()');assert.equal(d.querySelector('#preview-key-count').textContent,'4');assert.equal(d.querySelector('#preview-settings'),form);assert.equal(form.querySelector('[data-label]').value,'Keep label');data.error='hotkey_unavailable';await run('loadPreview()');assert(d.querySelector('#preview-status').textContent.includes('Shortcut listening could not start'));
+});

@@ -806,3 +806,5 @@ Unique window titles containing character names allow layouts to be restored. Id
 The feature runs locally, requires no ESI scope, records no video and sends no game input. Disabling previews stops capture streams and releases shortcuts. Quitting the app stops every preview.
 
 Recent macOS versions may label the Accessibility permission list **Device Control and Data Access**. After a native update of the unsigned local test app, an enabled permission may still refer to an older build. Remove EVE Muhely from both lists and add the current **/Users/…/Applications/EVE Muhely.app** again using the plus button. Toggling an old entry off and on may not refresh it.
+
+The **Shortcuts received** counter confirms that a configured combination reached the app. Holding a key switches only once; release and press again to switch again. Fn and Caps Lock do not change a configured shortcut. The app handles its configured switching combinations before EVE; other keys pass through normally. If shortcut listening cannot start, its status shows a separate error rather than reporting shortcuts as active.

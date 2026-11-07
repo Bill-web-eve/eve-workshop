@@ -50,6 +50,23 @@ API_AVAILABLE(macos(12.3))
 }
 @end
 
+// Match only the configured key codes/modifiers. No typed text is read or saved.
+@interface EvePreviewKeys : NSObject
+@property(weak) EvePreview *owner;
+@property NSDictionary *nextKey,*previousKey;
+@property NSMutableIndexSet *pressed;
+@property NSThread *thread;
+@property CFMachPortRef tap;
+@property CFRunLoopSourceRef source;
+@property CFRunLoopRef loop;
+@property BOOL stopped,hasTargets;
+- (BOOL)start;
+- (void)stop;
+- (BOOL)active;
+- (CGEventRef)handleType:(CGEventType)type event:(CGEventRef)event;
+@end
+static CGEventRef EvePreviewKeyTap(CGEventTapProxy proxy,CGEventType type,CGEventRef event,void *context){return [(__bridge EvePreviewKeys *)context handleType:type event:event];}
+
 @interface EvePreview : NSObject <NSWindowDelegate>
 @property NSUserDefaults *defaults;
 @property NSMutableArray<NSMutableDictionary *> *slots;
@@ -63,14 +80,15 @@ API_AVAILABLE(macos(12.3))
 @property NSInteger fps;
 @property NSDictionary *nextKey,*previousKey;
 @property NSString *error;
-@property EventHotKeyRef nextRef,previousRef;
-@property EventHandlerRef keyHandler;
+@property EvePreviewKeys *keys;
+@property NSUInteger shortcutCount;
 - (instancetype)initWithDefaults:(NSUserDefaults *)defaults;
 - (NSDictionary *)status;
 - (void)refresh:(void(^)(void))done;
 - (BOOL)configure:(NSDictionary *)options;
 - (BOOL)activate:(NSString *)key;
 - (BOOL)cycle:(NSInteger)direction;
+- (void)receivedShortcut:(NSInteger)direction;
 - (void)savePanel:(EvePreviewPanel *)panel;
 - (void)stop;
 @end
@@ -84,11 +102,6 @@ static BOOL EvePreviewShortcut(id value){return [value isKindOfClass:NSDictionar
 static BOOL EvePreviewLegacyActivate(pid_t pid){ProcessSerialNumber psn;return GetProcessForPID(pid,&psn)==noErr&&SetFrontProcessWithOptions(&psn,kSetFrontProcessFrontWindowOnly|kSetFrontProcessCausedByUser)==noErr;}
 static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1;if(GetFrontProcess(&psn)==noErr)GetProcessPID(&psn,&pid);return pid;}
 #pragma clang diagnostic pop
-static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void *context){
-    EventHotKeyID key;if(GetEventParameter(event,kEventParamDirectObject,typeEventHotKeyID,NULL,sizeof(key),NULL,&key)!=noErr)return eventNotHandledErr;
-    if(key.signature!='EVEP')return eventNotHandledErr;
-    EvePreview *preview=(__bridge EvePreview *)context;[preview cycle:key.id==1?1:-1];return noErr;
-}
 
 @implementation EvePreview
 - (instancetype)initWithDefaults:(NSUserDefaults *)defaults {
@@ -138,16 +151,24 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
     NSMutableArray *rows=[NSMutableArray new];pid_t front=[self frontPID];
     for(NSDictionary *slot in self.slots){NSDictionary *source=self.sources[slot[@"key"]];id capture=self.captures[slot[@"key"]];BOOL hasFrame=[(EvePreviewTile *)self.panels[slot[@"key"]].contentView image]!=nil;[rows addObject:@{@"key":slot[@"key"],@"title":slot[@"title"],@"label":slot[@"label"]?:@"",@"enabled":slot[@"enabled"]?:@YES,@"online":@(source!=nil),@"active":@(source&&[source[@"pid"] intValue]==front),@"width":slot[@"width"]?:@260,@"screen":slot[@"screen"]?:@"",@"has_frame":@(hasFrame),@"capturing":@(capture!=nil)}];}
     BOOL supported=NO;if(@available(macOS 12.3,*))supported=YES;
-    return @{@"supported":@(supported),@"enabled":@(self.enabled),@"editing":@(self.editing),@"only_eve":@(self.onlyEVE),@"fps":@(self.fps),@"screen_permission":@([self captureAllowed]),@"accessibility_permission":@([self accessibilityAllowed]),@"refreshing":@(self.busy),@"error":self.error?:@"",@"next_key":self.nextKey,@"previous_key":self.previousKey,@"hotkeys_active":@(self.nextRef&&self.previousRef),@"windows":rows};
+    return @{@"supported":@(supported),@"enabled":@(self.enabled),@"editing":@(self.editing),@"only_eve":@(self.onlyEVE),@"fps":@(self.fps),@"screen_permission":@([self captureAllowed]),@"accessibility_permission":@([self accessibilityAllowed]),@"refreshing":@(self.busy),@"error":self.error?:@"",@"next_key":self.nextKey,@"previous_key":self.previousKey,@"hotkeys_active":@([self.keys active]),@"shortcut_count":@(self.shortcutCount),@"windows":rows};
 }
-- (void)releaseKeys {if(self.nextRef){UnregisterEventHotKey(self.nextRef);self.nextRef=NULL;}if(self.previousRef){UnregisterEventHotKey(self.previousRef);self.previousRef=NULL;}}
+- (void)releaseKeys {[self.keys stop];self.keys=nil;}
 - (BOOL)registerKeys {
     if(!self.enabled||![self accessibilityAllowed]){[self releaseKeys];return YES;}
-    if(self.nextRef&&self.previousRef)return YES;
-    if(!self.keyHandler){EventTypeSpec type={kEventClassKeyboard,kEventHotKeyPressed};if(InstallApplicationEventHandler(EvePreviewHotKey,1,&type,(__bridge void *)self,&_keyHandler)!=noErr)return NO;}
-    EventHotKeyID next={'EVEP',1},previous={'EVEP',2};
-    if(RegisterEventHotKey([self.nextKey[@"code"] unsignedIntValue],[self.nextKey[@"modifiers"] unsignedIntValue],next,GetApplicationEventTarget(),0,&_nextRef)!=noErr||RegisterEventHotKey([self.previousKey[@"code"] unsignedIntValue],[self.previousKey[@"modifiers"] unsignedIntValue],previous,GetApplicationEventTarget(),0,&_previousRef)!=noErr){[self releaseKeys];return NO;}return YES;
+    if([self.keys active])return YES;
+    [self releaseKeys];
+    // Reserve briefly to validate conflicts; actual delivery uses Quartz before
+    // the game receives the key, rather than depending on Carbon dispatch.
+    EventHotKeyRef nextRef=NULL,previousRef=NULL;EventHotKeyID next={'EVEP',1},previous={'EVEP',2};
+    OSStatus first=RegisterEventHotKey([self.nextKey[@"code"] unsignedIntValue],[self.nextKey[@"modifiers"] unsignedIntValue],next,GetEventDispatcherTarget(),0,&nextRef);
+    OSStatus second=first==noErr?RegisterEventHotKey([self.previousKey[@"code"] unsignedIntValue],[self.previousKey[@"modifiers"] unsignedIntValue],previous,GetEventDispatcherTarget(),0,&previousRef):first;
+    if(nextRef)UnregisterEventHotKey(nextRef);if(previousRef)UnregisterEventHotKey(previousRef);
+    if(first!=noErr||second!=noErr){self.error=@"hotkey_conflict";return NO;}
+    EvePreviewKeys *keys=[EvePreviewKeys new];keys.owner=self;keys.nextKey=[self.nextKey copy];keys.previousKey=[self.previousKey copy];self.keys=keys;
+    if(![keys start]){[self releaseKeys];self.error=@"hotkey_unavailable";return NO;}return YES;
 }
+- (void)receivedShortcut:(NSInteger)direction {if(self.closed||!self.enabled)return;self.shortcutCount++;if(![self cycle:direction])self.error=@"activate_failed";}
 - (BOOL)configure:(NSDictionary *)options {
     if(![options isKindOfClass:NSDictionary.class])return NO;
     for(NSString *key in options)if(![@[@"enabled",@"editing",@"only_eve",@"fps",@"next_key",@"previous_key",@"slots"] containsObject:key])return NO;
@@ -167,7 +188,7 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
     }else for(NSDictionary *slot in self.slots)[slots addObject:[slot mutableCopy]];
     NSDictionary *oldNext=self.nextKey,*oldPrevious=self.previousKey;BOOL oldEnabled=self.enabled;
     [self releaseKeys];self.nextKey=next;self.previousKey=previous;if(options[@"enabled"])self.enabled=[options[@"enabled"] boolValue];
-    if(![self registerKeys]){self.nextKey=oldNext;self.previousKey=oldPrevious;self.enabled=oldEnabled;[self registerKeys];self.error=@"hotkey_conflict";return NO;}
+    if(![self registerKeys]){NSString *failure=self.error;self.nextKey=oldNext;self.previousKey=oldPrevious;self.enabled=oldEnabled;[self registerKeys];self.error=failure;return NO;}
     BOOL restart=options[@"fps"]&&[options[@"fps"] integerValue]!=self.fps;
     if(options[@"fps"])self.fps=[options[@"fps"] integerValue];if(options[@"only_eve"])self.onlyEVE=[options[@"only_eve"] boolValue];if(options[@"editing"])self.editing=[options[@"editing"] boolValue];
     if(!self.enabled)self.editing=NO;self.slots=slots;self.error=nil;if(restart||!self.enabled)[self stopCaptures];[self persist];[self renderPanels];if(self.enabled)[self refresh:nil];return YES;
@@ -196,7 +217,7 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
             // Discard only untouched anonymous helper-window entries superseded by
             // the named client in the same process. User-labelled layouts survive.
             for(NSMutableDictionary *slot in [self.slots copy])if(![slot[@"label"] length]&&[slot[@"title"] hasPrefix:@"EVE · PID "]){NSString *suffix=[slot[@"title"] substringFromIndex:[@"EVE · PID " length]];if([namedClients containsObject:@(suffix.intValue)]){[self.panels[slot[@"key"]] orderOut:nil];[self.panels removeObjectForKey:slot[@"key"]];[self.slots removeObject:slot];}}
-            self.sources=found;self.error=nil;[self persist];if(![self registerKeys])self.error=@"hotkey_conflict";[self renderPanels];if(done)done();
+            self.sources=found;self.error=nil;[self persist];[self registerKeys];[self renderPanels];if(done)done();
         });}];
     }else if(done)done();
 }
@@ -213,6 +234,7 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
 - (void)windowDidMove:(NSNotification *)note {[self savePanel:note.object];}
 - (void)windowDidResize:(NSNotification *)note {[self savePanel:note.object];}
 - (void)renderPanels {
+    BOOL hasTargets=NO;for(NSDictionary *slot in self.slots)if([slot[@"enabled"] boolValue]&&self.sources[slot[@"key"]])hasTargets=YES;self.keys.hasTargets=hasTargets;
     BOOL visible=self.enabled&&[self captureAllowed];pid_t front=[self frontPID];BOOL game=NO;
     for(NSDictionary *source in self.sources.allValues)if([source[@"pid"] intValue]==front)game=YES;
     for(NSUInteger index=0;index<self.slots.count;index++){
@@ -271,7 +293,42 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
     return [self activate:online[next][@"key"]];
 }
 - (void)stopCaptures {for(id capture in self.captures.allValues)[capture stopFeed];[self.captures removeAllObjects];}
-- (void)stop {self.closed=YES;for(id token in self.observers){[NSWorkspace.sharedWorkspace.notificationCenter removeObserver:token];[NSNotificationCenter.defaultCenter removeObserver:token];}[self.observers removeAllObjects];[self.timer invalidate];[self releaseKeys];if(self.keyHandler){RemoveEventHandler(self.keyHandler);self.keyHandler=NULL;}[self stopCaptures];for(NSPanel *panel in self.panels.allValues)[panel orderOut:nil];}
+- (void)stop {self.closed=YES;for(id token in self.observers){[NSWorkspace.sharedWorkspace.notificationCenter removeObserver:token];[NSNotificationCenter.defaultCenter removeObserver:token];}[self.observers removeAllObjects];[self.timer invalidate];[self releaseKeys];[self stopCaptures];for(NSPanel *panel in self.panels.allValues)[panel orderOut:nil];}
+@end
+
+@implementation EvePreviewKeys
+- (instancetype)init {if((self=[super init]))self.pressed=[NSMutableIndexSet new];return self;}
+- (BOOL)active {return !self.stopped&&self.tap&&CGEventTapIsEnabled(self.tap);}
+- (BOOL)start {
+    _tap=CGEventTapCreate(kCGSessionEventTap,kCGHeadInsertEventTap,kCGEventTapOptionDefault,CGEventMaskBit(kCGEventKeyDown)|CGEventMaskBit(kCGEventKeyUp),EvePreviewKeyTap,(__bridge void *)self);
+    if(!self.tap)return NO;
+    _source=CFMachPortCreateRunLoopSource(NULL,self.tap,0);if(!self.source){[self stop];return NO;}
+    self.thread=[[NSThread alloc] initWithBlock:^{@autoreleasepool{
+        BOOL run=NO;CFRunLoopRef loop=CFRunLoopGetCurrent();
+        @synchronized(self){if(!self.stopped){self.loop=(CFRunLoopRef)CFRetain(loop);CFRunLoopAddSource(loop,self.source,kCFRunLoopCommonModes);run=YES;}}
+        if(run){CFRunLoopRun();@synchronized(self){CFRunLoopRemoveSource(loop,self.source,kCFRunLoopCommonModes);CFRelease(self.loop);self.loop=NULL;}}
+        self.thread=nil;
+    }}];self.thread.name=@"EVEWorkshop.preview.shortcuts";[self.thread start];return YES;
+}
+- (CGEventRef)handleType:(CGEventType)type event:(CGEventRef)event {
+    if(self.stopped)return event;
+    if(type==kCGEventTapDisabledByTimeout||type==kCGEventTapDisabledByUserInput){if(self.tap)CGEventTapEnable(self.tap,true);return event;}
+    if(!event||(type!=kCGEventKeyDown&&type!=kCGEventKeyUp))return event;
+    NSUInteger code=(NSUInteger)CGEventGetIntegerValueField(event,kCGKeyboardEventKeycode);
+    if(type==kCGEventKeyUp){if([self.pressed containsIndex:code]){[self.pressed removeIndex:code];return NULL;}return event;}
+    if(!self.hasTargets)return event;
+    CGEventFlags flags=CGEventGetFlags(event);UInt32 modifiers=0;
+    if(flags&kCGEventFlagMaskControl)modifiers|=controlKey;if(flags&kCGEventFlagMaskAlternate)modifiers|=optionKey;
+    if(flags&kCGEventFlagMaskCommand)modifiers|=cmdKey;if(flags&kCGEventFlagMaskShift)modifiers|=shiftKey;
+    NSInteger direction=code==[self.nextKey[@"code"] unsignedIntegerValue]&&modifiers==[self.nextKey[@"modifiers"] unsignedIntValue]?1:code==[self.previousKey[@"code"] unsignedIntegerValue]&&modifiers==[self.previousKey[@"modifiers"] unsignedIntValue]?-1:0;
+    if(!direction)return event;
+    if([self.pressed containsIndex:code]||CGEventGetIntegerValueField(event,kCGKeyboardEventAutorepeat))return NULL;
+    [self.pressed addIndex:code];
+    dispatch_async(dispatch_get_main_queue(),^{EvePreview *owner=self.owner;if(!self.stopped&&owner.keys==self)[owner receivedShortcut:direction];});
+    return NULL;
+}
+- (void)stop {@synchronized(self){self.stopped=YES;if(self.tap)CFMachPortInvalidate(self.tap);if(self.loop){CFRunLoopStop(self.loop);CFRunLoopWakeUp(self.loop);}}}
+- (void)dealloc {if(_tap){CFMachPortInvalidate(_tap);CFRelease(_tap);}if(_source)CFRelease(_source);}
 @end
 
 @implementation EvePreviewTile

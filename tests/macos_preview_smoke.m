@@ -53,7 +53,7 @@ int main(int argc,const char *argv[]){@autoreleasepool{
  NSMutableDictionary *bad=[ordered[0] mutableCopy];bad[@"width"]=@999;require(![p configure:@{@"slots":@[bad,ordered[1],ordered[2]]}],@"invalid width accepted");
  p.slots[0][@"screen"]=@"disconnected";p.slots[0][@"x"]=@1e8;p.slots[0][@"y"]=@1e8;[p renderPanels];require(NSContainsRect(NSScreen.mainScreen.visibleFrame,p.panels[@"b"].frame),@"disconnected monitor fallback outside screen");
  if(argc>1){EvePreviewTile *tile=(id)panel.contentView;[tile display];NSBitmapImageRep *image=[tile bitmapImageRepForCachingDisplayInRect:tile.bounds];[tile cacheDisplayInRect:tile.bounds toBitmapImageRep:image];[[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:@(argv[1]) atomically:YES];}
- require([p configure:@{@"enabled":@NO}],@"disable failed");require(!panel.visible&&!p.editing&&p.captures.count==0&&!p.nextRef&&!p.previousRef,@"disable did not clean up");
+ require([p configure:@{@"enabled":@NO}],@"disable failed");require(!panel.visible&&!p.editing&&p.captures.count==0&&!p.keys,@"disable did not clean up");
  PreviewTest *restored=[[PreviewTest alloc] initWithDefaults:defaults];require(restored.slots.count==3&&[restored.slots[0][@"key"] isEqual:@"b"]&&[restored.slots[1][@"width"] intValue]==330,@"layout/order persistence");
  [restored stop];[p stop];require(!p.timer.valid&&p.observers.count==0,@"shutdown cleanup");
  [defaults setObject:@{@"slots":@[@{@"key":@"bad",@"title":@"EVE",@"width":@"invalid",@"label":@42}],@"fps":@"invalid",@"enabled":@"invalid"} forKey:@"EVEPreview"];

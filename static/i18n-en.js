@@ -1,6 +1,8 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Felismert gyorsbillentyűk:": "Shortcuts received:",
+"A gyorsbillentyűk fogadása nem indult el. Ellenőrizd az ablakváltási engedélyt.": "Shortcut listening could not start. Check window-switching permission.",
 "Feljebb": "Move up",
 "Lejjebb": "Move down",
 "Előnézet indítása…": "Starting preview…",
