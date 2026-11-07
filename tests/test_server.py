@@ -21,6 +21,21 @@ class ServerTests(unittest.TestCase):
         self.assertIn(b'function renderPreview',body)
         self.assertIn(b'/preview.js',self.request('/')[1])
 
+    def test_preview_mining_routes_require_local_session_and_csrf_without_esi(self):
+        self.assertEqual(self.request('/api/preview/mining',Cookie='')[0],403)
+        self.app.preview_mining.snapshot=Mock(return_value={'enabled':True,'characters':[]})
+        self.app.preview_mining.configure=Mock(return_value={'enabled':False,'characters':[]})
+        self.app.preview_mining.replace_crystal=Mock(return_value={'enabled':True,'characters':[]})
+        self.app.preview_mining.acknowledge=Mock(return_value={'enabled':True,'characters':[]})
+        with patch.object(self.app,'plan',side_effect=AssertionError('Log badges must not plan or fetch ESI')):
+            self.assertEqual(self.request('/api/preview/mining')[0],200)
+            self.assertEqual(self.request('/api/preview/mining/configure',{'enabled':False,'folder':'test'},Origin='https://other.invalid')[0],403)
+            self.app.preview_mining.configure.assert_not_called()
+            self.assertEqual(self.request('/api/preview/mining/configure',{'enabled':False,'folder':'test'})[0],200)
+            self.assertEqual(self.request('/api/preview/mining/replace-crystal',{'name':'Pilot','id':'a'*24})[0],200)
+            self.assertEqual(self.request('/api/preview/mining/acknowledge',{'name':'Pilot','ids':['b'*24]})[0],200)
+        self.app.preview_mining.replace_crystal.assert_called_once_with({'name':'Pilot','id':'a'*24})
+
     def test_learning_clone_routes_are_local_read_only_and_csrf_protected_for_refresh(self):
         self.assertEqual(self.request('/api/learning-clones',Cookie='')[0],403)
         self.assertEqual(self.request('/learning-clones.js')[0],200)

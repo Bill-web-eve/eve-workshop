@@ -41,6 +41,7 @@ from .refresh_policy import RefreshPolicy
 from .asset_locations import AssetLocations
 from .learning_clones import LearningCloneWatch
 from .boosts import BoostCounter,discover as boost_channels
+from .preview_mining import PreviewMining
 from . import stable_plans
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -75,6 +76,7 @@ class App:
         self.asset_locations=AssetLocations(self.store,self.eve)
         self.learning_clones=LearningCloneWatch(self.store,self.eve)
         self.boosts=BoostCounter(self.store)
+        self.preview_mining=PreviewMining(self.store)
 
     def desktop_auth_start(self, url):
         """One-use browser handoff; OAuth codes and tokens never enter the UI."""
@@ -839,6 +841,7 @@ class Handler(BaseHTTPRequestHandler):
                 radius=integer(int(query.get('radius',['5'])[0]),'Jump',12,1)
                 return self.send(200,self.app.intel.dashboard(center,radius,query.get('history',['0'])[0]=='1',region=integer(int(query.get('region',['0'])[0]),'Régió',2**31-1,0) or None,character_id=integer(int(query.get('character_id',['0'])[0]),'Karakter',2**31-1,0) or None))
             if path == '/api/intel/channels':return self.send(200,{'channels':self.app.intel.channels(query.get('folder',[''])[0])})
+            if path == '/api/preview/mining':return self.send(200,self.app.preview_mining.snapshot())
             if path == '/api/boosts':return self.send(200,self.app.boosts.snapshot())
             if path == '/api/boosts/channels':return self.send(200,{'channels':boost_channels(query.get('folder',[''])[0])})
             if path == '/api/intel/systems':
@@ -989,6 +992,9 @@ class Handler(BaseHTTPRequestHandler):
                 from .learning_clones import alerts
                 return self.send(200,{'items':notifications.claim(self.app.store,alerts(self.app.store))})
             elif path == '/api/fleet/preferences':return self.send(200,fleet.save_preferences(self.app.store,data))
+            elif path == '/api/preview/mining/configure':return self.send(200,self.app.preview_mining.configure(data))
+            elif path == '/api/preview/mining/replace-crystal':return self.send(200,self.app.preview_mining.replace_crystal(data))
+            elif path == '/api/preview/mining/acknowledge':return self.send(200,self.app.preview_mining.acknowledge(data))
             elif path == '/api/boosts/start':return self.send(200,self.app.boosts.start(data.get('folder'),data.get('channel')))
             elif path == '/api/boosts/stop':return self.send(200,self.app.boosts.stop())
             elif path == '/api/fleet/sides':return self.send(200,self.app.fleet.configure_sides(data))
@@ -1173,6 +1179,7 @@ class Server(ThreadingHTTPServer):
     def server_close(self):
         if getattr(self,'_workers_stopped',False):return super().server_close()
         self._workers_stopped=True
+        self.app.preview_mining.closed=True
         self.app.boosts.close()
         self.app.asset_locations.stop()
         self.app.learning_clones.stop()

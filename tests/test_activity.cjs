@@ -67,3 +67,12 @@ test('production-plan failures show the entire character and job error in Englis
  assert(d.querySelector('#activity-panel').textContent.includes('Pehra Qirna: Industry jobs: EVE data is currently unavailable. Previous data has been preserved. You can continue planning in manual mode.'));
  assert(!/[áéíóöőúüű]/i.test(d.querySelector('#activity-panel').textContent));
 });
+
+
+test('two-second local preview mining polls never create operation cards',async t=>{
+ const {w,d}=fixture();t.after(()=>w.close());
+ for(let i=0;i<5;i++)await w.EveActivity.run('/api/preview/mining',async()=>({characters:[],enabled:true}));
+ assert(!d.querySelector('#activity-panel')||d.querySelector('#activity-panel').hidden);
+ let finish;const saving=w.EveActivity.run('/api/preview/mining/configure',()=>new Promise(resolve=>finish=resolve));await wait(150);
+ assert(d.querySelector('#activity-panel')&&!d.querySelector('#activity-panel').hidden);finish({enabled:false,characters:[]});await saving;
+});

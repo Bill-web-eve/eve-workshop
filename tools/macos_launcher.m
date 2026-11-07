@@ -179,11 +179,17 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
     // Bare CLI smoke tests have no application identity; the installed app does.
     if(NSBundle.mainBundle.bundleIdentifier){self.notificationCenter=UNUserNotificationCenter.currentNotificationCenter;self.notificationCenter.delegate=self;}
     __weak EveWindow *weakSelf=self;
+    self.preview.miningAction=^(NSString *name,NSString *kind,NSString *identifier){
+        EveWindow *app=weakSelf;if(!app.ready||app.quitting)return;
+        NSData *encoded=[NSJSONSerialization dataWithJSONObject:@{@"name":name,@"kind":kind,@"id":identifier} options:0 error:nil];
+        NSString *json=[[NSString alloc] initWithData:encoded encoding:NSUTF8StringEncoding];
+        if(json)[app.web evaluateJavaScript:[NSString stringWithFormat:@"if(typeof previewMiningAction==='function')void previewMiningAction(%@)",json] completionHandler:nil];
+    };
     self.notificationMonitor=[NSTimer scheduledTimerWithTimeInterval:60 repeats:YES block:^(NSTimer *timer){
         EveWindow *app=weakSelf;
         if(app.ready&&!app.quitting)[app.web evaluateJavaScript:@"if(typeof refreshNotifications==='function'&&!notificationSettingsBusy)void refreshNotifications()" completionHandler:nil];
     }];
-    self.intelMonitor=[NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer){EveWindow *app=weakSelf;if(app.ready&&!app.quitting){[app.web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts();if(typeof pollImplantAlerts==='function')void pollImplantAlerts()" completionHandler:nil];for(WKWebView *web in app.intelViews.allValues)[web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts()" completionHandler:nil];}}];
+    self.intelMonitor=[NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer){EveWindow *app=weakSelf;if(app.ready&&!app.quitting){[app.web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts();if(typeof pollImplantAlerts==='function')void pollImplantAlerts();if(typeof pollPreviewMining==='function')void pollPreviewMining()" completionHandler:nil];for(WKWebView *web in app.intelViews.allValues)[web evaluateJavaScript:@"if(typeof pollIntelAlerts==='function')void pollIntelAlerts()" completionHandler:nil];}}];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]; [self menu];
     self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,1320,860) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
     self.window.title = [self english]?@"EVE Workshop":@"EVE Műhely"; self.window.minSize = NSMakeSize(900,650); self.window.delegate = self;
@@ -265,7 +271,7 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
     if (!message.frameInfo.mainFrame || ![self localURL:message.frameInfo.request.URL] || ![self managedWeb:message.webView] || ![message.body isKindOfClass:NSDictionary.class]) {reply(nil,([self english]?@"Untrusted origin":@"Nem megbízható eredet."));return;}
     NSDictionary *body=message.body;NSString *action=body[@"action"];
     if(message.webView!=self.web && ![@[@"clipboard",@"preferences",@"external",@"activate",@"openIntelWindow"] containsObject:action]){reply(nil,([self english]?@"Main window action required":@"Ez a művelet csak a főablakból érhető el."));return;}
-    if([@[@"previewStatus",@"previewRefresh",@"previewConfigure",@"previewPermission",@"previewActivate",@"previewCycle"] containsObject:action]){
+    if([@[@"previewKeyCapture",@"previewMining",@"previewStatus",@"previewRefresh",@"previewConfigure",@"previewPermission",@"previewActivate",@"previewCycle"] containsObject:action]){
         self.preview.english=[self english];self.preview.light=[self.window.appearance.name isEqual:NSAppearanceNameAqua];
         if([action isEqual:@"previewPermission"]){
             if([body[@"kind"] isEqual:@"screen"])CGRequestScreenCaptureAccess();
@@ -275,6 +281,8 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
         }
         if([action isEqual:@"previewRefresh"]){[self.preview refresh:^{reply([self.preview status],nil);}];return;}
         BOOL ok=YES;
+        if([action isEqual:@"previewKeyCapture"])ok=[self.preview setKeyCaptureValue:body[@"capturing"]];
+        if([action isEqual:@"previewMining"])ok=[self.preview syncMining:body[@"data"]];
         if([action isEqual:@"previewConfigure"])ok=[self.preview configure:body[@"options"]];
         if([action isEqual:@"previewActivate"])ok=[body[@"key"] isKindOfClass:NSString.class]&&[self.preview activate:body[@"key"]];
         if([action isEqual:@"previewCycle"])ok=[@[@(-1),@1] containsObject:body[@"direction"]]&&[self.preview cycle:[body[@"direction"] integerValue]];
