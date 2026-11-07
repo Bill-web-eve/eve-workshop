@@ -4,7 +4,7 @@ const {JSDOM}=require('jsdom'),root=path.join(__dirname,'../static'),tick=()=>ne
 async function fixture(platform='mac'){
  const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://127.0.0.1:8765',runScripts:'outside-only'}),w=dom.window,d=w.document,run=s=>vm.runInContext(s,dom.getInternalVMContext()),calls=[],native=[];
  const state={csrf:'test',version:'1.7.0',characters:[],corporations:[],production_characters:[],plans:[],jobs:[],settings:{source:'manual'},task:{running:false},sde:{buildNumber:1},recipe_count:1};
- const data={supported:true,enabled:false,editing:false,only_eve:true,fps:5,screen_permission:false,accessibility_permission:false,error:'',next_key:{code:124,modifiers:6144},previous_key:{code:123,modifiers:6144},hotkeys_active:false,windows:[{key:'a',title:'EVE - Pilot <A>',label:'',enabled:true,width:260,online:true,active:false,capturing:false},{key:'b',title:'EVE - Pilot B',label:'B',enabled:true,width:260,online:true,active:false,capturing:false}]};
+ const data={supported:true,enabled:false,editing:false,only_eve:true,fps:5,screen_permission:false,accessibility_permission:false,error:'',next_key:{code:124,modifiers:6144},previous_key:{code:123,modifiers:6144},hotkeys_active:false,windows:[{key:'a',title:'EVE - Pilot <A>',label:'',enabled:true,width:260,online:true,active:false,capturing:false,has_frame:false},{key:'b',title:'EVE - Pilot B',label:'B',enabled:true,width:260,online:true,active:false,capturing:false,has_frame:false}]};
  w.localStorage.setItem('eve-muhely-language','en');w.confirm=()=>true;
  if(platform==='mac')w.webkit={messageHandlers:{eveDesktop:{postMessage:async body=>{native.push(body);if(body.action==='previewConfigure'){const options=body.options;Object.assign(data,options);if(options.slots){data.windows=options.slots.map(slot=>({...data.windows.find(r=>r.key===slot.key),...slot}));delete data.slots;}}return structuredClone(data);}}}};
  w.fetch=async url=>{calls.push(url);const value=url==='/api/state'?state:url==='/api/notifications'?{items:[],counts:{},task:{running:false},corporations:[],preferences:{os_enabled:false,categories:{intel:false}}}:url==='/api/intel/alerts'?{enabled:false,items:[]}:null;if(value===null)throw Error('Unexpected '+url);return {ok:true,json:async()=>value};};
@@ -32,4 +32,8 @@ test('permission, layout and activation require explicit clicks; invalid hotkeys
 });
 test('Mac bridge exposes only the intended preview messages',async t=>{
  const {w,native}=await fixture();t.after(()=>w.close());await w.EveDesktop.cyclePreview(-1);assert.equal(native.at(-1).action,'previewCycle');assert.equal(native.at(-1).direction,-1);
+});
+
+test('capture status waits for the first actual frame before calling a preview live',async t=>{
+ const {w,d,run,data}=await fixture();t.after(()=>w.close());data.windows[0].capturing=true;await run('loadPreview()');assert.equal(d.querySelector('[data-preview-state]').textContent,'Starting preview…');data.windows[0].has_frame=true;await run('loadPreview()');assert.equal(d.querySelector('[data-preview-state]').textContent,'Live preview');
 });

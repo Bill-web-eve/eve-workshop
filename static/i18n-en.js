@@ -1,6 +1,7 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Előnézet indítása…": "Starting preview…",
 "KLIENSABLAKOK": "CLIENT WINDOWS",
 "Élő EVE-előnézetek, kattintásos ablakváltás és mentett elrendezés.": "Live EVE previews, click to switch windows and saved layouts.",
 "Az eve-preview első változata a Mac asztali alkalmazásban használható.": "The first version of eve-preview is available in the Mac desktop app.",

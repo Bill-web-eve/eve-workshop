@@ -28,13 +28,14 @@ API_AVAILABLE(macos(12.3))
 @interface EvePreviewCapture : NSObject <SCStreamOutput,SCStreamDelegate>
 @property SCStream *stream;
 @property CIContext *context;
+@property NSUInteger frames;
 @property(weak) EvePreviewTile *tile;
-@property BOOL closed,english;
+@property BOOL closed,english,paused;
 - (void)stopFeed;
 @end
 @implementation EvePreviewCapture
 - (void)stopFeed {self.closed=YES;[self.stream stopCaptureWithCompletionHandler:nil];self.stream=nil;}
-- (void)stream:(SCStream *)stream didStopWithError:(NSError *)error {dispatch_async(dispatch_get_main_queue(),^{if(!self.closed){self.tile.message=self.english?@"Capture paused":@"Előnézet szünetel";self.tile.needsDisplay=YES;}});}
+- (void)stream:(SCStream *)stream didStopWithError:(NSError *)error {dispatch_async(dispatch_get_main_queue(),^{if(!self.closed){self.paused=YES;self.tile.message=self.english?@"Capture paused":@"Előnézet szünetel";self.tile.needsDisplay=YES;}});}
 - (void)stream:(SCStream *)stream didOutputSampleBuffer:(CMSampleBufferRef)sample ofType:(SCStreamOutputType)type {
     if(self.closed||type!=SCStreamOutputTypeScreen||!CMSampleBufferIsValid(sample))return;
     NSArray *attachments=(__bridge NSArray *)CMSampleBufferGetSampleAttachmentsArray(sample,NO);
@@ -44,7 +45,7 @@ API_AVAILABLE(macos(12.3))
     @autoreleasepool{
         CIImage *source=[CIImage imageWithCVPixelBuffer:buffer];CGImageRef frame=[self.context createCGImage:source fromRect:source.extent];
         if(!frame)return;NSImage *image=[[NSImage alloc] initWithCGImage:frame size:NSZeroSize];CGImageRelease(frame);
-        dispatch_async(dispatch_get_main_queue(),^{if(!self.closed){self.tile.image=image;self.tile.message=@"";self.tile.needsDisplay=YES;}});
+        dispatch_async(dispatch_get_main_queue(),^{if(!self.closed){self.frames++;self.paused=NO;self.tile.image=image;self.tile.message=@"";self.tile.needsDisplay=YES;}});
     }
 }
 @end
@@ -118,7 +119,7 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
 - (void)persist {[self.defaults setObject:@{@"enabled":@(self.enabled),@"only_eve":@(self.onlyEVE),@"fps":@(self.fps),@"next_key":self.nextKey,@"previous_key":self.previousKey,@"slots":self.slots} forKey:@"EVEPreview"];}
 - (NSDictionary *)status {
     NSMutableArray *rows=[NSMutableArray new];pid_t front=NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;
-    for(NSDictionary *slot in self.slots){NSDictionary *source=self.sources[slot[@"key"]];[rows addObject:@{@"key":slot[@"key"],@"title":slot[@"title"],@"label":slot[@"label"]?:@"",@"enabled":slot[@"enabled"]?:@YES,@"online":@(source!=nil),@"active":@(source&&[source[@"pid"] intValue]==front),@"width":slot[@"width"]?:@260,@"screen":slot[@"screen"]?:@"",@"capturing":@(self.captures[slot[@"key"]]!=nil)}];}
+    for(NSDictionary *slot in self.slots){NSDictionary *source=self.sources[slot[@"key"]];id capture=self.captures[slot[@"key"]];BOOL hasFrame=[(EvePreviewTile *)self.panels[slot[@"key"]].contentView image]!=nil;[rows addObject:@{@"key":slot[@"key"],@"title":slot[@"title"],@"label":slot[@"label"]?:@"",@"enabled":slot[@"enabled"]?:@YES,@"online":@(source!=nil),@"active":@(source&&[source[@"pid"] intValue]==front),@"width":slot[@"width"]?:@260,@"screen":slot[@"screen"]?:@"",@"has_frame":@(hasFrame),@"capturing":@(capture!=nil)}];}
     BOOL supported=NO;if(@available(macOS 12.3,*))supported=YES;
     return @{@"supported":@(supported),@"enabled":@(self.enabled),@"editing":@(self.editing),@"only_eve":@(self.onlyEVE),@"fps":@(self.fps),@"screen_permission":@([self captureAllowed]),@"accessibility_permission":@([self accessibilityAllowed]),@"refreshing":@(self.busy),@"error":self.error?:@"",@"next_key":self.nextKey,@"previous_key":self.previousKey,@"hotkeys_active":@(self.nextRef&&self.previousRef),@"windows":rows};
 }
@@ -219,14 +220,18 @@ static OSStatus EvePreviewHotKey(EventHandlerCallRef handler,EventRef event,void
     NSDictionary *source=self.sources[key];if(!source||![self accessibilityAllowed])return NO;
     NSRunningApplication *game=[NSRunningApplication runningApplicationWithProcessIdentifier:[source[@"pid"] intValue]];
     if(![game.bundleIdentifier isEqual:@"com.ccpgames.eveonline"])return NO;
-    AXUIElementRef app=AXUIElementCreateApplication(game.processIdentifier);CFTypeRef value=NULL;AXUIElementRef target=NULL;
+    // Some EVE clients expose no AX windows. Activating the verified game
+    // process still focuses that client; AX raising is an optional refinement.
+    BOOL ok=[game activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+    AXUIElementRef app=AXUIElementCreateApplication(game.processIdentifier);AXUIElementSetMessagingTimeout(app,.35);
+    CFTypeRef value=NULL;AXUIElementRef target=NULL;
     if(AXUIElementCopyAttributeValue(app,kAXWindowsAttribute,&value)==kAXErrorSuccess){
         NSArray *windows=CFBridgingRelease(value);NSString *title=nil;if(@available(macOS 12.3,*))title=[source[@"window"] title];
-        for(id item in windows){CFTypeRef candidate=NULL;if(AXUIElementCopyAttributeValue((__bridge AXUIElementRef)item,kAXTitleAttribute,&candidate)==kAXErrorSuccess){NSString *name=CFBridgingRelease(candidate);if([name isEqual:title]){if(target){CFRelease(target);target=NULL;break;}target=(AXUIElementRef)CFRetain((__bridge CFTypeRef)item);}}}
+        for(id item in windows){CFTypeRef candidate=NULL;AXUIElementSetMessagingTimeout((__bridge AXUIElementRef)item,.35);if(AXUIElementCopyAttributeValue((__bridge AXUIElementRef)item,kAXTitleAttribute,&candidate)==kAXErrorSuccess){NSString *name=CFBridgingRelease(candidate);if([name isEqual:title]){if(target){CFRelease(target);target=NULL;break;}target=(AXUIElementRef)CFRetain((__bridge CFTypeRef)item);}}}
         if(!target&&windows.count==1)target=(AXUIElementRef)CFRetain((__bridge CFTypeRef)windows.firstObject);
     }
-    BOOL ok=NO;if(target){AXUIElementSetAttributeValue(target,kAXMinimizedAttribute,kCFBooleanFalse);[game activateWithOptions:NSApplicationActivateIgnoringOtherApps];ok=AXUIElementPerformAction(target,kAXRaiseAction)==kAXErrorSuccess;CFRelease(target);}CFRelease(app);
-    if(!ok)self.error=@"activate_failed";[self renderPanels];return ok;
+    if(target){AXUIElementSetAttributeValue(target,kAXMinimizedAttribute,kCFBooleanFalse);if(AXUIElementPerformAction(target,kAXRaiseAction)==kAXErrorSuccess)ok=YES;CFRelease(target);}CFRelease(app);
+    self.error=ok?nil:@"activate_failed";[self renderPanels];return ok;
 }
 - (BOOL)cycle:(NSInteger)direction {
     NSMutableArray *online=[NSMutableArray new];for(NSDictionary *slot in self.slots)if([slot[@"enabled"] boolValue]&&self.sources[slot[@"key"]])[online addObject:slot];if(!online.count)return NO;
