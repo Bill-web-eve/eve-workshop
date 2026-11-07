@@ -53,6 +53,29 @@ test('activity cards display exact zKillboard links, ship icons and range highli
  const card=d.querySelector('.intel-activity-card');assert(card);assert.equal(card.querySelector('a').href,'https://zkillboard.com/character/359618261/');assert.equal(card.querySelector('img').src,'https://images.evetech.net/types/11192/icon?size=32');
  assert(d.querySelector('.intel-range-halo'));assert.equal(d.querySelector('#intel-radius'),null);assert(d.querySelector('[data-intel-window=map]'));assert(d.querySelector('[data-intel-window=chat]'));
 });
+for(const mode of [null,'map'])test('dscan is a compact clickable reference in '+(mode||'main')+' map cards',async t=>{
+ const {w,d,run,intel}=await fixture(mode);t.after(()=>w.close());
+ const url='https://dscan.info/v/4d25dfc8e96d',opened=[];
+ w.EveDesktop.active=true;w.EveDesktop.openExternal=async value=>opened.push(value);
+ Object.assign(intel.nodes[0].contacts[0],{pilots:[],ships:[],scan_links:[url,url,'javascript:alert(1)','https://dscan.info.evil.example/v/scan']});
+ intel.reports[0].scan_links=[url];
+ await run('refreshIntel(true)');
+ const card=d.querySelector('.intel-activity-card'),link=card.querySelector('[data-intel-scan]');
+ assert.equal(link.textContent,'dscan');assert.equal(link.href,url);assert.equal(card.querySelectorAll('[data-intel-scan]').length,1);
+ assert(!card.textContent.includes(url));assert(!card.querySelector('.intel-id-note'));assert(!card.textContent.includes('Unnamed pilot'));
+ link.click();await tick();assert.deepEqual(opened,[url]);
+});
+test('dscan reference is labelled in OS and transparent overlay notifications without the full URL',async t=>{
+ const {w,run,intel,notifications:n}=await fixture();t.after(()=>w.close());
+ const url='https://dscan.info/v/4d25dfc8e96d',sent=[],overlay=[];
+ intel.alerts=[{id:'scan',category:'intel',kind:'intel_near',subject:'J5A-IX',character_name:'Own Pilot',jumps:2,corporation_id:null,when:1800000000,receipt:'receipt',notification_id:'id',scan_links:[url],overlay_reports:[{id:'scan',when:1800000000,pilots:[],ships:[],scan_links:[url]}]}];
+ w.EveDesktop.active=true;n.preferences.os_enabled=true;
+ w.EveDesktop.syncIntelOverlay=async data=>overlay.push(data);w.EveDesktop.notificationStatus=async()=>({status:'authorized'});w.EveDesktop.notify=async data=>sent.push(data);
+ const old=w.fetch;w.fetch=async(url,opts)=>url==='/api/notifications/sent'?{ok:true,json:async()=>({ok:true})}:url==='/api/intel/alerts'?{ok:true,json:async()=>({enabled:true,overlay:{enabled:true,seconds:60},items:intel.alerts})}:old(url,opts);
+ await run('pollIntelAlerts()');
+ assert.equal(sent.length,1);assert(sent[0].body.includes('dscan'));assert(!sent[0].body.includes(url));
+ assert.equal(overlay[0].items[0].pilots,'dscan');assert(!JSON.stringify(overlay[0]).includes(url));
+});
 test('resolved pilot IDs update contact links automatically without a manual refresh',async t=>{
  const {w,d,run,intel}=await fixture();t.after(()=>w.close());
  intel.nodes[0].contacts[0].pilots=[{name:'New Pilot',id:null}];

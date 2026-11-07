@@ -4,6 +4,7 @@ from datetime import datetime,timezone
 from pathlib import Path
 from collections import defaultdict
 from functools import lru_cache
+from urllib.parse import urlsplit,urlunsplit
 import hashlib,html,json,os,re,stat,threading,time
 from .planner import PlanningError
 from .esi import ESI,EsiError,AuthenticationError,INTEL_SCOPES
@@ -15,7 +16,7 @@ LINE=re.compile(r'^\ufeff*\[\s*(\d{4}\.\d\d\.\d\d \d\d:\d\d:\d\d)\s*\]\s*([^>]{1
 LINK=re.compile(r'<url=["\']?showinfo:(137[3-9]|138[0-6])//(\d+)["\']?>(.*?)</url>',re.I)
 WEB_URL=re.compile(r"(?<![\w@])(?:https?://|www\.)[^\s<>\"']+|(?<![\w@])(?:[a-z0-9-]+\.)+[a-z]{2,}/[^\s<>\"']*",re.I)
 MARKUP_LINK=re.compile(r'<(url|a)\b[^>]*>.*?</\1\s*>',re.I|re.S)
-PARSER_VERSION=3
+PARSER_VERSION=4
 NAME_LOOKUP_DELAY=2
 COUNTED_GROUP=re.compile(r'(?<![\w-])([1-9]\d{0,4})\s*(?:x\s*)?(?:frat(?:ernity)?|goons?|horde|pandemic horde|init(?:iative)?|neuts?|hostiles?|reds?|pilots?|people|ships?|interceptors?|ceptors?|frigates?|frigs?|destroyers?|cruisers?|battlecruisers?|battleships?|caps(?:itals)?|bombers?)(?![\w-])',re.I)
 STOP=re.compile(r'\b(?:on|at|in|to|from|towards|gate|gates|out|of|with|and|plus|jumped|jumping|jump|left|leaving|reported|seen|was|is|are|no|visual|nv|ni|onlined|docked|undocked|likely|maybe|possibly|spike|spiked|spiking|clear|clr|cleared|loc|pls|please|status|check|checkin|check-in|help|scan|scanned|reported|still|just|now|local|heading|destination|need|needle|red|reds|new|ago|minutes?|minute|min|camp|camping|for|the|a|an|cloaked|cloak|suspect|scout|unknown|neut|neuts|neutral|hostile|hostiles|fleets?|tackled)\b',re.I)
@@ -79,6 +80,22 @@ def without_web_links(body):
     return text,text!=html.unescape(body)
 
 
+def scan_links(body):
+    links=[]
+    for match in WEB_URL.finditer(html.unescape(body)):
+        raw=match.group().rstrip('.,;:!?)]}')
+        try:
+            url=urlsplit(raw if '://' in raw else 'https://'+raw)
+            if url.scheme.casefold() not in ['http','https'] or url.username or url.password or url.port not in [None,443]:continue
+            if url.hostname not in ['dscan.info','www.dscan.info','adashboard.info','www.adashboard.info']:continue
+            if not url.path.strip('/'):continue
+            value=urlunsplit(('https',url.hostname,url.path,url.query,url.fragment))
+        except ValueError:continue
+        if value not in links:links.append(value)
+        if len(links)==5:break
+    return links
+
+
 def parse_message(line,universe,channel,channel_id,now=None,regions=()):
     match=LINE.match(line.strip());now=time.time() if now is None else now
     if not match:return None
@@ -87,7 +104,7 @@ def parse_message(line,universe,channel,channel_id,now=None,regions=()):
     try:at=datetime.strptime(date,'%Y.%m.%d %H:%M:%S').replace(tzinfo=timezone.utc).timestamp()
     except ValueError:return None
     if at>now+60:return None
-    cleaned,had_web_links=without_web_links(body)
+    cleaned,had_web_links=without_web_links(body);scans=scan_links(body)
     linked=[{'name':re.sub('<[^>]+>','',m[3]).strip(),'id':int(m[2]),'verified':True} for m in LINK.finditer(cleaned)]
     plain=re.sub('<[^>]+>','',LINK.sub(' ',cleaned))
     # A linked character can be named after a system. Do not parse their name as a location.
@@ -107,8 +124,8 @@ def parse_message(line,universe,channel,channel_id,now=None,regions=()):
         remaining=remaining[:start]+' '*max(1,end-start)+remaining[end:]
     text=universe.pattern.sub(' ',text);text=universe.ship_pattern.sub(' ',text)
     ships=universe.reported_ships(plain)
-    # A scan link with only a location is informational, not an unnamed hostile.
-    if state=='contact' and had_web_links and not linked and not ships and not re.search(r'\w',remaining):state='unparsed'
+    # Ordinary links are informational; recognized scans have their own visible reference.
+    if state=='contact' and had_web_links and not scans and not linked and not ships and not re.search(r'\w',remaining):state='unparsed'
     text=re.sub(r'(?:\+\s*\d+|\b(?:\d+\s*x|x\s*\d+)\b)',' ',text,flags=re.I)
     candidates=[]
     for chunk in re.split(r'[|,;:()\[\]<>/]|\s{2,}|(?:\s+[+\-]\s*)|(?:->|→|=>)',text):
@@ -120,7 +137,7 @@ def parse_message(line,universe,channel,channel_id,now=None,regions=()):
     pilots=list({p['name'].casefold():p for p in linked+candidates}.values())[:12] if state=='contact' else []
     count=re.search(r'(?:\+|\bspike\s+)(\d{1,5})\b',plain,re.I) or COUNTED_GROUP.search(plain)
     key='\0'.join([channel_id or channel.casefold(),date,reporter,body]);identity=hashlib.sha256(key.encode()).hexdigest()
-    return {'id':identity,'timestamp':at,'channel':channel,'reporter':reporter,'message':body,'systems':ids,'pilots':pilots,'ships':ships,'state':state,'count':min(10000,int(count[1])) if count else len(pilots) or None,'ambiguous':len(ids)>1,'abbreviated':any(short for _,_,short in mentions),'parser_version':PARSER_VERSION}
+    return {'id':identity,'timestamp':at,'channel':channel,'reporter':reporter,'message':body,'systems':ids,'pilots':pilots,'ships':ships,'scan_links':scans,'state':state,'count':min(10000,int(count[1])) if count else len(pilots) or None,'ambiguous':len(ids)>1,'abbreviated':any(short for _,_,short in mentions),'parser_version':PARSER_VERSION}
 
 
 def enrich_reports(store,universe,reports):
@@ -219,12 +236,13 @@ def collect_alerts(store,universe=None,now=None):
         for sid,rows in by_system.items():
             distance=distances.get(sid)
             if distance is None or distance>p['jumps']:continue
-            pilots=sorted({p['name'] for r in rows for p in r['pilots']});identity=hashlib.sha256('\0'.join(pilots or ['unnamed']).encode()).hexdigest()[:20]
+            pilots=sorted({p['name'] for r in rows for p in r['pilots']});scans=list(dict.fromkeys(url for r in rows for url in r.get('scan_links',[])))[:5];identity=hashlib.sha256('\0'.join(pilots or scans or ['unnamed']).encode()).hexdigest()[:20]
             key=f"intel:{char['id']}:{sid}:{identity}";newest=max(rows,key=lambda r:r['timestamp']);name=universe.systems[sid]['name']
             items.append({'id':key,'domain':domain,'category':'intel','kind':'intel_near','subject':name+(' · '+', '.join(pilots[:6]) if pilots else ''),'corporation_id':None,'scope_name':'Személyes','when':newest['timestamp'],'checked_at':status['checked'],'reliable':True,'character_id':char['id'],'character_name':char['name'],'system_id':sid,'jumps':distance,'pilots':pilots,'report_id':newest['id'],'sound':p['sound'],'cooldown':p['cooldown_seconds']})
             items[-1]['episode_key']=str(int(cleared.get(sid,0)))
             items[-1]['system_name']=name
-            items[-1]['overlay_reports']=[{'id':r['id'],'when':r['timestamp'],'pilots':[pilot['name'] for pilot in r['pilots']],'ships':[ship['name'] for ship in r.get('ships',[])]} for r in rows]
+            items[-1]['scan_links']=scans
+            items[-1]['overlay_reports']=[{'id':r['id'],'when':r['timestamp'],'pilots':[pilot['name'] for pilot in r['pilots']],'ships':[ship['name'] for ship in r.get('ships',[])],'scan_links':r.get('scan_links',[])} for r in rows]
     kills,kill_domains=intel_kills.alerts(store,universe,p,pos,now);items+=kills;domains+=kill_domains
     return {'items':items,'observed_domains':domains,'enabled':p['enabled'] or p['killfeed_enabled'],'notifications_enabled':notifications_enabled,'overlay':{'enabled':p['overlay_enabled'] and notifications_enabled,'seconds':p['overlay_seconds']}}
 
@@ -471,7 +489,7 @@ class IntelMonitor:
             rows=by_sid[sid];recent=last.get(sid);clear=cleared.get(sid)
             pilots=sorted({p['name'] for row in rows for p in row['pilots']});state='contact' if rows else 'clear' if clear and now-clear<=min(600,p['ttl_minutes']*60) else 'old' if history and recent else 'quiet'
             contacts=rows or ([recent] if state=='old' and recent['state']=='contact' else [])
-            nodes.append({**universe.systems[sid],'distance':distance.get(sid),'in_range':distance.get(sid) is not None and distance[sid]<=p['jumps'],'state':state,'pilots':pilots,'contacts':[{'id':r['id'],'timestamp':r['timestamp'],'pilots':r['pilots'],'ships':r.get('ships',[]),'count':r.get('count'),'ambiguous':r['ambiguous'],'historical':r.get('historical',False)} for r in contacts],'reported_at':max(r['timestamp'] for r in rows) if rows else clear if state=='clear' else recent['timestamp'] if recent and state=='old' else None,'characters':[c['name'] for c in pos if c['system_id']==sid],'reports':[r['id'] for r in rows]})
+            nodes.append({**universe.systems[sid],'distance':distance.get(sid),'in_range':distance.get(sid) is not None and distance[sid]<=p['jumps'],'state':state,'pilots':pilots,'contacts':[{'id':r['id'],'timestamp':r['timestamp'],'pilots':r['pilots'],'ships':r.get('ships',[]),'scan_links':r.get('scan_links',[]),'count':r.get('count'),'ambiguous':r['ambiguous'],'historical':r.get('historical',False)} for r in contacts],'reported_at':max(r['timestamp'] for r in rows) if rows else clear if state=='clear' else recent['timestamp'] if recent and state=='old' else None,'characters':[c['name'] for c in pos if c['system_id']==sid],'reports':[r['id'] for r in rows]})
             nodes[-1]['kill_groups']=kill_by_system[sid]
         for report in reports:report['system_names']=[universe.systems[sid]['name'] for sid in report['systems']]
         manual_names={cid:universe.systems[sid]['name'] for cid,sid in p['manual_locations'].items() if sid in universe.systems}

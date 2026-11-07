@@ -48,12 +48,19 @@ class ParserTests(unittest.TestCase):
         self.assertEqual([x['name'] for x in self.parse('J5A-IX FRAT Runner')['pilots']],['FRAT Runner'])
         self.assertEqual([x['name'] for x in self.parse('J5A-IX MaledictionMan')['pilots']],['MaledictionMan'])
         self.assertEqual(self.parse('J5A-IX <url=showinfo:1373//999>John Lach</url>')['pilots'],[{'name':'John Lach','id':999,'verified':True}])
-    def test_scan_link_is_not_three_pilots_or_an_unnamed_hostile(self):
+    def test_scan_link_is_a_scan_reference_without_fake_pilots(self):
         for url in ['https://dscan.info/v/4d25dfc8e96d','http://dscan.info/v/4d25dfc8e96d','www.dscan.info/v/4d25dfc8e96d','dscan.info/v/4d25dfc8e96d']:
             body=url+' J5A-IX';p=self.parse(body)
             self.assertEqual(p['message'],body);self.assertEqual(p['systems'],[1]);self.assertEqual(p['pilots'],[]);self.assertEqual(p['ships'],[])
-            self.assertEqual(p['state'],'unparsed');self.assertEqual(i.active_state([p],NOW,120)[0],[])
+            self.assertEqual(p['state'],'contact');self.assertEqual(p['scan_links'],['https://'+url.split('://',1)[-1]]);self.assertEqual(len(i.active_state([p],NOW,120)[0]),1)
+        self.assertEqual(self.parse('J5A-IX https://example.com/scan')['state'],'unparsed')
         self.assertEqual(self.parse('J5A-IX')['state'],'contact')
+    def test_scan_links_are_deduplicated_bounded_and_cannot_point_to_other_schemes_or_hosts(self):
+        url='https://dscan.info/v/4d25dfc8e96d'
+        self.assertEqual(i.scan_links(url+' '+url+'.'),[url])
+        self.assertEqual(i.scan_links('<url="https://adashboard.info/intel/dscan/view/test?a=1&amp;b=2">scan</url>'),['https://adashboard.info/intel/dscan/view/test?a=1&b=2'])
+        self.assertEqual(i.scan_links('https://dscan.info.evil.example/v/hash https://evil.example/dscan.info/v/hash https://user:secret@dscan.info/v/hash https://dscan.info:99999/v/hash'),[])
+        self.assertEqual(len(i.scan_links(' '.join('https://dscan.info/v/'+str(n) for n in range(10)))),5)
     def test_url_contents_do_not_supply_system_ship_question_clear_or_count(self):
         url='https://dscan.info/Jita/Buzzard/clear?count=+99'
         p=self.parse(url);self.assertEqual(p['systems'],[]);self.assertEqual(p['ships'],[]);self.assertIsNone(p['count']);self.assertEqual(p['state'],'unparsed')
@@ -65,7 +72,7 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(self.parse('J5A-IX hostile '+url)['state'],'contact')
     def test_external_link_captions_are_not_pilots_but_eve_links_are_preserved(self):
         for link in ['<url=https://dscan.info/v/hash>info Jita Buzzard clr?</url>','<a href="https://dscan.info/v/hash">info Jita Buzzard clr?</a>','&lt;url=&quot;https://dscan.info/v/hash&quot;&gt;info Jita Buzzard clr?&lt;/url&gt;']:
-            p=self.parse('L-A5XP '+link);self.assertEqual(p['systems'],[2]);self.assertEqual(p['pilots'],[]);self.assertEqual(p['ships'],[]);self.assertEqual(p['state'],'unparsed')
+            p=self.parse('L-A5XP '+link);self.assertEqual(p['systems'],[2]);self.assertEqual(p['pilots'],[]);self.assertEqual(p['ships'],[]);self.assertEqual(p['state'],'contact');self.assertEqual(p['scan_links'],['https://dscan.info/v/hash'])
             p=self.parse('L-A5XP '+link+' <url=showinfo:1373//999>Jita</url> Buzzard')
             self.assertEqual(p['systems'],[2]);self.assertEqual(p['pilots'],[{'name':'Jita','id':999,'verified':True}]);self.assertEqual([x['name'] for x in p['ships']],['Buzzard'])
         p=self.parse('<url=showinfo:5//2>L-A5XP</url> Pilot One <url=showinfo:11172>Buzzard</url>')
@@ -95,7 +102,7 @@ class IntelStoreTests(unittest.TestCase):
             if not p.is_symlink():os.utime(p,(NOW,NOW))
         self.monitor.scan(self.p,NOW)
     def alerts(self):return i.collect_alerts(self.store,self.u,NOW)
-    def test_legacy_url_report_is_reparsed_without_losing_chat_or_alerting(self):
+    def test_legacy_url_report_is_reparsed_as_scan_without_losing_chat_or_inventing_pilots(self):
         self.enable()
         body='https://dscan.info/v/4d25dfc8e96d L-A5XP'
         self.write_log(line(body)+'\n');self.scan()
@@ -105,10 +112,15 @@ class IntelStoreTests(unittest.TestCase):
             legacy['id']='legacy-stable-id'
             db.execute('UPDATE intel_reports SET data=?',(json.dumps(legacy),))
         reports=i.read_reports(self.store,self.p,NOW,self.u)
-        self.assertEqual(len(reports),1);self.assertEqual(reports[0]['id'],'legacy-stable-id');self.assertEqual(reports[0]['message'],body);self.assertFalse(reports[0]['historical']);self.assertEqual(reports[0]['state'],'unparsed');self.assertEqual(reports[0]['pilots'],[])
-        self.assertEqual(self.alerts()['items'],[])
+        self.assertEqual(len(reports),1);self.assertEqual(reports[0]['id'],'legacy-stable-id');self.assertEqual(reports[0]['message'],body);self.assertFalse(reports[0]['historical']);self.assertEqual(reports[0]['state'],'contact');self.assertEqual(reports[0]['pilots'],[])
+        alerts=self.alerts()['items'];self.assertEqual(len(alerts),1);self.assertEqual(alerts[0]['pilots'],[]);self.assertEqual(alerts[0]['scan_links'],['https://dscan.info/v/4d25dfc8e96d'])
+        self.assertEqual(alerts[0]['overlay_reports'][0]['scan_links'],alerts[0]['scan_links'])
         dashboard=self.monitor.dashboard(now=NOW)
-        self.assertEqual(dashboard['reports'][0]['message'],body);self.assertTrue(all(not node['contacts'] for node in dashboard['nodes']))
+        self.assertEqual(dashboard['reports'][0]['message'],body);contact=next(node['contacts'][0] for node in dashboard['nodes'] if node['id']==2)
+        self.assertEqual(contact['scan_links'],alerts[0]['scan_links'])
+        n.save_preferences(self.store,{'os_enabled':True});claims=n.claim(self.store,self.alerts(),NOW)
+        self.assertEqual(claims[0]['scan_links'],alerts[0]['scan_links'])
+        self.enable(jumps=0);self.assertEqual(self.alerts()['items'],[])
         self.monitor.resolve_characters(NOW);self.eve.http.request.assert_not_called()
         with self.store.db() as db:self.assertEqual(json.loads(db.execute('SELECT data FROM intel_reports').fetchone()['data']),legacy)
 
