@@ -21,13 +21,42 @@ class IntelKillTests(unittest.TestCase):
         a=alerts['items'][0];self.assertEqual(a['kill_count'],2);self.assertEqual(a['cents'],'30');self.assertEqual(a['ships'],[{'type_id':590,'name':'Rifter','count':2}])
         self.assertEqual(a['kind'],'intel_kill');self.assertEqual(a['when'],NOW-20);self.assertEqual(a['overlay_reports'][0]['when'],NOW+10)
         self.assertEqual(a['overlay_reports'][0]['pilots'],[])
-    def test_regions_are_independent_of_chat_jump_limit_and_no_duplicate_per_character(self):
+    def test_kill_alerts_follow_jump_limit_and_do_not_duplicate_per_character(self):
         self.store.add_character(12,'Second Pilot')
         intel.save_preferences(self.store,{'manual_locations':{'11':1,'12':1},'jumps':0},self.u)
         self.ingest([kill(1,-1,2,cid=77),kill(2,-1,3,cid=77)])
+        self.assertEqual(self.alerts()['items'],[])
+        intel.save_preferences(self.store,{'jumps':1},self.u)
         alerts=self.alerts()['items'];self.assertEqual(len(alerts),1);self.assertEqual(alerts[0]['system_id'],2);self.assertEqual(alerts[0]['jumps'],1)
-        intel.save_preferences(self.store,{'kill_region_ids':[20]},self.u)
+        intel.save_preferences(self.store,{'kill_region_ids':[20],'jumps':2},self.u)
         alerts=self.alerts()['items'];self.assertEqual([a['system_id'] for a in alerts],[3])
+    def test_exact_five_jump_boundary_excludes_six_and_ten_without_hiding_map_kills(self):
+        from muhely.intel_universe import Universe
+        self.u=Universe({'systems':[{'id':sid,'name':f'System {sid}','region_id':10,'region':'Region 10'} for sid in range(1,13)],'edges':[[sid,sid+1] for sid in range(1,11)]})
+        intel.save_preferences(self.store,{'jumps':5},self.u)
+        self.ingest([kill(1,-1,6),kill(2,-1,7),kill(3,-1,11),kill(4,-1,12)])
+        data=self.alerts();self.assertEqual([(a['system_id'],a['jumps']) for a in data['items']],[(6,5)])
+        self.assertEqual({g['system_id'] for g in self.groups(NOW+11)},{6,7,11,12})
+        notifications.save_preferences(self.store,{'os_enabled':True})
+        self.assertEqual([a['system_id'] for a in notifications.claim(self.store,data,NOW+11)],[6])
+        self.assertEqual(len(data['items'][0]['overlay_reports']),1)
+    def test_closest_alertable_selected_character_is_the_reference(self):
+        self.store.add_character(12,'Second Pilot')
+        intel.save_preferences(self.store,{'manual_locations':{'11':1,'12':4},'jumps':0,'kill_region_ids':[10]},self.u)
+        self.ingest([kill(1,-1,4)])
+        alerts=self.alerts()['items'];self.assertEqual(len(alerts),0)  # Region 20 is not yet selected.
+        intel.save_preferences(self.store,{'kill_region_ids':[20]},self.u)
+        alerts=self.alerts()['items'];self.assertEqual(len(alerts),1)
+        self.assertEqual((alerts[0]['character_id'],alerts[0]['character_name'],alerts[0]['jumps']),(12,'Second Pilot',0))
+        intel.save_preferences(self.store,{'character_ids':[11]},self.u)
+        self.assertEqual(self.alerts()['items'],[])
+    def test_unknown_offline_and_expired_positions_cannot_trigger_kill_proximity(self):
+        intel.save_preferences(self.store,{'manual_locations':{},'kill_region_ids':[10]},self.u)
+        self.ingest([kill(1,-1)])
+        self.assertEqual(self.alerts()['items'],[])
+        for online,expires,expected in [(False,NOW+60,0),(True,NOW-1,0),(True,NOW+60,1)]:
+            self.store.save_snapshots(11,{'intel_position':test_intel.snapshot({'solar_system_id':1,'online':online},expires=expires)},domain='intel_location')
+            self.assertEqual(len(self.alerts()['items']),expected)
     def test_different_systems_or_event_times_are_not_combined_and_closed_batch_stays_closed(self):
         self.ingest([kill(1,-1),kill(2,-1,2),kill(3,-122)])
         self.assertEqual(len(self.groups()),3)

@@ -92,13 +92,16 @@ def alerts(store,universe,p,pos,now):
     feed=source(store);regions_=regions(p,pos,universe);items=[]
     domain='intel:kill';domains=[domain]
     if not feed['enabled'] or not p['killfeed_enabled']:return items,domains
+    references=[(c,universe.distances(c['system_id'])) for c in pos if c.get('alertable') and c['system_id'] in universe.systems]
     for g in groups(store,universe,p,now,regions_):
         if now<g['ready_at']:continue
-        distances=[universe.distances(c['system_id']).get(g['system_id']) for c in pos]
-        distance=min((d for d in distances if d is not None),default=None)
+        candidates=[(distances[g['system_id']],c) for c,distances in references if g['system_id'] in distances]
+        if not candidates:continue
+        distance,character=min(candidates,key=lambda pair:(pair[0],pair[1]['id']))
+        if distance>p['jumps']:continue
         items.append({'id':'intel:'+g['id'],'domain':domain,'category':'intel','kind':'intel_kill','subject':g['system_name'],
                       'corporation_id':None,'scope_name':'Személyes','when':g['last_at'],'checked_at':feed['checked'] or g['received'],'reliable':True,
-                      'system_id':g['system_id'],'system_name':g['system_name'],'character_name':'','region_name':g['region_name'],'jumps':distance,
+                      'system_id':g['system_id'],'system_name':g['system_name'],'character_id':character['id'],'character_name':character['name'],'region_name':g['region_name'],'jumps':distance,
                       'kill_count':g['count'],'cents':g['cents'],'missing':g['missing'],'ships':g['ships'],'sound':p['sound'],'cooldown':p['cooldown_seconds'],
                       'overlay_reports':[{'id':g['id'],'kind':'kill','when':g['ready_at'],'kill_count':g['count'],'cents':g['cents'],'missing':g['missing'],
                                           'pilots':[],'ships':[str(s['count'])+' × '+s['name'] for s in g['ships']]}]})

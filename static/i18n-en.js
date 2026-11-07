@@ -3023,5 +3023,6 @@ globalThis.EveEnglish={
   "A research előrejelzés mennyisége túl nagy.": "The research forecast quantity is too large.",
   "A holdadatok automatikus frissítési időköze 24 óra. Ez a külön gomb kézi ellenőrzést indít.": "Moon data refreshes automatically every 24 hours. This dedicated button starts a manual check.",
   "RP / nap": "RP / day",
+  "A chatintelhez íródó EVE-chatlog kell. A killintelhez a Fleet activity élő zKillboard-követése szükséges. A killértesítések és a chatriasztások is a megadott jumptávolságot követik. A régió távolabbi killjei a térképen továbbra is láthatók. Riasztáshoz megbízható karakterhelyzet szükséges. Mindkettő csak futó appnál működik, és az Intelértesítések kapcsolót követi.": "Chat intel requires an active EVE chat log. Kill intel requires live zKillboard tracking under Fleet activity. Both kill and chat alerts follow the configured jump range. More distant regional kills remain visible on the map. Alerts require a reliable character location. Both require the app to be running and follow the Intel notifications switch.",
 };
 if(typeof module!=='undefined'&&module.exports)module.exports=globalThis.EveEnglish;
