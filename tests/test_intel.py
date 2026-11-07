@@ -37,6 +37,17 @@ class ParserTests(unittest.TestCase):
         p=self.parse('J5A-IX  Pilot One  Pilot Two');self.assertEqual([x['name'] for x in p['pilots']],['Pilot One','Pilot Two'])
     def test_linked_character_named_after_system_is_not_a_location(self):
         p=self.parse('L-A5XP <url=showinfo:1373//999>Jita</url> Buzzard');self.assertEqual(p['systems'],[2]);self.assertEqual(p['pilots'],[{'name':'Jita','id':999,'verified':True}])
+    def test_ship_abbreviations_and_plural_hulls_are_not_part_of_pilot_names(self):
+        self.u=u.Universe({'systems':list(self.u.systems.values()),'edges':self.u.edges,'ships':['Lachesis','Malediction','Sabre','Stabber']})
+        p=self.parse('J5A-IX adj233 lach')
+        self.assertEqual([x['name'] for x in p['pilots']],['adj233']);self.assertEqual([s['name'] for s in p['ships']],['Lachesis'])
+        p=self.parse('L-A5XP 3 frat sabre and 2 maledictions')
+        self.assertEqual(p['pilots'],[]);self.assertEqual(p['count'],3);self.assertEqual([s['name'] for s in p['ships']],['Sabre','Malediction']);self.assertEqual(p['state'],'contact')
+        p=self.parse('J5A-IX 2 maledictions  Pilot One')
+        self.assertEqual([x['name'] for x in p['pilots']],['Pilot One']);self.assertEqual([s['name'] for s in p['ships']],['Malediction'])
+        self.assertEqual([x['name'] for x in self.parse('J5A-IX FRAT Runner')['pilots']],['FRAT Runner'])
+        self.assertEqual([x['name'] for x in self.parse('J5A-IX MaledictionMan')['pilots']],['MaledictionMan'])
+        self.assertEqual(self.parse('J5A-IX <url=showinfo:1373//999>John Lach</url>')['pilots'],[{'name':'John Lach','id':999,'verified':True}])
     def test_scan_link_is_not_three_pilots_or_an_unnamed_hostile(self):
         for url in ['https://dscan.info/v/4d25dfc8e96d','http://dscan.info/v/4d25dfc8e96d','www.dscan.info/v/4d25dfc8e96d','dscan.info/v/4d25dfc8e96d']:
             body=url+' J5A-IX';p=self.parse(body)
@@ -100,6 +111,20 @@ class IntelStoreTests(unittest.TestCase):
         self.assertEqual(dashboard['reports'][0]['message'],body);self.assertTrue(all(not node['contacts'] for node in dashboard['nodes']))
         self.monitor.resolve_characters(NOW);self.eve.http.request.assert_not_called()
         with self.store.db() as db:self.assertEqual(json.loads(db.execute('SELECT data FROM intel_reports').fetchone()['data']),legacy)
+
+    def test_old_misparsed_ship_suffix_recovers_cached_pilot_without_any_network(self):
+        self.write_log(line('L-A5XP adj233 lach')+'\n');self.scan()
+        with self.store.db() as db:
+            raw=json.loads(db.execute('SELECT data FROM intel_reports').fetchone()['data'])
+            raw.update(parser_version=2,pilots=[{'name':'adj233 lach','id':None,'verified':False}],ships=[])
+            db.execute('UPDATE intel_reports SET data=?',(json.dumps(raw),))
+            db.execute('INSERT INTO intel_characters VALUES(?,?,?,?,?)',('adj233',2120415907,'adj233',NOW-100,NOW+10000))
+            db.execute('INSERT INTO intel_characters VALUES(?,?,?,?,?)',('adj233 lach',None,'adj233 lach',NOW,NOW+3600))
+        row=self.monitor.dashboard(now=NOW)['reports'][0]
+        self.assertEqual(row['pilots'][0]['name'],'adj233');self.assertEqual(row['pilots'][0]['zkill_url'],'https://zkillboard.com/character/2120415907/')
+        self.assertEqual(row['message'],'L-A5XP adj233 lach');self.assertEqual([s['name'] for s in row['ships']],['Lachesis'])
+        self.monitor.resolve_characters(NOW);self.eve.http.request.assert_not_called()
+        again=self.monitor.dashboard(now=NOW)['reports'][0];self.assertEqual(again['pilots'],row['pilots'])
 
     def test_intel_notification_disable_also_disables_overlay_without_hiding_map_reports(self):
         self.enable(overlay_enabled=True,jumps=1)
@@ -195,9 +220,10 @@ class IntelStoreTests(unittest.TestCase):
         self.write_log(line('L-A5XP longgu q2q  longgu qwq')+'\n',cid=22);self.scan()
         self.monitor.refresh_policy.claim(['intel-names','intel-locations','skills'],now=NOW)
         self.eve.http.request.return_value=({'characters':[{'id':2124261111,'name':'longgu q2q'},{'id':2124261249,'name':'longgu qwq'}]}, {})
-        with patch('muhely.intel.time.time',return_value=NOW):self.monitor.poll_characters(new_messages=True)
+        with patch('muhely.intel.time.time',return_value=NOW):
+            self.monitor.poll_characters(new_messages=True);self.monitor.names_thread.join(timeout=3)
+        self.eve.http.request.assert_called_once_with(i.ESI+'/universe/ids/',json_body=['longgu q2q','longgu qwq'])
         with patch('muhely.intel.time.time',return_value=NOW+1):self.monitor.poll_characters(new_messages=True)
-        self.eve.http.request.assert_not_called()
         with patch('muhely.intel.time.time',return_value=NOW+2):
             self.monitor.poll_characters(new_messages=True);self.monitor.names_thread.join(timeout=3)
         self.assertFalse(self.monitor.names_thread.is_alive())
@@ -217,7 +243,8 @@ class IntelStoreTests(unittest.TestCase):
                 entered.set();self.assertTrue(release.wait(timeout=3))
             return {'characters':[{'name':name,'id':1000+index} for index,name in enumerate(json_body)]},{}
         self.eve.http.request.side_effect=lookup
-        with patch('muhely.intel.time.time',return_value=NOW):self.monitor.poll_characters(new_messages=True)
+        with patch('muhely.intel.time.time',return_value=NOW):
+            self.monitor.poll_characters(new_messages=True);self.assertTrue(entered.wait(timeout=3))
         with patch('muhely.intel.time.time',return_value=NOW+2):
             self.monitor.poll_characters();self.assertTrue(entered.wait(timeout=3))
             self.write_log(line('L-A5XP Pilot One')+'\n'+line('Jita Pilot Two',NOW+2)+'\n');self.scan()
@@ -239,7 +266,8 @@ class IntelStoreTests(unittest.TestCase):
     def test_lookup_failure_retries_automatically_and_honors_rate_limit_across_restart(self):
         self.write_log(line('L-A5XP Pilot One')+'\n');self.scan()
         self.eve.http.blocked_until=NOW+120;self.eve.http.request.side_effect=i.EsiError('rate limited')
-        with patch('muhely.intel.time.time',return_value=NOW):self.monitor.poll_characters(new_messages=True)
+        with patch('muhely.intel.time.time',return_value=NOW):
+            self.monitor.poll_characters(new_messages=True);self.monitor.names_thread.join(timeout=3)
         with patch('muhely.intel.time.time',return_value=NOW+2):
             self.monitor.poll_characters();self.monitor.names_thread.join(timeout=3)
         self.assertEqual(self.monitor.names_due,NOW+120)

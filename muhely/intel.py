@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime,timezone
 from pathlib import Path
 from collections import defaultdict
+from functools import lru_cache
 import hashlib,html,json,os,re,stat,threading,time
 from .planner import PlanningError
 from .esi import ESI,EsiError,AuthenticationError,INTEL_SCOPES
@@ -14,8 +15,9 @@ LINE=re.compile(r'^\ufeff*\[\s*(\d{4}\.\d\d\.\d\d \d\d:\d\d:\d\d)\s*\]\s*([^>]{1
 LINK=re.compile(r'<url=["\']?showinfo:(137[3-9]|138[0-6])//(\d+)["\']?>(.*?)</url>',re.I)
 WEB_URL=re.compile(r"(?<![\w@])(?:https?://|www\.)[^\s<>\"']+|(?<![\w@])(?:[a-z0-9-]+\.)+[a-z]{2,}/[^\s<>\"']*",re.I)
 MARKUP_LINK=re.compile(r'<(url|a)\b[^>]*>.*?</\1\s*>',re.I|re.S)
-PARSER_VERSION=2
+PARSER_VERSION=3
 NAME_LOOKUP_DELAY=2
+COUNTED_GROUP=re.compile(r'(?<![\w-])([1-9]\d{0,4})\s*(?:x\s*)?(?:frat(?:ernity)?|goons?|horde|pandemic horde|init(?:iative)?|neuts?|hostiles?|reds?|pilots?|people|ships?|interceptors?|ceptors?|frigates?|frigs?|destroyers?|cruisers?|battlecruisers?|battleships?|caps(?:itals)?|bombers?)(?![\w-])',re.I)
 STOP=re.compile(r'\b(?:on|at|in|to|from|towards|gate|gates|out|of|with|and|plus|jumped|jumping|jump|left|leaving|reported|seen|was|is|are|no|visual|nv|ni|onlined|docked|undocked|likely|maybe|possibly|spike|spiked|spiking|clear|clr|cleared|loc|pls|please|status|check|checkin|check-in|help|scan|scanned|reported|still|just|now|local|heading|destination|need|needle|red|reds|new|ago|minutes?|minute|min|camp|camping|for|the|a|an|cloaked|cloak|suspect|scout|unknown|neut|neuts|neutral|hostile|hostiles|fleets?|tackled)\b',re.I)
 
 
@@ -89,7 +91,7 @@ def parse_message(line,universe,channel,channel_id,now=None,regions=()):
     linked=[{'name':re.sub('<[^>]+>','',m[3]).strip(),'id':int(m[2]),'verified':True} for m in LINK.finditer(cleaned)]
     plain=re.sub('<[^>]+>','',LINK.sub(' ',cleaned))
     # A linked character can be named after a system. Do not parse their name as a location.
-    searching=plain
+    searching=COUNTED_GROUP.sub(lambda m:' '*len(m.group()),plain)
     # Racial ship names such as Amarr Shuttle also contain real system names.
     searching=universe.ship_pattern.sub(lambda m:' '*len(m.group()),searching)
     mentions=universe.mentions(searching,regions)
@@ -116,7 +118,7 @@ def parse_message(line,universe,channel,channel_id,now=None,regions=()):
             if 2<=len(name)<=64 and len(name.split())<=4 and re.search('[A-Za-zÀ-ž]',name) and re.fullmatch(r"[\w .’'\-]+",name) and not name.isdigit():
                 if name.casefold() not in {p['name'].casefold() for p in linked}:candidates.append({'name':name,'id':None,'verified':False})
     pilots=list({p['name'].casefold():p for p in linked+candidates}.values())[:12] if state=='contact' else []
-    count=re.search(r'(?:\+|\bspike\s+)(\d{1,5})\b',plain,re.I)
+    count=re.search(r'(?:\+|\bspike\s+)(\d{1,5})\b',plain,re.I) or COUNTED_GROUP.search(plain)
     key='\0'.join([channel_id or channel.casefold(),date,reporter,body]);identity=hashlib.sha256(key.encode()).hexdigest()
     return {'id':identity,'timestamp':at,'channel':channel,'reporter':reporter,'message':body,'systems':ids,'pilots':pilots,'ships':ships,'state':state,'count':min(10000,int(count[1])) if count else len(pilots) or None,'ambiguous':len(ids)>1,'abbreviated':any(short for _,_,short in mentions),'parser_version':PARSER_VERSION}
 
@@ -157,6 +159,13 @@ def positions(store,universe,p,now):
     return result
 
 
+@lru_cache(maxsize=4096)
+def reparse_report(message,timestamp,reporter,channel,universe,regions):
+    date=datetime.fromtimestamp(timestamp,timezone.utc).strftime('%Y.%m.%d %H:%M:%S')
+    parsed=parse_message(f'[ {date} ] {reporter} > {message}',universe,channel,'',timestamp,regions)
+    return json.dumps(parsed) if parsed else None
+
+
 def read_reports(store,p,now,universe=None):
     channels={s.casefold() for s in p['channels']}
     with store.db() as db:rows=db.execute('SELECT data FROM intel_reports WHERE ts>=? AND ts<=? ORDER BY ts DESC LIMIT 3000',(now-86400,now+60)).fetchall()
@@ -164,12 +173,11 @@ def read_reports(store,p,now,universe=None):
     for raw in rows:
         row=json.loads(raw['data'])
         if row['channel'].casefold() not in channels:continue
-        # Reinterpret old URL reports on read, without deleting history or changing IDs.
-        if row.get('parser_version',0)<PARSER_VERSION and without_web_links(row['message'])[1]:
+        # Reinterpret old reports once per parser version; never delete history or change IDs.
+        if row.get('parser_version',0)<PARSER_VERSION:
             universe=universe or intel_universe.load(store)
-            date=datetime.fromtimestamp(row['timestamp'],timezone.utc).strftime('%Y.%m.%d %H:%M:%S')
-            parsed=parse_message(f"[ {date} ] {row['reporter']} > {row['message']}",universe,row['channel'],'',now,p['region_ids'])
-            if parsed:row={**row,**parsed,'id':row['id']}
+            parsed=reparse_report(row['message'],row['timestamp'],row['reporter'],row['channel'],universe,tuple(p['region_ids']))
+            if parsed:row={**row,**json.loads(parsed),'id':row['id']}
         reports.append(row)
     return reports
 
@@ -256,7 +264,7 @@ class IntelMonitor:
         self.refresh_event.set();self._start_locations(preferences(self.store),manual=True)
     def queue_characters(self):
         with self.lock:
-            if self.names_due is None:self.names_due=time.time()+NAME_LOOKUP_DELAY
+            if self.names_due is None:self.names_due=max(time.time(),self.names_next_attempt)
     def poll_characters(self,new_messages=False):
         now=time.time()
         if now-self.last_names>=AUTO_SECONDS or new_messages:
@@ -267,7 +275,7 @@ class IntelMonitor:
             now=time.time()
             if self.names_thread and self.names_thread.is_alive() or self.closed or now<max(self.names_next_attempt,self.status.get('names_retry_at',0)):return
             if not manual and self.names_due is not None and now<self.names_due:return
-            self.names_due=None;self.names_next_attempt=now+NAME_LOOKUP_DELAY
+            self.names_due=None
             self.status['resolving_characters']=True;self.status['names_done']=0;self.status['names_total']=0
             def work():
                 try:self.resolve_characters()
@@ -287,6 +295,7 @@ class IntelMonitor:
             if start and self.stop_event.wait(NAME_LOOKUP_DELAY):return
             batch=names[start:start+100]
             try:
+                with self.lock:self.names_next_attempt=time.time()+NAME_LOOKUP_DELAY
                 result,_=self.eve.http.request(ESI+'/universe/ids/',json_body=batch)
                 if not isinstance(result,dict) or not isinstance(result.get('characters',[]),list):raise EsiError('A pilótaazonosítók most nem ellenőrizhetők.')
                 requested={name.casefold() for name in batch};found={}

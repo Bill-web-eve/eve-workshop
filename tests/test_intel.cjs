@@ -66,6 +66,17 @@ test('resolved pilot IDs update contact links automatically without a manual ref
  assert.equal(card.querySelector('a').href,'https://zkillboard.com/character/2124261111/');
  assert(!card.textContent.includes('ID not yet identified'));
 });
+test('counted hull reports show ship icons without fabricated unresolved pilot names',async t=>{
+ const {w,d,run,intel}=await fixture();t.after(()=>w.close());
+ intel.nodes[0].contacts[0].pilots=[];
+ intel.nodes[0].contacts[0].ships=[{name:'Sabre',type_id:22456},{name:'Malediction',type_id:11186}];
+ intel.reports[0].pilots=[];intel.reports[0].message='J5A-IX 3 frat sabre and 2 maledictions';
+ await run('refreshIntel(true)');
+ const card=d.querySelector('.intel-activity-card');
+ assert(!card.querySelector('.intel-id-note'));assert(!card.textContent.includes('3 frat'));
+ assert(card.textContent.includes('Sabre'));assert(card.textContent.includes('Malediction'));
+ assert.equal(card.querySelectorAll('img').length,2);
+});
 test('detached chat aggregates selected channels, keeps source text safe and does not send OS alerts',async t=>{
  const {w,d,run,intel,calls}=await fixture('chat');t.after(()=>w.close());
  assert.equal(d.documentElement.dataset.intelWindow,'chat');assert.equal(d.querySelector('#page-title').textContent,'Combined intel chat');assert(!d.querySelector('#intel-chat-feed script'));assert.equal(d.querySelectorAll('.intel-chat-line').length,1);

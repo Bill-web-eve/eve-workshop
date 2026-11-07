@@ -32,7 +32,11 @@ class Universe:
         self.pattern=re.compile(r'(?<![\w-])(?:'+('|'.join(re.escape(r['name']) for r in sorted(self.systems.values(),key=lambda r:-len(r['name']))))+r')(?![\w-])',re.I)
         self.ship_names={name.casefold():name for name in data.get('ships',[])}
         self.ship_types={name.casefold():tid for name,tid in data.get('ship_types',{}).items()}
-        self.ship_aliases={'caracal ni':'Caracal Navy Issue','caracal navy':'Caracal Navy Issue','carcacal':'Caracal','carcacal ni':'Caracal Navy Issue','vni':'Vexor Navy Issue','cheeta':'Cheetah','drek':'Drekavac','hecates':'Hecate',"hecate's":'Hecate','pod':'Capsule'}
+        self.ship_aliases={'caracal ni':'Caracal Navy Issue','caracal navy':'Caracal Navy Issue','carcacal':'Caracal','carcacal ni':'Caracal Navy Issue','vni':'Vexor Navy Issue','cheeta':'Cheetah','drek':'Drekavac','hecates':'Hecate',"hecate's":'Hecate','pod':'Capsule','lach':'Lachesis','lachi':'Lachesis','maled':'Malediction','maledi':'Malediction','stabb':'Stabber'}
+        for key,name in list({**self.ship_names,**self.ship_aliases}.items()):
+            self.ship_aliases.setdefault(key+'s',name)
+            self.ship_aliases.setdefault(key+"'s",name)
+            if key.endswith(('x','s','sh','ch')):self.ship_aliases.setdefault(key+'es',name)
         ships=sorted(set(data.get('ships',[]))|set(self.ship_aliases)|{'shuttle','loki','dscan','capsule','ships','fleet','gang','neuts','neutral','neutrals','hostile','hostiles'},key=lambda s:-len(s))
         self.ship_pattern=re.compile(r'(?<![\w-])(?:'+'|'.join(map(re.escape,ships))+r')(?![\w-])',re.I)
     def reported_ships(self,text):
