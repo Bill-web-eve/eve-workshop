@@ -41,3 +41,18 @@ test('capture status waits for the first actual frame before calling a preview l
 test('shortcut delivery count updates without replacing edited fields',async t=>{
  const {w,d,run,data}=await fixture();t.after(()=>w.close());const form=d.querySelector('#preview-settings');form.querySelector('[data-label]').value='Keep label';form.dispatchEvent(new w.Event('input',{bubbles:true}));data.shortcut_count=4;await run('loadPreview()');assert.equal(d.querySelector('#preview-key-count').textContent,'4');assert.equal(d.querySelector('#preview-settings'),form);assert.equal(form.querySelector('[data-label]').value,'Keep label');data.error='hotkey_unavailable';await run('loadPreview()');assert(d.querySelector('#preview-status').textContent.includes('Shortcut listening could not start'));
 });
+
+
+test('single letters save with no modifiers and reject identical shortcuts',async t=>{
+ const {w,d,run,native,data}=await fixture();t.after(()=>w.close());let form=d.querySelector('#preview-settings');
+ for(const code of ['0','6','29','25','40','111'])assert(form.elements.next_code.querySelector(`option[value="${code}"]`),'missing key '+code);
+ assert.equal(form.elements.next_code.querySelector('option[value="0"]').textContent,'A');
+ form.elements.next_code.value='40';for(const mask of [256,512,2048,4096])form.elements['next_'+mask].checked=false;
+ form.dispatchEvent(new w.Event('input',{bubbles:true}));form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
+ const saved=native.findLast(r=>r.action==='previewConfigure');assert.equal(saved.options.next_key.code,40);assert.equal(saved.options.next_key.modifiers,0);assert.equal(run('Object.keys(dirty).length'),0);
+ form=d.querySelector('#preview-settings');assert.equal(form.elements.next_code.selectedOptions[0].textContent,'K');for(const mask of [256,512,2048,4096])assert.equal(form.elements['next_'+mask].checked,false);
+ assert(d.querySelector('#view-content').textContent.includes('uncheck all four modifiers'));assert(d.querySelector('#view-content').textContent.includes('only while EVE is in front'));
+ data.shortcut_count=7;await run('loadPreview()');assert.equal(d.querySelector('#preview-settings'),form);assert.equal(form.elements.next_code.value,'40');
+ form.elements.previous_code.value='40';for(const mask of [256,512,2048,4096])form.elements['previous_'+mask].checked=false;
+ const count=native.filter(r=>r.action==='previewConfigure').length;form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();assert.equal(native.filter(r=>r.action==='previewConfigure').length,count);assert(d.querySelector('#global-error').textContent.includes('must be different'));
+});

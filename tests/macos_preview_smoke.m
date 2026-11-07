@@ -36,7 +36,8 @@ int main(int argc,const char *argv[]){@autoreleasepool{
  require(!p.enabled&&p.onlyEVE&&p.fps==5,@"safe disabled defaults");
  require(![p configure:@{@"enabled":@1}],@"numeric boolean accepted");
  require(![p configure:@{@"fps":@0}]&&![p configure:@{@"fps":@11}]&&![p configure:@{@"fps":@1.5}],@"invalid frame rates");
- require(![p configure:@{@"next_key":@{@"code":@124,@"modifiers":@0}}],@"modifier-less shortcut");
+ require([p configure:@{@"next_key":@{@"code":@40,@"modifiers":@0}}],@"single K shortcut rejected");
+ for(NSNumber *invalid in @[@(-1),@1.5,@YES,@1])require(![p configure:@{@"next_key":@{@"code":@40,@"modifiers":invalid}}],@"invalid modifier accepted");
  require(![p configure:@{@"next_key":p.previousKey}],@"identical shortcuts");
  require(![p configure:@{@"unrecognized":@YES}],@"unknown fields");
  p.slots=[@[[ @{@"key":@"a",@"title":@"EVE - Pilot A",@"label":@"A",@"enabled":@YES,@"width":@260} mutableCopy],[@{@"key":@"b",@"title":@"EVE - Pilot B",@"label":@"B",@"enabled":@YES,@"width":@260} mutableCopy],[@{@"key":@"c",@"title":@"EVE - Offline",@"label":@"",@"enabled":@YES,@"width":@260} mutableCopy]] mutableCopy];
@@ -54,7 +55,7 @@ int main(int argc,const char *argv[]){@autoreleasepool{
  p.slots[0][@"screen"]=@"disconnected";p.slots[0][@"x"]=@1e8;p.slots[0][@"y"]=@1e8;[p renderPanels];require(NSContainsRect(NSScreen.mainScreen.visibleFrame,p.panels[@"b"].frame),@"disconnected monitor fallback outside screen");
  if(argc>1){EvePreviewTile *tile=(id)panel.contentView;[tile display];NSBitmapImageRep *image=[tile bitmapImageRepForCachingDisplayInRect:tile.bounds];[tile cacheDisplayInRect:tile.bounds toBitmapImageRep:image];[[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:@(argv[1]) atomically:YES];}
  require([p configure:@{@"enabled":@NO}],@"disable failed");require(!panel.visible&&!p.editing&&p.captures.count==0&&!p.keys,@"disable did not clean up");
- PreviewTest *restored=[[PreviewTest alloc] initWithDefaults:defaults];require(restored.slots.count==3&&[restored.slots[0][@"key"] isEqual:@"b"]&&[restored.slots[1][@"width"] intValue]==330,@"layout/order persistence");
+ PreviewTest *restored=[[PreviewTest alloc] initWithDefaults:defaults];require([restored.nextKey[@"code"] intValue]==40&&[restored.nextKey[@"modifiers"] intValue]==0,@"single-key shortcut persistence");require(restored.slots.count==3&&[restored.slots[0][@"key"] isEqual:@"b"]&&[restored.slots[1][@"width"] intValue]==330,@"layout/order persistence");
  [restored stop];[p stop];require(!p.timer.valid&&p.observers.count==0,@"shutdown cleanup");
  [defaults setObject:@{@"slots":@[@{@"key":@"bad",@"title":@"EVE",@"width":@"invalid",@"label":@42}],@"fps":@"invalid",@"enabled":@"invalid"} forKey:@"EVEPreview"];
  PreviewTest *safe=[[PreviewTest alloc] initWithDefaults:defaults];require(!safe.enabled&&safe.fps==5&&[safe.slots[0][@"width"] intValue]==260,@"malformed saved data");[safe stop];

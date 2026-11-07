@@ -1,6 +1,7 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Önálló billentyűhöz válassz például K-t, és kapcsold ki mind a négy módosítót. A módosító nélküli és a csak Shiftet használó billentyű csak az EVE előtt aktív; ott váltásra szolgál, a chatbe nem ír betűt.": "For a single-key shortcut, select K, for example, and uncheck all four modifiers. Bare keys and Shift-only shortcuts work only while EVE is in front; there they switch clients instead of typing in chat.",
 "Felismert gyorsbillentyűk:": "Shortcuts received:",
 "A gyorsbillentyűk fogadása nem indult el. Ellenőrizd az ablakváltási engedélyt.": "Shortcut listening could not start. Check window-switching permission.",
 "Feljebb": "Move up",

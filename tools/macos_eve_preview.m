@@ -55,6 +55,7 @@ API_AVAILABLE(macos(12.3))
 @property(weak) EvePreview *owner;
 @property NSDictionary *nextKey,*previousKey;
 @property NSMutableIndexSet *pressed;
+@property NSSet<NSNumber *> *gamePIDs;
 @property NSThread *thread;
 @property CFMachPortRef tap;
 @property CFRunLoopSourceRef source;
@@ -63,6 +64,7 @@ API_AVAILABLE(macos(12.3))
 - (BOOL)start;
 - (void)stop;
 - (BOOL)active;
+- (pid_t)foregroundPID;
 - (CGEventRef)handleType:(CGEventType)type event:(CGEventRef)event;
 @end
 static CGEventRef EvePreviewKeyTap(CGEventTapProxy proxy,CGEventType type,CGEventRef event,void *context){return [(__bridge EvePreviewKeys *)context handleType:type event:event];}
@@ -94,7 +96,8 @@ static CGEventRef EvePreviewKeyTap(CGEventTapProxy proxy,CGEventType type,CGEven
 @end
 
 static BOOL EvePreviewBoolean(id value){return [value isKindOfClass:NSNumber.class]&&CFGetTypeID((__bridge CFTypeRef)value)==CFBooleanGetTypeID();}
-static BOOL EvePreviewShortcut(id value){return [value isKindOfClass:NSDictionary.class]&&[value[@"code"] isKindOfClass:NSNumber.class]&&[value[@"modifiers"] isKindOfClass:NSNumber.class]&&!EvePreviewBoolean(value[@"code"])&&!EvePreviewBoolean(value[@"modifiers"])&&[value[@"modifiers"] doubleValue]==[value[@"modifiers"] integerValue]&&[value[@"code"] integerValue]>=0&&[value[@"code"] integerValue]<=126&&[value[@"code"] doubleValue]==[value[@"code"] integerValue]&&[value[@"modifiers"] integerValue]>0&&([value[@"modifiers"] unsignedIntValue]&~(cmdKey|optionKey|controlKey|shiftKey))==0;}
+static BOOL EvePreviewShortcut(id value){return [value isKindOfClass:NSDictionary.class]&&[value[@"code"] isKindOfClass:NSNumber.class]&&[value[@"modifiers"] isKindOfClass:NSNumber.class]&&!EvePreviewBoolean(value[@"code"])&&!EvePreviewBoolean(value[@"modifiers"])&&[value[@"modifiers"] doubleValue]==[value[@"modifiers"] integerValue]&&[value[@"code"] integerValue]>=0&&[value[@"code"] integerValue]<=126&&[value[@"code"] doubleValue]==[value[@"code"] integerValue]&&[value[@"modifiers"] integerValue]>=0&&([value[@"modifiers"] unsignedIntValue]&~(cmdKey|optionKey|controlKey|shiftKey))==0;}
+static BOOL EvePreviewGlobalShortcut(NSDictionary *key){return ([key[@"modifiers"] unsignedIntValue]&(cmdKey|controlKey|optionKey))!=0;}
 // Public compatibility APIs for EVE clients whose AppKit process ID is -1.
 // These are used only after validating the window owner's EVE bundle identity.
 #pragma clang diagnostic push
@@ -161,8 +164,9 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
     // Reserve briefly to validate conflicts; actual delivery uses Quartz before
     // the game receives the key, rather than depending on Carbon dispatch.
     EventHotKeyRef nextRef=NULL,previousRef=NULL;EventHotKeyID next={'EVEP',1},previous={'EVEP',2};
-    OSStatus first=RegisterEventHotKey([self.nextKey[@"code"] unsignedIntValue],[self.nextKey[@"modifiers"] unsignedIntValue],next,GetEventDispatcherTarget(),0,&nextRef);
-    OSStatus second=first==noErr?RegisterEventHotKey([self.previousKey[@"code"] unsignedIntValue],[self.previousKey[@"modifiers"] unsignedIntValue],previous,GetEventDispatcherTarget(),0,&previousRef):first;
+    OSStatus first=noErr,second=noErr;
+    if(EvePreviewGlobalShortcut(self.nextKey))first=RegisterEventHotKey([self.nextKey[@"code"] unsignedIntValue],[self.nextKey[@"modifiers"] unsignedIntValue],next,GetEventDispatcherTarget(),0,&nextRef);
+    if(first==noErr&&EvePreviewGlobalShortcut(self.previousKey))second=RegisterEventHotKey([self.previousKey[@"code"] unsignedIntValue],[self.previousKey[@"modifiers"] unsignedIntValue],previous,GetEventDispatcherTarget(),0,&previousRef);
     if(nextRef)UnregisterEventHotKey(nextRef);if(previousRef)UnregisterEventHotKey(previousRef);
     if(first!=noErr||second!=noErr){self.error=@"hotkey_conflict";return NO;}
     EvePreviewKeys *keys=[EvePreviewKeys new];keys.owner=self;keys.nextKey=[self.nextKey copy];keys.previousKey=[self.previousKey copy];self.keys=keys;
@@ -234,7 +238,7 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
 - (void)windowDidMove:(NSNotification *)note {[self savePanel:note.object];}
 - (void)windowDidResize:(NSNotification *)note {[self savePanel:note.object];}
 - (void)renderPanels {
-    BOOL hasTargets=NO;for(NSDictionary *slot in self.slots)if([slot[@"enabled"] boolValue]&&self.sources[slot[@"key"]])hasTargets=YES;self.keys.hasTargets=hasTargets;
+    BOOL hasTargets=NO;for(NSDictionary *slot in self.slots)if([slot[@"enabled"] boolValue]&&self.sources[slot[@"key"]])hasTargets=YES;self.keys.hasTargets=hasTargets;NSMutableSet *gamePIDs=[NSMutableSet new];for(NSDictionary *source in self.sources.allValues)if([source[@"pid"] intValue]>0)[gamePIDs addObject:source[@"pid"]];self.keys.gamePIDs=[gamePIDs copy];
     BOOL visible=self.enabled&&[self captureAllowed];pid_t front=[self frontPID];BOOL game=NO;
     for(NSDictionary *source in self.sources.allValues)if([source[@"pid"] intValue]==front)game=YES;
     for(NSUInteger index=0;index<self.slots.count;index++){
@@ -297,7 +301,8 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
 @end
 
 @implementation EvePreviewKeys
-- (instancetype)init {if((self=[super init]))self.pressed=[NSMutableIndexSet new];return self;}
+- (instancetype)init {if((self=[super init])){self.pressed=[NSMutableIndexSet new];self.gamePIDs=[NSSet new];}return self;}
+- (pid_t)foregroundPID {return EvePreviewLegacyFrontPID();}
 - (BOOL)active {return !self.stopped&&self.tap&&CGEventTapIsEnabled(self.tap);}
 - (BOOL)start {
     _tap=CGEventTapCreate(kCGSessionEventTap,kCGHeadInsertEventTap,kCGEventTapOptionDefault,CGEventMaskBit(kCGEventKeyDown)|CGEventMaskBit(kCGEventKeyUp),EvePreviewKeyTap,(__bridge void *)self);
@@ -312,17 +317,22 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
 }
 - (CGEventRef)handleType:(CGEventType)type event:(CGEventRef)event {
     if(self.stopped)return event;
-    if(type==kCGEventTapDisabledByTimeout||type==kCGEventTapDisabledByUserInput){if(self.tap)CGEventTapEnable(self.tap,true);return event;}
+    if(type==kCGEventTapDisabledByTimeout||type==kCGEventTapDisabledByUserInput){[self.pressed removeAllIndexes];if(self.tap)CGEventTapEnable(self.tap,true);return event;}
     if(!event||(type!=kCGEventKeyDown&&type!=kCGEventKeyUp))return event;
     NSUInteger code=(NSUInteger)CGEventGetIntegerValueField(event,kCGKeyboardEventKeycode);
     if(type==kCGEventKeyUp){if([self.pressed containsIndex:code]){[self.pressed removeIndex:code];return NULL;}return event;}
+    if([self.pressed containsIndex:code])return NULL;
     if(!self.hasTargets)return event;
     CGEventFlags flags=CGEventGetFlags(event);UInt32 modifiers=0;
     if(flags&kCGEventFlagMaskControl)modifiers|=controlKey;if(flags&kCGEventFlagMaskAlternate)modifiers|=optionKey;
     if(flags&kCGEventFlagMaskCommand)modifiers|=cmdKey;if(flags&kCGEventFlagMaskShift)modifiers|=shiftKey;
     NSInteger direction=code==[self.nextKey[@"code"] unsignedIntegerValue]&&modifiers==[self.nextKey[@"modifiers"] unsignedIntValue]?1:code==[self.previousKey[@"code"] unsignedIntegerValue]&&modifiers==[self.previousKey[@"modifiers"] unsignedIntValue]?-1:0;
     if(!direction)return event;
-    if([self.pressed containsIndex:code]||CGEventGetIntegerValueField(event,kCGKeyboardEventAutorepeat))return NULL;
+    NSDictionary *shortcut=direction>0?self.nextKey:self.previousKey;
+    // Bare letters and Shift-only shortcuts must never consume normal typing
+    // in another app. Focus is queried here, not from a stale UI timer.
+    if(!EvePreviewGlobalShortcut(shortcut)&&![self.gamePIDs containsObject:@([self foregroundPID])])return event;
+    if(CGEventGetIntegerValueField(event,kCGKeyboardEventAutorepeat))return NULL;
     [self.pressed addIndex:code];
     dispatch_async(dispatch_get_main_queue(),^{EvePreview *owner=self.owner;if(!self.stopped&&owner.keys==self)[owner receivedShortcut:direction];});
     return NULL;
