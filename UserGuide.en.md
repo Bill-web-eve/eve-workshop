@@ -792,12 +792,12 @@ Research data and the Jita prices fetched for this view refresh automatically **
 
 Automatic moon calendar, notification and corporation extraction timer refreshes run **once every 24 hours**. A general EVE refresh does not bypass this interval. Attempts remain spaced after failures and app restarts. Use the dedicated **Settings → Data access → Refresh moon data** button for a manual check. Local calendar exports, countdowns and alerts for already known extraction times continue using the saved data. The existing 90-day cache for static system metadata remains in effect.
 
-## eve-preview – EVE client previews (Mac)
+## eve-preview – EVE client previews (Mac and Windows)
 
-**eve-preview** in the sidebar displays small live thumbnails of running EVE clients. This first version supports the Mac desktop app on macOS 12.3 or later. The browser and Windows views explain their current availability.
+**eve-preview** in the sidebar displays small live thumbnails of running EVE clients. It supports the Mac desktop app on macOS 12.3 or later and the Windows 11 x64 desktop app. It is not available in a normal browser.
 
-1. Start the EVE clients. Use the two permission buttons on the eve-preview page to request macOS **Screen & System Audio Recording** and **Accessibility** access. Enable EVE Muhely under **System Settings → Privacy & Security**. Changing screen permission may require restarting the app.
-2. **Refresh window list**, enable previews and save settings. By default they appear only over EVE, at 5 frames per second. The rate is adjustable from 1 to 10.
+1. Start the EVE clients. **On Mac**, use the two permission buttons on the eve-preview page to request macOS **Screen & System Audio Recording** and **Accessibility** access. Enable EVE Muhely under **System Settings → Privacy & Security**. Changing screen permission may require restarting the app. **On Windows**, there are no Mac permission prompts: run EVE and EVE Workshop under the same Windows user and at the same privilege level.
+2. **Refresh window list**, enable previews and save settings. By default they appear only over EVE. Mac capture defaults to 5 frames per second, adjustable from 1 to 10; Windows uses live Desktop Window Manager thumbnails and the OS controls their frame rate.
 3. In **Edit layout**, drag thumbnails to the desired monitor and resize using the lower-right corner. Position and size are saved automatically. After **Finish layout**, clicking a thumbnail activates its original EVE client window.
 4. Set custom labels, 160–900 px widths and individual visibility. Use the up/down buttons for cycling order, then save. Click the next or previous shortcut field and press the desired key or combination, such as **K**, **Control + K** or **Control + Option + Page Up**. Tab leaves the field. Existing shortcuts do not switch clients while being recorded. Next and previous must differ. Click **Save settings**. Bare and Shift-only keys work only over EVE, where they also replace typing the key in chat. Other applications can still type normally. Cycling wraps around and skips disabled or offline clients.
 
@@ -808,6 +808,8 @@ The feature runs locally, requires no ESI scope, records no video and sends no g
 Recent macOS versions may label the Accessibility permission list **Device Control and Data Access**. After a native update of the unsigned local test app, an enabled permission may still refer to an older build. Remove EVE Muhely from both lists and add the current **/Users/…/Applications/EVE Muhely.app** again using the plus button. Toggling an old entry off and on may not refresh it.
 
 The **Shortcuts received** counter confirms that a configured combination reached the app. Holding a key switches only once; release and press again to switch again. Fn and Caps Lock do not change a configured shortcut. The app handles its configured switching combinations before EVE; other keys pass through normally. If shortcut listening cannot start, its status shows a separate error rather than reporting shortcuts as active.
+
+On Windows, the defaults are **Control + Alt + Page Down** (next) and **Control + Alt + Page Up** (previous). The shortcut fields accept single keys and combinations, using Windows virtual key codes. Layouts and shortcuts are stored in the Windows user profile separately from the Mac settings. The previews stay above normal and borderless windowed EVE clients; exclusive full-screen mode and Windows security screens are not supported. A minimized client can stop updating. Drag or resize a preview in **Edit layout** to choose its monitor and position, then finish editing before clicking it to switch. Turning previews off or quitting the app unregisters every DWM thumbnail and stops the shortcut listener.
 
 ### Mining and damage alerts on previews
 

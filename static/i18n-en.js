@@ -3108,5 +3108,10 @@ globalThis.EveEnglish={
   "A holdadatok automatikus frissítési időköze 24 óra. Ez a külön gomb kézi ellenőrzést indít.": "Moon data refreshes automatically every 24 hours. This dedicated button starts a manual check.",
   "RP / nap": "RP / day",
   "A chatintelhez íródó EVE-chatlog kell. A killintelhez a Fleet activity élő zKillboard-követése szükséges. A killértesítések és a chatriasztások is a megadott jumptávolságot követik. A régió távolabbi killjei a térképen továbbra is láthatók. Riasztáshoz megbízható karakterhelyzet szükséges. Mindkettő csak futó appnál működik, és az Intelértesítések kapcsolót követi.": "Chat intel requires an active EVE chat log. Kill intel requires live zKillboard tracking under Fleet activity. Both kill and chat alerts follow the configured jump range. More distant regional kills remain visible on the map. Alerts require a reliable character location. Both require the app to be running and follow the Intel notifications switch.",
+  "Az eve-preview a Mac vagy Windows asztali alkalmazásban használható.": "eve-preview is available in the Mac or Windows desktop app.",
+  "Windows: az élő képet a Desktop Window Manager adja; külön macOS-engedély nem szükséges. Az EVE és az EVE Workshop azonos jogosultsági szinten fusson.": "Windows uses live Desktop Window Manager thumbnails; no macOS permissions are needed. Run EVE and EVE Workshop at the same privilege level.",
+  "A Windows gyorsbillentyű-figyelése nem indult el. Kapcsold ki, majd be az előnézeteket.": "Windows shortcut listening could not start. Turn previews off and on again.",
+  "A Windows nem tudja megjeleníteni az EVE-ablak élő képét.": "Windows could not display the live EVE window.",
+  "A Windows nem tudta előrehozni az EVE-ablakot. Ellenőrizd, hogy azonos jogosultsággal futnak-e az alkalmazások.": "Windows could not activate the EVE window. Check that both apps run at the same privilege level.",
 };
 if(typeof module!=='undefined'&&module.exports)module.exports=globalThis.EveEnglish;

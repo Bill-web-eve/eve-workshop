@@ -64,7 +64,7 @@ class WindowHost:
         self.main=None;self.children={};self.lock=threading.RLock()
         self.quitting=False;self.stopped=False;self.ready=False
         self.theme='dark';self.language='hu';self.tray=None;self.notification_granted=False
-        self.self_test_callback=None;self.overlay=None
+        self.self_test_callback=None;self.overlay=None;self.preview=None
         try:
             prefs=json.loads((self.folder/'windows-shell.json').read_text())
             self.language='en' if prefs.get('language')=='en' else 'hu'
@@ -116,7 +116,26 @@ class WindowHost:
             except OSError:pass
         self._ui(window,frame)
         if self.overlay is not None:self._ui(self.main,lambda:self.overlay.preferences(self.theme,self.language))
+        if self.preview is not None:self._ui(self.main,lambda:self.preview.preferences(self.theme,self.language))
         return True
+
+    def _preview_action(self,action,body):
+        def apply():
+            if self.preview is None:
+                from .windows_preview import NativePreview
+                def callback(kind,data=None):
+                    script='if(typeof pollPreviewMining==="function")void pollPreviewMining()' if kind=='poll' else 'void previewMiningAction('+json.dumps(data)+')'
+                    if not self.quitting:self._script(self.main,script)
+                self.preview=NativePreview(self.folder,self.main.native,callback,self.theme,self.language)
+            if action=='previewStatus':return self.preview.status()
+            if action=='previewRefresh':return self.preview.refresh()
+            if action=='previewConfigure':return self.preview.configure(body.get('options'))
+            if action=='previewKeyCapture':return self.preview.capture_key(body.get('capturing'))
+            if action=='previewMining':return self.preview.sync(body.get('data'))
+            if action=='previewActivate':return self.preview.activate(body.get('key'))
+            if action=='previewCycle':return self.preview.cycle(body.get('direction'))
+            raise ValueError('Unknown preview action')
+        return self._ui(self.main,apply)
 
     def _overlay_action(self,action,body):
         def apply():
@@ -198,6 +217,7 @@ class WindowHost:
             self.notification_granted=True;self._save_preferences();return {'status':'authorized'}
         if action=='notify':return self._notification(body)
         if action in {'intelOverlayStatus','configureIntelOverlay','syncIntelOverlay'}:return self._overlay_action(action,body)
+        if action in {'previewStatus','previewRefresh','previewConfigure','previewKeyCapture','previewMining','previewActivate','previewCycle'}:return self._preview_action(action,body)
         if action=='quitCheck':
             if not self.quitting:raise ValueError('No close request is pending')
             message=('Unsaved changes or EVE requests are still in progress. Close EVE Workshop?' if self.language=='en' else 'Még nem mentett módosítás vagy folyamatban lévő lekérés van. Bezárod az EVE Műhelyt?')
@@ -211,6 +231,7 @@ class WindowHost:
                 self.quitting=False
                 raise ValueError('Could not stop the local service. Please try again.' if self.language=='en' else 'A helyi szolgáltatás nem állt le. Próbáld újra.')
             self.stopped=True
+            if self.preview is not None:self._ui(self.main,self.preview.dispose)
             if self.overlay is not None:self._ui(self.main,self.overlay.dispose)
             for child in list(self.children.values()):child.destroy()
             if self.tray is not None:self._ui(self.main,self.tray.Dispose)
@@ -284,7 +305,10 @@ class WindowHost:
     def create_main(self):
         self.main=self.create_window('EVE Workshop',self.origin+'/',width=1320,height=860)
         self.main.events.closing+=self._closing
-        def loaded():self.ready=True
+        def loaded():
+            self.ready=True
+            try:self._preview_action('previewStatus',{})
+            except Exception:LOG.exception('Windows previews could not start')
         self.main.events.loaded+=loaded
         return self.main
 

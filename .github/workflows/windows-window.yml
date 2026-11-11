@@ -5,6 +5,10 @@ on:
     paths:
       - muhely/windows_window.py
       - muhely/windows_overlay.py
+      - muhely/windows_preview.py
+      - muhely/preview_mining.py
+      - static/preview.js
+      - tests/test_windows_preview.py
       - windows_desktop.py
       - windows_window_smoke.py
       - static/desktop.js

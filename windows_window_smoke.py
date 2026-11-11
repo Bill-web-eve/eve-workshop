@@ -73,6 +73,95 @@ def check_overlay(host,window,folder):
     return {'native_overlay':True,'overlay_expiry':True,'overlay_no_focus':True,'overlay_click_through':True,'overlay_placement':True}
 
 
+def check_preview(host,window):
+    """Exercise real DWM/WinForms against our own test surfaces, never an EVE client."""
+    from muhely.windows_preview import Win32,PreviewState
+    from System.Windows.Forms import Form,MouseButtons,MouseEventArgs
+    from System.Drawing import Bitmap,Rectangle,Color
+    sources=[];forms=[];actions=[]
+    def create():
+        for index in range(2):
+            form=Form();form.Text='EVE - Preview CI '+str(index);form.Width=800;form.Height=500
+            form.BackColor=Color.FromArgb(10+index*30,60,100);form.Show()
+            forms.append(form);sources.append({'key':'ci-preview-'+str(index),'title':str(form.Text),'hwnd':form.Handle.ToInt64()})
+    host._ui(window,create)
+    with patch.object(Win32,'discover',return_value=sources):
+        def exercise():
+            preview=host.preview
+            assert preview is not None and not preview.disposed
+            preview.refresh();preview.last_poll=time.monotonic()+100
+            preview.configure({'enabled':True,'only_eve':False,'next_key':{'code':75,'modifiers':0},'previous_key':{'code':72,'modifiers':0}})
+            assert preview.state.hotkeys_active,'Native shortcut hook did not start'
+            assert len(preview.tiles)==2
+            for tile in preview.tiles.values():
+                hwnd=tile['form'].Handle.ToInt64();style=preview.api.user.GetWindowLongPtrW(hwnd,-20)
+                assert preview.api.user.IsWindowVisible(hwnd),'Preview is not visible'
+                assert style&0x8 and style&0x80 and style&0x8000000,'Preview native styles are missing'
+                assert not style&0x80000,'DWM thumbnails require an opaque destination window'
+                assert not tile['form'].ShowInTaskbar
+                assert tile['thumbnail'],'DWM did not register the live source'
+                size=preview.api.W.SIZE()
+                import ctypes
+                assert preview.api.dwm.DwmQueryThumbnailSourceSize(tile['thumbnail'],ctypes.byref(size))==0
+                assert size.cx>0 and size.cy>0
+            first=preview.tiles[sources[0]['key']];slot=preview.state.slots[0]
+            preview.configure({'editing':True})
+            from muhely.windows_overlay import NativeOverlay
+            screens=NativeOverlay.screens()
+            screen=screens[0]
+            preview.state.place(slot,screen['left']+70,screen['top']+90,330,screens)
+            preview._bounds(slot,first)
+            reloaded=PreviewState(host.folder)
+            assert reloaded.slots[0]['width']==330 and reloaded.slots[0]['screen']==screen['id']
+            assert not reloaded.editing,'Layout edit mode must not be restored at startup'
+            preview.configure({'editing':False})
+            real_callback=preview.callback
+            preview.callback=lambda kind,data=None:actions.append((kind,data))
+            try:
+                preview.sync({'enabled':True,'characters':[{'name':'Preview CI 0','alerts':[{'kind':'crystal_broken','id':'ci-break'}],'last_damage':None}]})
+                alert,x=preview._icons(slot,first)[0]
+                assert x>=first['form'].Width-24,'Badge is not in the name bar right edge'
+                preview._mouse(slot,first,MouseEventArgs(MouseButtons.Left,1,x+5,12,0))
+                assert actions[-1]==('mining',{'name':'Preview CI 0','kind':'crystal_broken','id':'ci-break'})
+                preview.sync({'enabled':True,'characters':[{'name':'Preview CI 0','alerts':[{'kind':'module_stopped','id':'ci-pause'}],'last_damage':None}]})
+                preview._mouse(slot,first,MouseEventArgs(MouseButtons.Left,1,x+5,12,0))
+                assert actions[-1][1]['kind']=='module_stopped'
+                with patch.object(preview.state,'clock',return_value=1000.1):
+                    preview.sync({'enabled':True,'characters':[{'name':'Preview CI 0','alerts':[],'last_damage':1000}]})
+                    bitmap=Bitmap(first['form'].Width,first['form'].Height)
+                    try:
+                        first['form'].DrawToBitmap(bitmap,Rectangle(0,0,bitmap.Width,bitmap.Height))
+                        assert preview.failure is None,str(preview.failure)
+                        assert any((lambda c:c.R>180 and c.G<130 and c.B<130)(bitmap.GetPixel(x,y)) for x in range(7,150) for y in range(2,22)),'Damaged name did not paint red'
+                    finally:bitmap.Dispose()
+                with patch.object(preview.state,'clock',return_value=1011):assert not preview.state.flashing(slot['key'])
+                # A click uses the same native activation path as a real thumbnail.
+                preview._mouse(slot,first,MouseEventArgs(MouseButtons.Left,1,40,40,0))
+                assert preview.api.user.GetForegroundWindow()==sources[0]['hwnd']
+                preview.cycle(1);assert preview.api.user.GetForegroundWindow()==sources[1]['hwnd']
+                preview.capture_key(True);assert not preview.hook.process(75,True,0,True)
+                preview.capture_key(False);assert preview.hook.process(75,True,0,True)
+                assert preview.events.get_nowait()==1
+                assert preview.hook.process(75,False,0,True)
+                # only_eve must hide behind the workshop and show for a game source.
+                preview.configure({'only_eve':True})
+                assert preview.api.user.SetForegroundWindow(window.native.Handle.ToInt64())
+                preview._visibility();assert not preview.api.user.IsWindowVisible(first['form'].Handle.ToInt64())
+                preview.activate(slot['key']);preview._visibility()
+                assert preview.api.user.IsWindowVisible(first['form'].Handle.ToInt64())
+                preview.configure({'enabled':False})
+                assert not preview.tiles and not preview.state.hotkeys_active
+                assert not preview.hook.thread.is_alive(),'Preview hook survived disable'
+            finally:preview.callback=real_callback
+        try:host._ui(window,exercise)
+        finally:
+            def cleanup():
+                if host.preview is not None:host.preview.configure({'enabled':False})
+                for form in forms:form.Dispose()
+            host._ui(window,cleanup)
+    return {'native_preview':True,'preview_dwm':True,'preview_activation':True,'preview_shortcuts':True,'preview_badges':True,'preview_damage':True,'preview_saved_layout':True}
+
+
 def check(report_path=None):
     if sys.platform!='win32':raise RuntimeError('Windows is required for the native window test')
     import certifi
@@ -131,6 +220,7 @@ def check(report_path=None):
                     assert host._ui(window,Clipboard.GetText)=='EVE window smoke'
                     results['clipboard_readback']=True
                     results.update(check_overlay(host,window,folder))
+                    results.update(check_preview(host,window))
             except Exception as error:results['error']=str(error) or 'Native assertion failed'
             finally:
                 restore_clipboard()
@@ -178,6 +268,7 @@ def check(report_path=None):
             if not finished.wait(75):
                 results['error']='Native window test timed out';restore_clipboard();host.stopped=True
                 if host.overlay is not None:host._ui(window,host.overlay.dispose)
+                if host.preview is not None:host._ui(window,host.preview.dispose)
                 for child in list(host.children.values()):child.destroy()
                 window.destroy()
         threading.Thread(target=timeout,daemon=True).start()
@@ -192,8 +283,9 @@ def check(report_path=None):
             results['backend_process_exited']=all(p.returncode==0 for p in processes)
             results['backend_listener_closed']=not listener_present(port)
         results['overlay_disposed']=host.overlay is not None and host.overlay.disposed
+        results['preview_disposed']=host.preview is not None and host.preview.disposed
         if report_path:Path(report_path).write_text(json.dumps(results,indent=2))
-        if results.get('error') or not results.get('clipboard_readback') or not results.get('native_overlay') or not results['overlay_disposed'] or not results['backend_stopped'] or not results['backend_process_exited'] or not results['backend_listener_closed']:raise RuntimeError(results.get('error','Native result incomplete'))
+        if results.get('error') or not results.get('clipboard_readback') or not results.get('native_overlay') or not results['overlay_disposed'] or not results.get('native_preview') or not results['preview_disposed'] or not results['backend_stopped'] or not results['backend_process_exited'] or not results['backend_listener_closed']:raise RuntimeError(results.get('error','Native result incomplete'))
         return results
 
 

@@ -39,3 +39,14 @@ test('unrelated bridge messages cannot resolve a native call; native errors are 
  receive({eveDesktop:1,id:message.id+100,value:true});await Promise.resolve();assert.equal(settled,false);
  receive({eveDesktop:1,id:message.id,error:'Native action unavailable'});await assert.rejects(promise,/Native action unavailable/);
 });
+
+test('Windows preview actions use the authenticated WebView2 message bridge',async t=>{
+ const {w,messages}=fixture();t.after(()=>w.close());
+ await w.EveDesktop.previewStatus();await w.EveDesktop.refreshPreview();await w.EveDesktop.configurePreview({enabled:true});
+ await w.EveDesktop.capturePreviewKey(true);await w.EveDesktop.syncPreviewMining({enabled:true,characters:[]});
+ await w.EveDesktop.activatePreview('pilot');await w.EveDesktop.cyclePreview(-1);
+ const payload=action=>messages.find(m=>m.payload.action===action).payload;
+ assert(payload('previewStatus'));assert(payload('previewRefresh'));assert.equal(payload('previewConfigure').options.enabled,true);
+ assert.equal(payload('previewKeyCapture').capturing,true);assert.equal(payload('previewMining').data.enabled,true);
+ assert.equal(payload('previewActivate').key,'pilot');assert.equal(payload('previewCycle').direction,-1);
+});

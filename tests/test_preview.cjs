@@ -7,14 +7,14 @@ async function fixture(platform='mac'){
  const mining={enabled:true,folder:'/test/Gamelogs',characters:[],error:null,file_errors:0};
  const data={supported:true,enabled:false,editing:false,only_eve:true,fps:5,screen_permission:false,accessibility_permission:false,error:'',next_key:{code:124,modifiers:6144},previous_key:{code:123,modifiers:6144},hotkeys_active:false,windows:[{key:'a',title:'EVE - Pilot <A>',label:'',enabled:true,width:260,online:true,active:false,capturing:false,has_frame:false},{key:'b',title:'EVE - Pilot B',label:'B',enabled:true,width:260,online:true,active:false,capturing:false,has_frame:false}]};
  w.localStorage.setItem('eve-muhely-language','en');w.confirm=()=>true;
- if(platform==='mac')w.webkit={messageHandlers:{eveDesktop:{postMessage:async body=>{native.push(body);if(body.action==='previewConfigure'){const options=body.options;Object.assign(data,options);if(options.slots){data.windows=options.slots.map(slot=>({...data.windows.find(r=>r.key===slot.key),...slot}));delete data.slots;}}return structuredClone(data);}}}};
+ if(platform==='mac'||platform==='windows')w.webkit={messageHandlers:{eveDesktop:{postMessage:async body=>{native.push(body);if(body.action==='previewConfigure'){const options=body.options;Object.assign(data,options);if(options.slots){data.windows=options.slots.map(slot=>({...data.windows.find(r=>r.key===slot.key),...slot}));delete data.slots;}}return structuredClone(data);}}}};
  w.fetch=async (url,options={})=>{calls.push(url);if(url==='/api/preview/mining/replace-crystal'){const body=JSON.parse(options.body);assert.equal(body.name,mining.characters[0].name);assert.equal(body.id,mining.characters[0].alerts[0].id);mining.characters[0].alerts=[{id:'a'.repeat(24),kind:'module_stopped',at:2}];}if(url==='/api/preview/mining/acknowledge'){const body=JSON.parse(options.body);mining.characters[0].alerts=mining.characters[0].alerts.filter(a=>!body.ids.includes(a.id));}const value=url==='/api/state'?state:url.startsWith('/api/preview/mining')?mining:url==='/api/notifications'?{items:[],counts:{},task:{running:false},corporations:[],preferences:{os_enabled:false,categories:{intel:false}}}:url==='/api/intel/alerts'?{enabled:false,items:[]}:null;if(value===null)throw Error('Unexpected '+url);return {ok:true,json:async()=>value};};
  for(const tag of d.querySelectorAll('script[src]'))run(fs.readFileSync(path.join(root,tag.getAttribute('src')),'utf8'));
  await tick();await tick();if(platform==='windows'){w.EveDesktop.active=true;w.EveDesktop.platform='windows';}
  run('navigate("preview")');await tick();await tick();return {w,d,run,native,calls,data,mining};
 }
-for(const platform of ['browser','windows'])test('eve-preview explains unavailable '+platform+' support without native or ESI calls',async t=>{
- const f=await fixture(platform);t.after(()=>f.w.close());assert(f.d.querySelector('#view-content').textContent.includes('Mac desktop app'));assert.equal(f.d.querySelector('#preview-settings'),null);assert.equal(f.native.length,0);assert(!f.calls.some(url=>url.includes('preview')));
+for(const platform of ['browser'])test('eve-preview explains unavailable '+platform+' support without native or ESI calls',async t=>{
+ const f=await fixture(platform);t.after(()=>f.w.close());assert(f.d.querySelector('#view-content').textContent.includes('Mac or Windows desktop app'));assert.equal(f.d.querySelector('#preview-settings'),null);assert.equal(f.native.length,0);assert(!f.calls.some(url=>url.includes('preview')));
 });
 test('Mac preview has compact translated controls, safe window names and a separate menu',async t=>{
  const {w,d,native,calls,run}=await fixture();t.after(()=>w.close());assert.equal(d.querySelector('#page-title').textContent,'eve-preview');assert(d.querySelector('[data-view=preview]'));assert(d.querySelector('.plan-selector').hidden);assert.equal(d.querySelectorAll('[data-preview-row]').length,2);assert(d.querySelector('#view-content').textContent.includes('EVE - Pilot <A>'));assert.equal(d.querySelector('#view-content A'),null);assert(!/[áéíóöőúüű]/i.test(d.querySelector('#view-content').textContent.replaceAll('EVE Műhely','')),d.querySelector('#view-content').textContent);assert(!native.some(r=>r.action==='previewPermission'));assert(!calls.some(url=>url.includes('preview')&&url!=='/api/preview/mining'));
@@ -74,4 +74,21 @@ test('native crystal and pause clicks call the protected event-specific endpoint
  assert(calls.includes('/api/preview/mining/replace-crystal'));assert(d.querySelector('#preview-mining-rows').textContent.includes('Module not running'));assert(native.findLast(r=>r.action==='previewMining').data.characters[0].alerts[0].kind==='module_stopped');
  await run(`previewMiningAction({name:'Pilot A',kind:'module_stopped',id:'${'a'.repeat(24)}'})`);
  assert(calls.includes('/api/preview/mining/acknowledge'));assert(d.querySelector('#preview-mining-rows').textContent.includes('No new alerts'));
+});
+
+test('Windows preview uses Windows key codes, labels and native controls without macOS permissions',async t=>{
+ const {w,d,native,run,data}=await fixture('windows');t.after(()=>w.close());
+ assert(d.querySelector('#preview-settings'));assert.equal(d.querySelectorAll('[data-preview-permission]').length,0);
+ assert(d.querySelector('#view-content').textContent.includes('Desktop Window Manager'));
+ assert(d.querySelector('#preview-settings').elements.fps.parentElement.hidden);
+ const form=d.querySelector('#preview-settings'),input=form.elements.next_shortcut;
+ input.focus();input.dispatchEvent(new w.KeyboardEvent('keydown',{code:'KeyK',key:'k',bubbles:true,cancelable:true}));
+ assert.equal(input.value,'K');assert.equal(form.elements.next_code.value,'75');assert.equal(form.elements.next_modifiers.value,'0');
+ const previous=form.elements.previous_shortcut;
+ previous.dispatchEvent(new w.KeyboardEvent('keydown',{code:'PageUp',key:'PageUp',ctrlKey:true,altKey:true,bubbles:true,cancelable:true}));
+ assert.equal(previous.value,'Control + Alt + Page Up');assert.equal(form.elements.previous_code.value,'33');
+ form.elements.enabled.checked=true;form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
+ const saved=native.findLast(r=>r.action==='previewConfigure');assert.equal(saved.options.next_key.code,75);assert.equal(saved.options.previous_key.code,33);
+ data.error='activate_failed';await run('loadPreview()');assert(d.querySelector('#preview-status').textContent.includes('same privilege level'));
+ assert(!/[áéíóöőúüű]/i.test(d.querySelector('#view-content').textContent.replaceAll('EVE Műhely','')),d.querySelector('#view-content').textContent);
 });

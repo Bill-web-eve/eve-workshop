@@ -21,7 +21,7 @@ class WindowsWindowTests(unittest.TestCase):
                 with self.assertRaises(ValueError):self.host.dispatch(self.window,url,{'action':'activate'})
 
     def test_child_window_cannot_save_files_send_notifications_or_quit_app(self):
-        for action in ['save','chooseIntelFolder','notify','requestNotifications','stopped','quitCheck','intelOverlayStatus','configureIntelOverlay','syncIntelOverlay']:
+        for action in ['save','chooseIntelFolder','notify','requestNotifications','stopped','quitCheck','intelOverlayStatus','configureIntelOverlay','syncIntelOverlay','previewStatus','previewRefresh','previewConfigure','previewActivate','previewCycle','previewMining','previewKeyCapture']:
             with self.subTest(action=action),self.assertRaises(ValueError):self.host.dispatch(Mock(),self.host.origin,{'action':action})
 
     def test_external_links_exclude_file_scripts_credentials_and_control_characters(self):
@@ -92,6 +92,23 @@ class WindowsWindowTests(unittest.TestCase):
             factory.return_value.configure.assert_called_once_with({'editing':True})
             self.host.dispatch(self.window,self.host.origin,{'action':'syncIntelOverlay','data':{'enabled':False,'seconds':60,'items':[]}})
             factory.return_value.sync.assert_called_once_with({'enabled':False,'seconds':60,'items':[]})
+            self.host.dispatch(self.window,self.host.origin,{'action':'stopped'})
+            factory.return_value.dispose.assert_called_once()
+            self.assertTrue(all(c.args[0] is self.window for c in ui.call_args_list))
+
+    def test_preview_native_bridge_is_main_only_runs_on_sta_and_disposes_before_exit(self):
+        with patch('desktop.stop_backend',return_value=True),patch('muhely.windows_preview.NativePreview') as factory,patch.object(self.host,'_ui',side_effect=lambda window,fn:fn()) as ui:
+            for action,body,method,arg in [
+                ('previewStatus',{},'status',None),('previewRefresh',{},'refresh',None),
+                ('previewConfigure',{'options':{'enabled':True}},'configure',{'enabled':True}),
+                ('previewKeyCapture',{'capturing':True},'capture_key',True),
+                ('previewMining',{'data':{'enabled':False,'characters':[]}},'sync',{'enabled':False,'characters':[]}),
+                ('previewActivate',{'key':'a'},'activate','a'),('previewCycle',{'direction':-1},'cycle',-1)]:
+                self.host.dispatch(self.window,self.host.origin,{'action':action,**body})
+                method=getattr(factory.return_value,method)
+                if arg is None:method.assert_called_once_with()
+                else:method.assert_called_once_with(arg)
+            self.assertEqual(factory.call_count,1)
             self.host.dispatch(self.window,self.host.origin,{'action':'stopped'})
             factory.return_value.dispose.assert_called_once()
             self.assertTrue(all(c.args[0] is self.window for c in ui.call_args_list))
