@@ -21,6 +21,15 @@ class ServerTests(unittest.TestCase):
         self.assertIn(b'function renderPreview',body)
         self.assertIn(b'/preview.js',self.request('/')[1])
 
+    def test_static_types_are_constants_and_request_paths_cannot_inject_headers(self):
+        with patch('mimetypes.guess_type',return_value=('text/plain\r\nX-Injected: yes',None)):
+            for path,expected in [('/app.js','text/javascript; charset=utf-8'),('/style.css','text/css; charset=utf-8'),('/icon.svg','image/svg+xml'),('/app-window-icon.png','image/png')]:
+                status,_,headers=self.request(path)
+                self.assertEqual(status,200);self.assertEqual(headers['Content-Type'],expected)
+                self.assertNotIn('X-Injected',headers)
+        status,_,headers=self.request('/app.js%0d%0aX-Injected:%20yes')
+        self.assertEqual(status,404);self.assertNotIn('X-Injected',headers)
+
     def test_preview_mining_routes_require_local_session_and_csrf_without_esi(self):
         self.assertEqual(self.request('/api/preview/mining',Cookie='')[0],403)
         self.app.preview_mining.snapshot=Mock(return_value={'enabled':True,'characters':[]})

@@ -34,8 +34,16 @@ def declaration(line,now):
     return {'name':reporter,'at':at,'charges':sorted(charges),'event':event}
 
 def folder_path(value):
-    if not isinstance(value,str) or not value.strip() or len(value)>2000:raise PlanningError('Válassz elérhető chatlogmappát.')
-    root=Path(value).expanduser().resolve()
+    if not isinstance(value,str) or not value.strip() or len(value)>2000 or any(ord(c)<32 or ord(c)==127 for c in value):raise PlanningError('Válassz elérhető chatlogmappát.')
+    # This directory is deliberately selected by the authenticated local user,
+    # not a filename below a server-owned root. EVE/OneDrive/custom log folders
+    # may be outside the profile. Discover only lists matching log basenames;
+    # reading later requires a matching header and a no-follow regular-file open.
+    try:
+        candidate=Path(value).expanduser()
+        if not candidate.is_absolute():raise ValueError('Absolute log folder required')
+        root=candidate.resolve(strict=True)
+    except (OSError,ValueError,RuntimeError):raise PlanningError('A chatlogmappa nem érhető el.') from None
     if not root.is_dir():raise PlanningError('A chatlogmappa nem érhető el.')
     return root
 

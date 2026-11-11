@@ -70,7 +70,7 @@ for(const mode of [null,'map'])test('dscan is a compact clickable reference in '
  await run('refreshIntel(true)');
  const card=d.querySelector('.intel-activity-card'),link=card.querySelector('[data-intel-scan]');
  assert.equal(link.textContent,'dscan');assert.equal(link.href,url);assert.equal(card.querySelectorAll('[data-intel-scan]').length,1);
- assert(!card.textContent.includes(url));assert(!card.querySelector('.intel-id-note'));assert(!card.textContent.includes('Unnamed pilot'));
+ assert.doesNotMatch(card.textContent,/https?:[/][/]/);assert(!card.querySelector('.intel-id-note'));assert(!card.textContent.includes('Unnamed pilot'));
  link.click();await tick();assert.deepEqual(opened,[url]);
 });
 test('dscan reference is labelled in OS and transparent overlay notifications without the full URL',async t=>{
@@ -81,8 +81,8 @@ test('dscan reference is labelled in OS and transparent overlay notifications wi
  w.EveDesktop.syncIntelOverlay=async data=>overlay.push(data);w.EveDesktop.notificationStatus=async()=>({status:'authorized'});w.EveDesktop.notify=async data=>sent.push(data);
  const old=w.fetch;w.fetch=async(url,opts)=>url==='/api/notifications/sent'?{ok:true,json:async()=>({ok:true})}:url==='/api/intel/alerts'?{ok:true,json:async()=>({enabled:true,overlay:{enabled:true,seconds:60},items:intel.alerts})}:old(url,opts);
  await run('pollIntelAlerts()');
- assert.equal(sent.length,1);assert(sent[0].body.includes('dscan'));assert(!sent[0].body.includes(url));
- assert.equal(overlay[0].items[0].pilots,'dscan');assert(!JSON.stringify(overlay[0]).includes(url));
+ assert.equal(sent.length,1);assert(sent[0].body.includes('dscan'));assert.doesNotMatch(sent[0].body,/https?:[/][/]/);
+ assert.equal(overlay[0].items[0].pilots,'dscan');assert.doesNotMatch(JSON.stringify(overlay[0]),/https?:[/][/]/);
 });
 test('resolved pilot IDs update contact links automatically without a manual refresh',async t=>{
  const {w,d,run,intel}=await fixture();t.after(()=>w.close());

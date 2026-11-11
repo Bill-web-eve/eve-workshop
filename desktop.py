@@ -134,7 +134,7 @@ def main():
         assert (ROOT/'static/index.html').exists()
         # Verify certificate validation against the public EVE SSO service.
         metadata,_=Transport().request('https://login.eveonline.com/.well-known/oauth-authorization-server')
-        assert metadata.get('issuer','').startswith('https://login.eveonline.com')
+        assert metadata.get('issuer') in {'https://login.eveonline.com','https://login.eveonline.com/'}
         result={'version':__version__,'architecture':__import__('platform').machine(),
                 'python':__import__('platform').python_version(),'cryptography':cryptography.__version__,
                 'recipes':len(catalog.recipes),'https_verified':True}

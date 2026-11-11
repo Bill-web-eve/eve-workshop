@@ -84,7 +84,16 @@ const EveI18n=(()=>{
         let source=maps.get(name),current=node.getAttribute(name);
         if(!source||source.last!==current)source={source:current,last:current};
         const translated=t(source.source);source.last=translated;maps.set(name,source);
-        if(translated!==current)node.setAttribute(name,translated);
+        if(translated!==current){
+          // Keep attribute names literal: translations are text, never markup,
+          // event handlers, styles or navigation destinations.
+          switch(name){
+            case 'title':node.setAttribute('title',translated);break;
+            case 'aria-label':node.setAttribute('aria-label',translated);break;
+            case 'placeholder':node.setAttribute('placeholder',translated);break;
+            case 'alt':node.setAttribute('alt',translated);break;
+          }
+        }
       }
       for(const child of node.childNodes)visit(child);
     };

@@ -7,7 +7,6 @@ import hashlib
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
-import mimetypes
 import os
 from pathlib import Path
 import re
@@ -762,6 +761,17 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def send(self, status, data, content_type='application/json; charset=utf-8', cookie=False, headers=None):
+        # Validate before writing a status line: a failed header must never leave
+        # a partial response or introduce a second header/response.
+        response_headers=[('Content-Type',content_type),*(headers or {}).items()]
+        for name,value in response_headers:
+            if not isinstance(name,str) or not re.fullmatch(r'[!#$%&\x27*+.^_`|~0-9A-Za-z-]+',name):
+                raise ValueError('Invalid response header name')
+            if not isinstance(value,str) or '\r' in value or '\n' in value or any(ord(c)<32 or ord(c)==127 for c in value):
+                raise ValueError('Invalid response header value')
+            value.encode('latin-1')
+        if '\r' in content_type or '\n' in content_type:
+            raise ValueError('Invalid response content type')
         if isinstance(data, (dict, list)):
             data = json.dumps(data, ensure_ascii=False, allow_nan=False).encode()
         elif isinstance(data, str):
@@ -803,8 +813,12 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
             if path in ['/preview.js', '/research.js', '/readiness.js', '/learning-clones.js', '/locations.js', '/market-history.js', '/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+                # Types are server-owned constants, not derived MIME metadata
+                # from an untrusted request path or an OS MIME registration.
+                content_type={'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
+                              '.png':'image/png','.svg':'image/svg+xml'}[Path(path).suffix]
                 return self.send(200, (ROOT/'static'/path[1:]).read_bytes(),
-                                 mimetypes.guess_type(path)[0] or 'application/octet-stream')
+                                 content_type)
             if path.startswith('/desktop/auth/'):
                 ticket = path.removeprefix('/desktop/auth/')
                 with self.app.desktop_auth_lock:

@@ -46,7 +46,7 @@ def check(online=False):
         finally:server.shutdown();server.server_close();thread.join(timeout=2)
     if online:
         metadata,_=Transport().request('https://login.eveonline.com/.well-known/oauth-authorization-server')
-        assert metadata['issuer'].startswith('https://login.eveonline.com')
+        assert metadata.get('issuer') in {'https://login.eveonline.com','https://login.eveonline.com/'}
     return {'version':__version__,'windows_x64':True,'python':sys.version.split()[0],
         'empty_profile':True,'dpapi':True,'http_api':True,'large_reaction':True,'plan_save':True,'https':online}
 

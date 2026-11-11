@@ -2,7 +2,7 @@ from pathlib import Path
 from datetime import datetime,timezone
 import tempfile,unittest,copy
 from unittest.mock import patch
-from muhely.boosts import BoostCounter,CHARGES,declaration,discover
+from muhely.boosts import BoostCounter,CHARGES,declaration,discover,folder_path
 from muhely.store import Store
 from muhely.planner import PlanningError
 
@@ -27,6 +27,15 @@ class BoostTests(unittest.TestCase):
   self.assertEqual(len(CHARGES),9);self.log();self.log('Local');self.log('Friendly BOOST Room');self.log('I. Boost X2',2)
   self.assertEqual(discover(str(self.logs)),['Friendly BOOST Room','I. Boost X2'])
   with self.assertRaises(PlanningError):self.counter.start(str(self.logs),'Local')
+ def test_selected_log_folder_must_be_absolute_existing_directory_without_controls(self):
+  self.assertEqual(folder_path(str(self.logs)),self.logs.resolve())
+  regular=self.root/'not-a-directory.txt';regular.write_text('private data')
+  for folder in ['',None,'relative/logs','../outside',str(self.logs)+'\x00',str(self.logs)+'\n',str(self.root/'missing'),str(regular)]:
+   with self.subTest(folder=folder),self.assertRaises(PlanningError):folder_path(folder)
+ def test_discovery_only_lists_log_channel_names_without_opening_file_contents(self):
+  self.log();(self.logs/'private.txt').write_text('not a chat log')
+  with patch('builtins.open',side_effect=AssertionError('Discovery must not read contents')):
+   self.assertEqual(discover(str(self.logs)),['I. Boost X2'])
  def test_existing_lines_are_skipped_and_new_declarations_are_counted_once(self):
   p=self.log(text=message(-10,'Old','Active Shielding Charge'));self.start()
   self.append(p,message(1,'Pilot','Active Shielding Charge Shield Harmonizing Charge'));self.now+=2;self.counter.scan()

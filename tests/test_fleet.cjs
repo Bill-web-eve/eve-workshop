@@ -140,3 +140,13 @@ test('live updates preserve an open session when an earlier kill changes its ID'
  run('fleetData=JSON.parse(JSON.stringify(fleetData))');data.sessions=[{...data.sessions[0],id:'11:122',kill_ids:[122,123]}];
  await run('loadFleet(true)');assert.equal(d.querySelector('[data-fleet-session="11:122"]').getAttribute('aria-pressed'),'true');assert(d.querySelector('#fleet-session'));
 });
+
+test('fleet progress, error and character text cannot create HTML elements',async t=>{
+ const {w,d,run,data}=await fixture();t.after(()=>w.close());
+ const hostile='<img src=x onerror=alert(1)>&"';
+ Object.assign(data.status,{running:true,total:2,completed:1,subject:hostile,error:hostile});
+ data.live_status.error=hostile;data.characters[0].name=hostile;data.sessions[0].character_name=hostile;
+ run('render()');
+ assert(d.querySelector('#view-content').textContent.includes(hostile));
+ assert.equal(d.querySelector('#view-content img[src="x"],#view-content [onerror]'),null);
+});
