@@ -96,6 +96,25 @@ class PreviewMiningTests(unittest.TestCase):
     def test_stale_crystal_click_does_not_replace_a_new_break(self):
         p=self.log();self.monitor.snapshot();self.append(p,line(CRYSTAL));old=self.alerts()['crystal_broken'];self.append(p,line(CRYSTAL,3))
         self.monitor.replace_crystal({'name':'Pilot A','id':old['id']});self.assertEqual(set(self.alerts()),{'crystal_broken'})
+    def test_incoming_damage_uses_real_markup_and_rejects_outgoing_misses_and_zero(self):
+        incoming='<color=0xffcc0000><b>61</b> <color=0x77ffffff><font size=10>from</font> <b><color=0xffffffff>Serpentis Platoon Leader</b><font size=10><color=0x77ffffff> - Grazes'
+        self.assertEqual(event(line(incoming,1,'combat'),NOW+2),{'kind':'damage','at':NOW+1})
+        self.assertEqual(event(line('1,234 from Enemy - Hits',1,'combat'),NOW+2)['kind'],'damage')
+        for body in ['27 to Serpentis Admiral - Vespa II - Glances Off','Serpentis Captain misses you completely','0 from Enemy - Hits','0.00 from Enemy - Hits','Warp scramble attempt from Enemy to You','15 GJ energy neutralized from Enemy','-12 from Enemy']:
+            self.assertIsNone(event(line(body,1,'combat'),NOW+2),body)
+        self.assertIsNone(event(line('61 from Enemy - Hits',1,'notify'),NOW+2))
+        self.assertIsNone(event(line('61 from Enemy - Hits',10,'combat'),NOW))
+    def test_damage_is_character_scoped_not_a_mining_warning_and_old_hits_are_skipped(self):
+        a=self.log(text=line('61 from Enemy - Grazes',-1,'combat'));b=self.log(cid=2,name='Pilot B')
+        self.monitor.snapshot();self.assertIsNone(self.data()['characters'][0]['last_damage'])
+        self.append(a,line('61 from Enemy - Grazes',3,'combat'));self.now=NOW+4;rows=self.data()['characters']
+        self.assertEqual(rows[0]['last_damage'],NOW+3);self.assertIsNone(rows[1]['last_damage']);self.assertEqual(rows[0]['alerts'],[])
+        self.append(a,line('1 from Enemy - Hits',2,'combat'));self.data();self.assertEqual(self.data()['characters'][0]['last_damage'],NOW+3)
+        self.append(b,line('20 to Enemy - Hits',5,'combat'));self.assertIsNone(self.data()['characters'][1]['last_damage'])
+    def test_new_game_session_resets_old_damage(self):
+        a=self.log();self.monitor.snapshot();self.append(a,line('61 from Enemy - Hits',1,'combat'));self.assertIsNotNone(self.data()['characters'][0]['last_damage'])
+        self.log(session='120010',text=line('You mined 2 units of Coesite',10,'mining'));self.now=NOW+11
+        self.assertIsNone(self.data()['characters'][0]['last_damage'])
     def test_closed_monitor_does_not_read_logs(self):
         self.log();self.monitor.closed=True
         self.assertIsNone(self.monitor.snapshot()['checked'])

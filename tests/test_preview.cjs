@@ -61,7 +61,7 @@ test('shortcut fields record a single key or full combination without dropdowns'
 });
 
 test('mining badges are forwarded from authenticated local logs without changing dirty fields',async t=>{
- const {w,d,run,native}=await fixture();t.after(()=>w.close());assert(d.querySelector('#preview-mining'));assert(d.querySelector('#preview-mining').textContent.includes('Mining alerts'));
+ const {w,d,run,native}=await fixture();t.after(()=>w.close());assert(d.querySelector('#preview-mining'));assert(d.querySelector('#preview-mining').textContent.includes('Mining and damage alerts'));
  assert(native.some(r=>r.action==='previewMining'));const form=d.querySelector('#preview-mining-settings');form.elements.folder.value='/half-entered';
  run(`previewMiningData={enabled:true,folder:'/original',characters:[{name:'Pilot <A>',last_module:'Strip Miner',alerts:[{id:'123456789012345678901234',kind:'crystal_broken',at:1,crystal:'Crystal <A>'}]}]};renderPreviewMining();`);
  assert.equal(d.querySelector('#preview-mining-settings'),form);assert.equal(form.elements.folder.value,'/half-entered');assert(d.querySelector('#preview-mining').textContent.includes('Crystal destroyed'));assert(d.querySelector('#preview-mining').textContent.includes('Pilot <A>'));assert.equal(d.querySelector('#preview-mining A'),null);assert(d.querySelector('[data-mining-ack]'));

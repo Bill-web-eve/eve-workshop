@@ -809,12 +809,14 @@ A legújabb macOS-verziók az Accessibility engedélylistát **Device Control an
 
 A **Felismert gyorsbillentyűk** számláló jelzi, hogy a beállított kombináció megérkezett az apphoz. Nyomva tartáskor csak egyszer vált; újabb váltáshoz engedd fel, majd nyomd meg újra. Az Fn és a Caps Lock nem változtatja meg a beállított kombinációt. A váltóbillentyűket az app az EVE előtt kezeli, a többi leütés a megszokott módon működik. Ha a fogadás nem indult el, külön hiba jelenik meg.
 
-### Bányászati jelzések az előnézeten
+### Bányászati és sebzésjelzések az előnézeten
 
-Az eve-preview **Bányászati jelzések** részében be- és kikapcsolható a helyi **Gamelogs** mappa figyelése, és megadható a mappa útvonala. Alapból az EVE szokásos mappáját használja; ha az Intel chatmappája be van állítva, annak Gamelogs testvérmappáját is megkeresi. Nincs hozzá új ESI-engedély vagy ESI-lekérés. A megnyitott EVE-kliensek eredeti karakterneve alapján illeszti az ikonokat; az előnézet saját címkéje nem változtatja ezt meg.
+Az eve-preview **Bányászati és sebzésjelzések** részében be- és kikapcsolható a helyi **Gamelogs** mappa figyelése, és megadható a mappa útvonala. Alapból az EVE szokásos mappáját használja; ha az Intel chatmappája be van állítva, annak Gamelogs testvérmappáját is megkeresi. Nincs hozzá új ESI-engedély vagy ESI-lekérés. A megnyitott EVE-kliensek eredeti karakterneve alapján illeszti az ikonokat; az előnézet saját címkéje nem változtatja ezt meg.
 
 Az új naplóüzenetek alapján az előnézet névcsíkjának jobb szélén külön ikon jelzi a **megtelt rakteret**, **elkopott kristályt** és **elfogyott követ**. Az egérrel föléjük állva látható az időpont és az üzenetben megnevezett modul/kristály. Induláskor a korábbi események kimaradnak; új játéknapló-munkamenet új jelzésekkel indul. A felületen a **Tudomásul vettem** gomb törli az adott, már látott jelzéseket. Másik lézer további termelése nem törli a kristályhibát vagy az elfogyott kő eseményét.
 
 A kristály cseréjét/betöltését a napló nem jelzi megbízhatóan. A **kristályikonra kattintva** kézzel jelzed, hogy kicserélted: a törött kristály ikonja **szünetjelre** vált. A szünetjel a következő új, sikeres bányászati naplóeseménynél automatikusan eltűnik, illetve kattintással is törölhető. Ez karakterenként igazolja a bányászat folytatását: a napló nem tartalmaz modulhely-azonosítót, ezért több azonos típusú lézernél nem bizonyítja az egyes modulok működését. Az ikonokra kattintás továbbra is kiválasztja az adott EVE-ablakot; nem indít el játékbeli modult.
 
 A modul neve csak az utolsó megfelelő naplóemlítésből ismert. A raktér pontos m³-értékét/telítettségi százalékát, az ürítést és minden egyes lézer aktív állapotát nem mutatja az alkalmazás, mert ezek a Gamelogs alapján nem állapíthatók meg biztosan. Az ikonok eseményjelzések, nem folyamatos telemetria.
+
+Az eve-preview névcsíkján a karakter neve **pirosan villog a beérkező sebzés utáni 10 másodpercben**. Az újabb találat meghosszabbítja a jelzést. Kizárólag a saját hajóra érkező, pozitív sebzésű combat naplóüzenet váltja ki: kiosztott sebzés, mellélövés és régi naplóbejegyzés nem. A jelzéshez a fenti Gamelogs-figyelésnek bekapcsolva kell lennie; ESI-lekérés nem szükséges. A villogás a képfelvételtől függetlenül működik, és a találatok megszűnése után automatikusan leáll.

@@ -20,11 +20,13 @@
 @property NSImage *image;
 @property NSArray<NSDictionary *> *miningAlerts;
 @property BOOL editing,active,light;
+@property NSTimeInterval damageUntil;
 @property NSPoint dragStart;
 @property NSRect initialFrame;
 @property BOOL resizing,dragging;
 - (NSRect)miningBadgeRect:(NSUInteger)index;
 - (NSRect)captionRect;
+- (BOOL)damageHighlightAt:(NSTimeInterval)now;
 @end
 
 API_AVAILABLE(macos(12.3))
@@ -79,7 +81,7 @@ static CGEventRef EvePreviewKeyTap(CGEventTapProxy proxy,CGEventType type,CGEven
 @property NSMutableDictionary<NSString *,EvePreviewPanel *> *panels;
 @property NSMutableDictionary *captures;
 @property NSMutableArray *observers;
-@property NSTimer *timer;
+@property NSTimer *timer,*damageTimer;
 @property dispatch_queue_t frames;
 @property BOOL enabled,editing,onlyEVE,english,light,busy,closed,applyingFrame;
 @property NSInteger fps;
@@ -89,6 +91,7 @@ static CGEventRef EvePreviewKeyTap(CGEventTapProxy proxy,CGEventType type,CGEven
 @property NSUInteger shortcutCount;
 @property BOOL keyCapture;
 @property NSDictionary<NSString *,NSArray *> *miningByName;
+@property NSDictionary<NSString *,NSNumber *> *damageByName;
 @property(copy) void (^miningAction)(NSString *,NSString *,NSString *);
 - (instancetype)initWithDefaults:(NSUserDefaults *)defaults;
 - (NSDictionary *)status;
@@ -98,6 +101,7 @@ static CGEventRef EvePreviewKeyTap(CGEventTapProxy proxy,CGEventType type,CGEven
 - (BOOL)cycle:(NSInteger)direction;
 - (void)receivedShortcut:(NSInteger)direction;
 - (BOOL)syncMining:(NSDictionary *)data;
+- (BOOL)updateDamageAnimation;
 - (BOOL)setKeyCaptureValue:(id)value;
 - (void)savePanel:(EvePreviewPanel *)panel;
 - (void)stop;
@@ -117,7 +121,7 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
 @implementation EvePreview
 - (instancetype)initWithDefaults:(NSUserDefaults *)defaults {
     if((self=[super init])){
-        self.defaults=defaults;self.miningByName=@{};self.slots=[NSMutableArray new];self.sources=[NSMutableDictionary new];self.panels=[NSMutableDictionary new];self.captures=[NSMutableDictionary new];
+        self.defaults=defaults;self.miningByName=@{};self.damageByName=@{};self.slots=[NSMutableArray new];self.sources=[NSMutableDictionary new];self.panels=[NSMutableDictionary new];self.captures=[NSMutableDictionary new];
         self.frames=dispatch_queue_create("EVEWorkshop.preview.frames",DISPATCH_QUEUE_SERIAL);self.fps=5;self.onlyEVE=YES;
         self.nextKey=@{@"code":@124,@"modifiers":@(controlKey|optionKey)};self.previousKey=@{@"code":@123,@"modifiers":@(controlKey|optionKey)};
         NSDictionary *saved=[defaults dictionaryForKey:@"EVEPreview"];
@@ -184,9 +188,11 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
 - (BOOL)setKeyCaptureValue:(id)value {if(!EvePreviewBoolean(value))return NO;self.keyCapture=[value boolValue];self.keys.suspended=self.keyCapture;return YES;}
 - (BOOL)syncMining:(NSDictionary *)data {
     if(![data isKindOfClass:NSDictionary.class]||!EvePreviewBoolean(data[@"enabled"])||![data[@"characters"] isKindOfClass:NSArray.class]||[data[@"characters"] count]>128)return NO;
-    NSMutableDictionary *rows=[NSMutableDictionary new];
+    NSMutableDictionary *rows=[NSMutableDictionary new],*damage=[NSMutableDictionary new];
     if([data[@"enabled"] boolValue])for(id row in data[@"characters"]){
         if(![row isKindOfClass:NSDictionary.class]||![row[@"name"] isKindOfClass:NSString.class]||![row[@"name"] length]||[row[@"name"] length]>100||![row[@"alerts"] isKindOfClass:NSArray.class]||[row[@"alerts"] count]>4)return NO;
+        id stamp=row[@"last_damage"];
+        if(stamp&&stamp!=NSNull.null){if(![stamp isKindOfClass:NSNumber.class]||EvePreviewBoolean(stamp)||!isfinite([stamp doubleValue])||[stamp doubleValue]<0||[stamp doubleValue]>NSDate.date.timeIntervalSince1970+2)return NO;damage[[row[@"name"] lowercaseString]]=@([stamp doubleValue]+10);}
         NSMutableArray *alerts=[NSMutableArray new];NSMutableSet *kinds=[NSMutableSet new];
         for(id alert in row[@"alerts"]){
             if(![alert isKindOfClass:NSDictionary.class]||![@[@"cargo_full",@"crystal_broken",@"rock_depleted",@"module_stopped"] containsObject:alert[@"kind"]]||[kinds containsObject:alert[@"kind"]]||![alert[@"at"] isKindOfClass:NSNumber.class]||!isfinite([alert[@"at"] doubleValue])||[alert[@"at"] doubleValue]<0)return NO;
@@ -197,7 +203,7 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
         }
         rows[[row[@"name"] lowercaseString]]=[alerts copy];
     }
-    self.miningByName=[rows copy];[self renderPanels];return YES;
+    self.miningByName=[rows copy];self.damageByName=[damage copy];[self renderPanels];return YES;
 }
 - (BOOL)configure:(NSDictionary *)options {
     if(![options isKindOfClass:NSDictionary.class])return NO;
@@ -263,6 +269,12 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
 }
 - (void)windowDidMove:(NSNotification *)note {[self savePanel:note.object];}
 - (void)windowDidResize:(NSNotification *)note {[self savePanel:note.object];}
+- (BOOL)updateDamageAnimation {
+    BOOL running=NO;NSTimeInterval now=NSDate.date.timeIntervalSince1970;
+    for(EvePreviewPanel *panel in self.panels.allValues){EvePreviewTile *tile=(id)panel.contentView;if(tile.damageUntil>0)tile.needsDisplay=YES;if(self.enabled&&!self.closed&&panel.visible&&tile.damageUntil>now)running=YES;}
+    if(!running){[self.damageTimer invalidate];self.damageTimer=nil;}
+    return running;
+}
 - (void)renderPanels {
     BOOL hasTargets=NO;for(NSDictionary *slot in self.slots)if([slot[@"enabled"] boolValue]&&self.sources[slot[@"key"]])hasTargets=YES;self.keys.hasTargets=hasTargets;NSMutableSet *gamePIDs=[NSMutableSet new];for(NSDictionary *source in self.sources.allValues)if([source[@"pid"] intValue]>0)[gamePIDs addObject:source[@"pid"]];self.keys.gamePIDs=[gamePIDs copy];
     BOOL visible=self.enabled&&[self captureAllowed];pid_t front=[self frontPID];BOOL game=NO;
@@ -273,13 +285,14 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
         if(!panel){panel=[[EvePreviewPanel alloc] initWithContentRect:[self frameForSlot:slot index:index] styleMask:NSWindowStyleMaskBorderless|NSWindowStyleMaskNonactivatingPanel backing:NSBackingStoreBuffered defer:NO];panel.slotID=key;panel.title=[@"eve-preview · " stringByAppendingString:slot[@"title"]];panel.delegate=self;panel.releasedWhenClosed=NO;panel.hidesOnDeactivate=NO;panel.canHide=NO;panel.floatingPanel=YES;panel.level=NSScreenSaverWindowLevel;panel.collectionBehavior=NSWindowCollectionBehaviorCanJoinAllSpaces|NSWindowCollectionBehaviorFullScreenAuxiliary|NSWindowCollectionBehaviorIgnoresCycle;if(@available(macOS 13.0,*))panel.collectionBehavior|=NSWindowCollectionBehaviorCanJoinAllApplications;panel.excludedFromWindowsMenu=YES;
             EvePreviewTile *tile=[[EvePreviewTile alloc] initWithFrame:panel.contentView.bounds];tile.owner=self;tile.slotID=key;tile.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;panel.contentView=tile;self.panels[key]=panel;}
         if(![(EvePreviewTile *)panel.contentView dragging]){self.applyingFrame=YES;[panel setFrame:[self frameForSlot:slot index:index] display:YES];self.applyingFrame=NO;}
-        EvePreviewTile *tile=(id)panel.contentView;tile.caption=[slot[@"label"] length]?slot[@"label"]:slot[@"title"];tile.editing=self.editing;tile.active=[source[@"pid"] intValue]==front;tile.light=self.light;NSString *pilot=[slot[@"title"] hasPrefix:@"EVE - "]?[slot[@"title"] substringFromIndex:6]:slot[@"title"];tile.miningAlerts=self.miningByName[pilot.lowercaseString]?:@[];
+        EvePreviewTile *tile=(id)panel.contentView;tile.caption=[slot[@"label"] length]?slot[@"label"]:slot[@"title"];tile.editing=self.editing;tile.active=[source[@"pid"] intValue]==front;tile.light=self.light;NSString *pilot=[slot[@"title"] hasPrefix:@"EVE - "]?[slot[@"title"] substringFromIndex:6]:slot[@"title"];tile.miningAlerts=self.miningByName[pilot.lowercaseString]?:@[];tile.damageUntil=[self.damageByName[pilot.lowercaseString] doubleValue];
         NSMutableArray *tips=[NSMutableArray new];NSDictionary *labels=self.english?@{@"cargo_full":@"Cargo full",@"crystal_broken":@"Crystal destroyed",@"rock_depleted":@"Asteroid depleted",@"module_stopped":@"Module not running"}:@{@"cargo_full":@"Megtelt raktér",@"crystal_broken":@"Elkopott kristály",@"rock_depleted":@"Elfogyott kő",@"module_stopped":@"Modul nem fut"};
         for(NSDictionary *alert in tile.miningAlerts){NSString *detail=[alert[@"crystal"] length]?alert[@"crystal"]:alert[@"module"];NSString *stamp=[NSDateFormatter localizedStringFromDate:[NSDate dateWithTimeIntervalSince1970:[alert[@"at"] doubleValue]] dateStyle:NSDateFormatterShortStyle timeStyle:NSDateFormatterMediumStyle];[tips addObject:[NSString stringWithFormat:@"%@ · %@ · %@",labels[alert[@"kind"]],detail,stamp]];}
         if(tile.miningAlerts.count)[tips addObject:self.english?@"Click crystal: replaced; click pause: module restarted.":@"Kristályra kattintás: kicserélve; szünetjelre kattintás: modul újraindítva."];tile.toolTip=[tips componentsJoinedByString:@"\n"];tile.needsDisplay=YES;
         if(!self.onlyEVE||game||self.editing)[panel orderFrontRegardless];else[panel orderOut:nil];
         if(!self.captures[key])[self startCapture:key];
     }
+    if([self updateDamageAnimation]&&!self.damageTimer){__weak EvePreview *weakSelf=self;self.damageTimer=[NSTimer scheduledTimerWithTimeInterval:.5 repeats:YES block:^(NSTimer *timer){[weakSelf updateDamageAnimation];}];[NSRunLoop.mainRunLoop addTimer:self.damageTimer forMode:NSRunLoopCommonModes];}
 }
 - (void)startCapture:(NSString *)key {
     if(@available(macOS 12.3,*)){
@@ -326,7 +339,7 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
     return [self activate:online[next][@"key"]];
 }
 - (void)stopCaptures {for(id capture in self.captures.allValues)[capture stopFeed];[self.captures removeAllObjects];}
-- (void)stop {self.closed=YES;for(id token in self.observers){[NSWorkspace.sharedWorkspace.notificationCenter removeObserver:token];[NSNotificationCenter.defaultCenter removeObserver:token];}[self.observers removeAllObjects];[self.timer invalidate];[self releaseKeys];[self stopCaptures];for(NSPanel *panel in self.panels.allValues)[panel orderOut:nil];}
+- (void)stop {self.closed=YES;for(id token in self.observers){[NSWorkspace.sharedWorkspace.notificationCenter removeObserver:token];[NSNotificationCenter.defaultCenter removeObserver:token];}[self.observers removeAllObjects];[self.timer invalidate];[self.damageTimer invalidate];self.damageTimer=nil;[self releaseKeys];[self stopCaptures];for(NSPanel *panel in self.panels.allValues)[panel orderOut:nil];}
 @end
 
 @implementation EvePreviewKeys
@@ -372,12 +385,14 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
 
 @implementation EvePreviewTile
 - (BOOL)isFlipped{return YES;}
+- (BOOL)damageHighlightAt:(NSTimeInterval)now {return self.damageUntil>now&&fmod(now,1.0)<.5;}
 - (NSRect)miningBadgeRect:(NSUInteger)index {return NSMakeRect(self.bounds.size.width-22*(self.miningAlerts.count-index)-4,2,20,20);}
 - (NSRect)captionRect {CGFloat right=self.miningAlerts.count?NSMinX([self miningBadgeRect:0])-6:self.bounds.size.width-7;return NSMakeRect(7,4,MAX(0,right-7),17);}
 - (void)drawRect:(NSRect)dirty {
     NSColor *paper=self.light?[NSColor colorWithWhite:.95 alpha:1]:[NSColor colorWithSRGBRed:.07 green:.13 blue:.18 alpha:1],*ink=self.light?NSColor.labelColor:[NSColor colorWithWhite:.9 alpha:1];[paper setFill];NSRectFill(self.bounds);
     if(self.image)[self.image drawInRect:NSInsetRect(NSMakeRect(0,24,self.bounds.size.width,self.bounds.size.height-24),2,2) fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1 respectFlipped:YES hints:nil];
-    NSString *caption=[self.caption stringByAppendingString:self.editing?@" · ↔":@""];NSMutableParagraphStyle *paragraph=[NSMutableParagraphStyle new];paragraph.lineBreakMode=NSLineBreakByTruncatingTail;[caption drawInRect:[self captionRect] withAttributes:@{NSFontAttributeName:[NSFont systemFontOfSize:11 weight:NSFontWeightSemibold],NSForegroundColorAttributeName:ink,NSParagraphStyleAttributeName:paragraph}];
+    NSColor *captionInk=[self damageHighlightAt:NSDate.date.timeIntervalSince1970]?(self.light?NSColor.systemRedColor:[NSColor colorWithSRGBRed:1 green:.35 blue:.35 alpha:1]):ink;
+    NSString *caption=[self.caption stringByAppendingString:self.editing?@" · ↔":@""];NSMutableParagraphStyle *paragraph=[NSMutableParagraphStyle new];paragraph.lineBreakMode=NSLineBreakByTruncatingTail;[caption drawInRect:[self captionRect] withAttributes:@{NSFontAttributeName:[NSFont systemFontOfSize:11 weight:NSFontWeightSemibold],NSForegroundColorAttributeName:captionInk,NSParagraphStyleAttributeName:paragraph}];
     NSDictionary *symbols=@{@"cargo_full":@"shippingbox.fill",@"crystal_broken":@"diamond.fill",@"rock_depleted":@"mountain.2.fill",@"module_stopped":@"pause.fill"};
     for(NSUInteger i=0;i<self.miningAlerts.count;i++){
         NSDictionary *alert=self.miningAlerts[i];NSRect badge=[self miningBadgeRect:i];

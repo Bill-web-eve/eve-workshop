@@ -1,6 +1,8 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Bányászati és sebzésjelzések": "Mining and damage alerts",
+"Beérkező sebzésnél a karakter neve 10 másodpercig pirosan villog; újabb találat újraindítja az időt. Saját támadás és mellélövés nem vált ki villogást.": "Incoming damage makes the character name flash red for 10 seconds; another hit restarts the timer. Outgoing damage and misses do not trigger flashing.",
 "Csak a figyelés indítása utáni új eseményeket jelöli. A modul neve az utolsó említésből származik; az egyes lézerek működése és a raktér százaléka nem olvasható ki biztosan. A raktér-, kristály- és kőhibák nyugtázásig vagy új játéknapló-munkamenetig maradnak meg; másik lézer termelése nem törli őket.": "Only new events after monitoring starts are shown. The module name is its last mention; individual laser activity and hold percentage cannot be reliably read. Cargo, crystal and asteroid warnings remain until acknowledged or a new game-log session starts; mining by another laser does not clear them.",
 "Az előnézet kristályikonjára kattintva jelzed a kristálycserét; ekkor szünetjel marad. A szünetjel a következő sikeres bányászati naplóeseménynél automatikusan eltűnik; kattintással is törölhető. Ez karakterenként jelzi a bányászat folytatását, nem az egyes lézerek állapotát.": "Click the crystal icon on a preview to mark the crystal as replaced; it becomes a pause icon. The pause icon clears automatically on the next successful mining log event, or on a click. This indicates that the character is mining again, not the status of each laser.",
 "Modul nem fut": "Module not running",

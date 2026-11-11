@@ -809,12 +809,14 @@ Recent macOS versions may label the Accessibility permission list **Device Contr
 
 The **Shortcuts received** counter confirms that a configured combination reached the app. Holding a key switches only once; release and press again to switch again. Fn and Caps Lock do not change a configured shortcut. The app handles its configured switching combinations before EVE; other keys pass through normally. If shortcut listening cannot start, its status shows a separate error rather than reporting shortcuts as active.
 
-### Mining alerts on previews
+### Mining and damage alerts on previews
 
-In **eve-preview → Mining alerts**, enable or disable local **Gamelogs** monitoring and set its folder path. The default is EVE's standard folder, or the Gamelogs sibling of the configured Intel chat folder. No new ESI permission or request is needed. Badges match the original EVE character name, regardless of custom preview labels.
+In **eve-preview → Mining and damage alerts**, enable or disable local **Gamelogs** monitoring and set its folder path. The default is EVE's standard folder, or the Gamelogs sibling of the configured Intel chat folder. No new ESI permission or request is needed. Badges match the original EVE character name, regardless of custom preview labels.
 
 New log messages add separate icons at the right end of the character-name bar for **cargo full**, **crystal destroyed** and **asteroid depleted**. Hover to see the time and named module/crystal. Existing history is skipped when monitoring starts; a new game-log session starts with fresh alerts. **Acknowledge** removes the events already shown. Mining by another laser does not clear a broken crystal or depleted asteroid event.
 
 Crystal replacement/loading is not reliably logged. **Click the crystal icon** to mark it replaced: it becomes a **pause icon**. The next new successful mining event clears pause automatically; clicking pause also clears it. This confirms mining has resumed for the character, not for each laser: the log does not identify individual module slots. Icon clicks also select the EVE window; they never activate in-game modules.
 
 The module name is its last relevant log mention. Exact hold volume/percentage, unloading and the active state of every laser are not reliably available from Gamelogs and are not displayed. Badges indicate events, not continuous telemetry.
+
+The character name in the eve-preview title bar **flashes red for 10 seconds after incoming damage**. Each new hit restarts the timer. Only positive incoming ship-damage combat log lines trigger it: outgoing damage, misses and historical lines do not. The Gamelogs monitor above must be enabled; no ESI request is required. Flashing is independent of capture frames and stops automatically after the last hit.

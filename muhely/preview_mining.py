@@ -1,4 +1,4 @@
-"""Read local game-log events for preview badges; no ESI or game interaction."""
+"""Read local game-log events for preview badges and incoming damage; no ESI or game interaction."""
 from datetime import datetime, timezone
 from pathlib import Path
 import hashlib, html, os, re, stat, threading, time
@@ -6,6 +6,7 @@ from .planner import PlanningError
 
 FILE = re.compile(r'^\d{8}_\d{6}_(\d+)\.txt$', re.I)
 LINE = re.compile(r'^\[\s*(\d{4}\.\d\d\.\d\d \d\d:\d\d:\d\d)\s*\]\s*\(([^)]+)\)\s*(.*)$')
+INCOMING_DAMAGE = re.compile(r'^(?P<amount>\d(?:[\d\s,.]*\d)?) from \S.+$', re.I)
 KINDS = ('cargo_full', 'crystal_broken', 'rock_depleted', 'module_stopped')
 PATTERNS = [
  ('cargo_full', re.compile(r"^Your (?P<module>.+?) has completed operations\. Ship's (?:cargo|mining|ore) hold is full\.?$", re.I)),
@@ -23,6 +24,11 @@ def event(line, now):
     if at > now + 60: return None
     body = html.unescape(re.sub(r'<[^>]*>', '', body)).strip()
     if len(body) > 2000: return None
+    if category == 'combat':
+        hit = INCOMING_DAMAGE.fullmatch(body)
+        if hit and any(c in '123456789' for c in hit['amount']) and at <= now + 2:
+            return {'kind':'damage', 'at':at}
+        return None
     if category == 'mining' and re.match(r'^You mined [\d\s,.]+ units of .+', body):
         return {'kind':'mined', 'at':at}
     if category not in ('notify', 'hint', 'info'): return None
@@ -124,7 +130,7 @@ class PreviewMining:
                         if fresh:
                             cursor = {'identity':identity, 'offset':0, 'name':name, 'skip_partial':False}
                             self.files[cid] = cursor
-                            self.characters[name.casefold()] = {'name':name, 'character_id':int(cid), 'alerts':{}, 'last_module':'', 'module_at':None, 'last_mined':None}
+                            self.characters[name.casefold()] = {'name':name, 'character_id':int(cid), 'alerts':{}, 'last_module':'', 'module_at':None, 'last_mined':None, 'last_damage':None}
                             if not self.initialized:
                                 # Start at EOF: old errors must never look like a live problem.
                                 sep = b'\n\x00' if enc == 'utf-16-le' else b'\x00\n' if enc == 'utf-16-be' else b'\n'
@@ -148,6 +154,9 @@ class PreviewMining:
                             found = event(line, now)
                             if not found or found['at'] < self.started: continue
                             kind = found['kind']
+                            if kind == 'damage':
+                                row['last_damage'] = max(row['last_damage'] or 0, found['at'])
+                                continue
                             if kind == 'mined':
                                 row['last_mined'] = found['at']
                                 stopped = row['alerts'].get('module_stopped')
