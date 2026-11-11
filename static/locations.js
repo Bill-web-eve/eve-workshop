@@ -3,7 +3,7 @@
 // table filters, page size or the selected character/production scope.
 globalThis.EveLocations=(()=>{
  const cache=new Map(),busy=new Map();let timer=null,generation=0;
- const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
  const t=s=>globalThis.EveI18n?.t(s)||s;
  const key=(id,scope)=>String(scope||'personal')+':'+id;
  const statusText=status=>t(({access:'A hely neve nem érhető el · hozzáférés szükséges',disabled:'Corporation figyelése kikapcsolva',unknown:'Ismeretlen hely',unavailable:'A hely neve átmenetileg nem érhető el'})[status]||'Helynév betöltése…');

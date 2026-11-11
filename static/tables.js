@@ -1,7 +1,7 @@
 'use strict';
 const EveTables=(()=>{
   const t=value=>typeof EveI18n==='undefined'?value:EveI18n.t(value);
-  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const escape=value=>String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   const normalize=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('hu-HU').replace(/\s+/g,' ').trim();
   const collator=new Intl.Collator('hu',{numeric:true,sensitivity:'base'});
   const number=value=>{

@@ -74,8 +74,8 @@ const EveI18n=(()=>{
     const visit=node=>{
       if(node.nodeType===3){
         if(node.parentElement?.closest(skip))return;
-        if(node.parentElement?.dataset.i18nName===node.data)return;
-        if(project(node,sources,()=>node.data,value=>node.data=value)&&node.parentElement?.closest('tbody'))tableChanged=true;
+        if(node.parentElement?.dataset.i18nName===node.textContent)return;
+        if(project(node,sources,()=>node.textContent,value=>node.textContent=value)&&node.parentElement?.closest('tbody'))tableChanged=true;
         return;
       }
       if(node.nodeType!==1||node.matches('script,style,code,pre,textarea,[data-i18n-skip]'))return;
@@ -107,7 +107,7 @@ const EveI18n=(()=>{
   }
   function sourceText(node){
     if(!node)return '';
-    if(node.nodeType===3){const info=sources.get(node);return info&&info.last===node.data?info.source:node.data;}
+    if(node.nodeType===3){const info=sources.get(node);return info&&info.last===node.textContent?info.source:node.textContent;}
     return [...node.childNodes].map(sourceText).join('');
   }
   function setLanguage(value,persist=true){

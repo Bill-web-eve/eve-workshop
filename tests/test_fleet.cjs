@@ -150,3 +150,13 @@ test('fleet progress, error and character text cannot create HTML elements',asyn
  assert(d.querySelector('#view-content').textContent.includes(hostile));
  assert.equal(d.querySelector('#view-content img[src="x"],#view-content [onerror]'),null);
 });
+
+test('translated fleet labels are encoded even when a translation returns HTML-like text',async t=>{
+ const {w,d,run,data}=await fixture();t.after(()=>w.close());
+ const original=w.EveI18n.t,hostile='<img src=x onerror=alert(1)>&"';
+ w.EveI18n.t=value=>['nap','Bekapcsolva','Lekérés folyamatban','Kapcsolódás…','Élő kapcsolat aktív','Ellenőrizve:','Beérkezett:','Releváns frissítés:','Killmailek betöltése…','Oldal'].includes(value)?hostile:original(value);
+ Object.assign(data.status,{running:true,total:2,completed:1,subject:'Safe pilot',page:1});data.location_status.running=true;data.location_status.character='Safe pilot';
+ run('render()');
+ assert(d.querySelector('#view-content').textContent.includes(hostile));
+ assert.equal(d.querySelector('#view-content img[src="x"],#view-content [onerror]'),null);
+});

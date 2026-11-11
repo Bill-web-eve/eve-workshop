@@ -98,7 +98,7 @@ function intelKillTable(groups){
 function intelKillStatus(d){
   if(!d.kill_feed)return '';
   const enabled=d.preferences.killfeed_enabled&&d.kill_feed.enabled,names=d.regions.filter(([id])=>d.kill_regions?.includes(id)).map(([,name])=>name);
-  return `<div class="banner"><strong>zKillboard · R2Z2</strong> · <span>${EveI18n.t(!enabled?'Kikapcsolva':d.kill_feed.error?'Újracsatlakozásra vár':d.kill_feed.checked?'Élő kapcsolat aktív':'Kapcsolódás…')}</span><div><span>Killértesítések régiója:</span> ${names.length?names.map(verbatim).join(', '):EveI18n.t('Nincs ismert régió')}</div><small>Régión belüli killjelzés; nem igazol jelenlegi ellenséges jelenlétet.</small></div>`;
+  return `<div class="banner"><strong>zKillboard · R2Z2</strong> · <span>${esc(EveI18n.t(!enabled?'Kikapcsolva':d.kill_feed.error?'Újracsatlakozásra vár':d.kill_feed.checked?'Élő kapcsolat aktív':'Kapcsolódás…'))}</span><div><span>Killértesítések régiója:</span> ${names.length?names.map(verbatim).join(', '):esc(EveI18n.t('Nincs ismert régió'))}</div><small>Régión belüli killjelzés; nem igazol jelenlegi ellenséges jelenlétet.</small></div>`;
 }
 function renderIntel(content){
   if(intelWindowMode==='chat')return renderIntelChat(content);

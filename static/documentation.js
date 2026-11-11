@@ -2,7 +2,7 @@
 // Small, escaped Markdown renderer for the bundled manuals. No raw HTML,
 // executable URLs, remote scripts or external Markdown dependency.
 const EveManual=(()=>{
-  const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const escape=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   const normalize=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().replace(/\s+/g,' ').trim();
   function inline(source,depth=0){
     if(depth>5)return escape(source);

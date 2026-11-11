@@ -4,7 +4,7 @@ const $$ = selector => [...document.querySelectorAll(selector)];
 const fmt = n => new Intl.NumberFormat('hu-HU', {maximumFractionDigits: 0}).format(n || 0);
 const hours = n => new Intl.NumberFormat('hu-HU', {maximumFractionDigits: 1}).format((n || 0) / 3600);
 // Encode text before it enters an HTML template (including error messages).
-const esc = value => String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+const esc = value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const verbatim=value=>`<span data-i18n-skip>${esc(value)}</span>`;
 const confirmUI=message=>confirm(EveI18n.t(message));
 const date = n => n ? EveI18n.date(n * 1000, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Még nem frissült';

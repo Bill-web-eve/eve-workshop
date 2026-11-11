@@ -5,7 +5,7 @@ globalThis.EveActivity=(()=>{
   const t=(source,...values)=>{let value=globalThis.EveI18n?.t(source)||source;values.forEach((v,i)=>value=value.replaceAll('{'+i+'}',String(v)));return value;};
   const part=(text,...args)=>({text,args});
   const detailText=value=>Array.isArray(value)?value.map(p=>p.raw?p.text:t(p.text,...(p.args||[]))).join(' · '):t(value);
-  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const escape=value=>String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   const labels={
     "/api/learning-clones":"Tanulóklónok ellenőrzése","/api/learning-clones/refresh":"Tanulóklónok ellenőrzése",
     "/api/locations":"Helynevek feloldása…",

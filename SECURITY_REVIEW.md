@@ -38,3 +38,11 @@ Relevant boundaries:
 - The app runs under the user's OS permissions; it is not a privileged file service and does not claim to sandbox the user's own folder choices to its application profile.
 
 A scanner may still report this intentional directory probe as `py/path-injection`. That remaining report needs a design-aware false-positive review; it should not be hidden by moving input through storage, disabling the query or breaking arbitrary local log-folder selection. No dismissal was performed as part of this change.
+
+## Follow-up after the first verification scan
+
+The CodeQL run for `520f08c` completed successfully, but the alert list was not clean: it showed 36 open and 24 closed reports. Several changed HTML sink locations were reported under new alert numbers. The review therefore continued instead of treating a successful scanner execution as a clean result.
+
+One inspected path ran from a DOM label through the shared translation cache and table markup into an HTML insertion. The follow-up uses conventional regular-expression replacements in all five HTML encoders (app, tables, activity, manual and location labels), explicitly encodes translated labels interpolated into markup, and uses the unambiguous `textContent` setter for text-node translation. Translation data remains unencoded when used as plain text or stored form data; encoding happens only at the HTML boundary. The readiness fallback label is also encoded without changing its intentional location markup.
+
+Additional tests substitute HTML-like translated labels and hostile table headings, alongside the existing literal-text and exception-message tests. These checks verify behavior; another fresh CodeQL analysis is still required to validate the report list. The intentional local Boost-directory selection remains a separate design-aware review item.

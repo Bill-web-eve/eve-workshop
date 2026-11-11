@@ -40,3 +40,10 @@ test('translated attributes remain literal text and never become URL or event-ha
  assert.equal(d.querySelectorAll('img').length,1);assert.equal(d.querySelector('[onerror],[onload],a,script,svg'),null);
  w.EveI18n.setLanguage('hu');assert.equal(input.title,'Cím');
 });
+
+test('table headers and metadata use the same text-only encoding boundary',async t=>{
+ const {w,d,run}=await fixture();t.after(()=>w.close());w.securityPayload=payload;
+ run(`$('#view-content').innerHTML=table([securityPayload],['<tr><td>safe</td></tr>'],'security-table')`);
+ const heading=d.querySelector('#view-content th');assert(heading.textContent.includes(payload));assert.equal(heading.getAttribute('data-label'),payload);
+ assert.equal(d.querySelector('#view-content img,#view-content svg,#view-content [onerror]'),null);
+});
