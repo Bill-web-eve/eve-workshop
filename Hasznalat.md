@@ -833,6 +833,6 @@ A külön frissítő a saját futtatókörnyezetének másolatából dolgozik. M
 
 A karakterek, tokenek, tervek, foglalások, holdak és beállítások külön felhasználói mappája megmarad. A telepítéshez hely kell a letöltésnek, a segédfolyamatnak, az új appnak és a korábbi példánynak, továbbá írható alkalmazáskönyvtár szükséges. Lemezképről vagy fejlesztői forrásból futó példányhoz előbb a teljes telepítőt kell telepíteni.
 
-A jelenlegi 1.8.0 kiadásban még nincs frissítő. Az első, ezt tartalmazó verziót egyszer kézzel kell telepíteni. Ha a legfrissebb kiadáshoz még nincs aláírt frissítési adat, ezt külön jelzi. Böngészőből az app fájljai nem cserélhetők le.
+Az 1.9.0 az első frissítőt tartalmazó kiadás. Az 1.8.0 vagy korábbi változatról egyszer kézzel kell telepíteni; a későbbi stabil verziók már az alkalmazásból telepíthetők. Ha a legfrissebb kiadáshoz még nincs aláírt frissítési adat, ezt külön jelzi. Böngészőből az app fájljai nem cserélhetők le.
 
 A saját, ingyenes frissítési aláírás különbözik az Apple/Microsoft kiadói tanúsítványától. Macen a rendszer továbbra is újra kérheti a preview engedélyeit. A frissítő nem módosítja a rendszer biztonsági vagy adatvédelmi beállításait.

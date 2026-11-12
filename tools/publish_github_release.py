@@ -14,7 +14,7 @@ from urllib.parse import quote
 ROOT = Path(__file__).resolve().parents[1]
 import sys
 if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
-MANIFEST = ROOT / 'release-assets/v1.8.0/manifest.json'
+MANIFEST = ROOT / 'release-assets/v1.9.0/manifest.json'
 
 
 def checked_bundle(manifest_path):

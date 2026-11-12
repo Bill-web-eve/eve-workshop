@@ -15,13 +15,15 @@ from unittest.mock import patch, Mock
 import urllib.error
 import zipfile
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from muhely import __version__
+# A fixed old-client fixture keeps upgrade/rollback cases stable across releases.
+FIXTURE_CURRENT_VERSION = '1.8.0'
 from muhely.store import Store
 from muhely.updates import Updates, UpdateError, REPO, canonical, verify_document, strict_json, installation, asset_valid, atomic_json
 from muhely.update_install import extract_archive, payload_version, replace_application, backup_database, launch_helper, wait_process, ticket_folder
 
 class UpdateTests(unittest.TestCase):
     def setUp(self):
+        baseline=patch('muhely.updates.__version__',FIXTURE_CURRENT_VERSION);baseline.start();self.addCleanup(baseline.stop)
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
         self.store=Store(self.root/'profile');self.private=Ed25519PrivateKey.generate();self.key=self.private.public_key()
         self.bytes=b'verified archive';self.now=time.time()
@@ -192,7 +194,7 @@ class RestartAndInstallTests(unittest.TestCase):
         entries.append(('EVE Muhely/app/muhely/__init__.py',b"__version__='1.9.0'\n"))
         archive=self.archive(entries);(folder/'archive.zip').write_bytes(archive.read_bytes())
         p=copy.deepcopy(self.payload);p['assets']['windows-x64'].update(size=archive.stat().st_size,sha256=hashlib.sha256(archive.read_bytes()).hexdigest())
-        atomic_json(folder/'receipt.json',{'document':self.sign(p),'platform':'windows-x64','target':str(target),'backend_pid':12345,'created':time.time(),'current_version':__version__})
+        atomic_json(folder/'receipt.json',{'document':self.sign(p),'platform':'windows-x64','target':str(target),'backend_pid':12345,'created':time.time(),'current_version':FIXTURE_CURRENT_VERSION})
         atomic_json(folder/'handoff.json',{'parent_pid':23456,'profile':str(self.store.folder),'origin':'http://127.0.0.1:8765'})
         with patch('muhely.updates.trust_key',return_value=self.key),patch('muhely.update_install.wait_process') as wait,patch('muhely.update_install.subprocess.Popen') as start,patch('muhely.update_install.verify_restart') as healthy:
             self.assertEqual(apply_update(folder),0)

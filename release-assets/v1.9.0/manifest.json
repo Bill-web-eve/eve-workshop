@@ -1,0 +1,38 @@
+{
+  "tag": "v1.9.0",
+  "title": "EVE Workshop 1.9.0 \u2013 Signed application updates",
+  "assets": [
+    {
+      "name": "EVE_Muhely-1.9.0-Windows11-x64.sha256",
+      "sha256": "88abd5e8ce9066116669bb33d8737fc4a4603409fe1b0bdf02ae8fac035ec57d"
+    },
+    {
+      "name": "EVE_Muhely-1.9.0-Windows11-x64.zip",
+      "sha256": "3d1f619d2ca2b6d446de3ef4fb1084dcf70a491fb5b866ea4ea5e2b4eadfd87a"
+    },
+    {
+      "name": "EVE_Muhely-1.9.0-macOS-AppleSilicon.dmg",
+      "sha256": "2fdc40204fd7652bb8de1464fdebf852d07f7e8f287876322321cbe55f6aae80"
+    },
+    {
+      "name": "EVE_Muhely-1.9.0-macOS-AppleSilicon.sha256",
+      "sha256": "8804efc2bae7e647801767f810f1a35f850ab3d980678f3051efd9c30ef115a4"
+    },
+    {
+      "name": "EVE_Muhely-Telepites.txt",
+      "sha256": "a4ceb29831a769ba1cf307cc58d8fe8eda1dce021f1039a341a0407f58697118"
+    },
+    {
+      "name": "EVE_Muhely-Windows-Telepites.txt",
+      "sha256": "ff2fe7fbdceca23aac7ea64de7a6cf6aec44a632e424db2c0892bd5c0a3246a8"
+    },
+    {
+      "name": "EVE_Muhely-1.9.0-macOS-AppleSilicon-update.zip",
+      "sha256": "501b35090568a456db9e58147e89347c9969298e2314b85695b0756f73709106"
+    },
+    {
+      "name": "update.json",
+      "sha256": "14252a756f594b27bc5f98c97839d4312f181a32c479d8b003a51b307dc17ce7"
+    }
+  ]
+}

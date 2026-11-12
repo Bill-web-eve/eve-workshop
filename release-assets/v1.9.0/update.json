@@ -1,0 +1,22 @@
+{
+  "payload": {
+    "schema": 1,
+    "version": "1.9.0",
+    "notes_url": "https://github.com/Bill-web-eve/eve-workshop/releases/tag/v1.9.0",
+    "assets": {
+      "macos-arm64": {
+        "name": "EVE_Muhely-1.9.0-macOS-AppleSilicon-update.zip",
+        "url": "https://github.com/Bill-web-eve/eve-workshop/releases/download/v1.9.0/EVE_Muhely-1.9.0-macOS-AppleSilicon-update.zip",
+        "size": 29316963,
+        "sha256": "501b35090568a456db9e58147e89347c9969298e2314b85695b0756f73709106"
+      },
+      "windows-x64": {
+        "name": "EVE_Muhely-1.9.0-Windows11-x64.zip",
+        "url": "https://github.com/Bill-web-eve/eve-workshop/releases/download/v1.9.0/EVE_Muhely-1.9.0-Windows11-x64.zip",
+        "size": 29118262,
+        "sha256": "3d1f619d2ca2b6d446de3ef4fb1084dcf70a491fb5b866ea4ea5e2b4eadfd87a"
+      }
+    }
+  },
+  "signature": "ICEfnARFx8fX+ND1GkTgBJ3IUdqhBjSXpRFwW4qx6B2cU4iFT4xqDMPfqaDL1NcP1gkHOM2C3HilmVWjwyEmAA=="
+}

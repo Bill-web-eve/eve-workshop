@@ -4,15 +4,15 @@ Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple S
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.8.0**, **Windows 11 x64 1.8.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.9.0**, **Windows 11 x64 1.9.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
-## Fejlesztés alatt: alkalmazáson belüli frissítés
+## Az 1.9.0 kiadás újdonságai
 
-A következő kiadáshoz elkészült a **Beállítások → Frissítések** felület: napi verzióellenőrzés, új verziót jelző sáv és **Letöltés és újraindítás** gomb. A csomagokat saját Ed25519-aláírás hitelesíti; a külön frissítő megvárja az app leállását, adatbázismentést készít, egyben cseréli az alkalmazást, majd ellenőrzi az újraindított verziót. A személyes adatok külön mappája megmarad. A Windowsos teljes frissítési próbát a natív CI-munkafolyamat tartalmazza.
+Elérhető a **Beállítások → Frissítések** felület: napi verzióellenőrzés, új verziót jelző sáv és **Letöltés és újraindítás** gomb. A csomagokat saját Ed25519-aláírás hitelesíti; a külön frissítő megvárja az app leállását, adatbázismentést készít, egyben cseréli az alkalmazást, majd ellenőrzi az újraindított verziót. A személyes adatok külön mappája megmarad. A Windowsos teljes frissítési próbát a natív CI-munkafolyamat tartalmazza.
 
-Az **1.8.0 telepítőben még nincs frissítő**: az első ezt tartalmazó kiadást egyszer kézzel kell telepíteni. Ez a forrásváltozás nem jelent új release-t. Csomagolási és aláírási útmutató: [UPDATING.md](UPDATING.md).
+Az **1.9.0 kiadást egyszer kézzel kell telepíteni**: az 1.8.0 és korábbi verziók még nem tartalmaznak frissítőt. Ezután a későbbi stabil kiadásokat az alkalmazásból lehet telepíteni. Csomagolási és aláírási útmutató: [UPDATING.md](UPDATING.md).
 
 ## Mit tud?
 

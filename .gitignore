@@ -126,3 +126,9 @@ runtime/
 
 # Signed Mac update transport (verified by the release manifest).
 !release-assets/v*/EVE_Muhely-*-macOS-AppleSilicon-update.zip
+
+# Reviewed 1.9.0 signed application updates release.
+!release-assets/v1.9.0/EVE_Muhely-1.9.0-macOS-AppleSilicon.dmg
+!release-assets/v1.9.0/EVE_Muhely-1.9.0-macOS-AppleSilicon.sha256
+!release-assets/v1.9.0/EVE_Muhely-1.9.0-Windows11-x64.zip
+!release-assets/v1.9.0/EVE_Muhely-1.9.0-Windows11-x64.sha256

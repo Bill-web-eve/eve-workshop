@@ -21,7 +21,7 @@ The helper repeats signature/hash validation, rejects archive traversal, aliases
 
 Files used by the updater live in the profile's `updates` directory. Database backups live in `backups`. Failed update status appears in Settings → Updates; detailed helper diagnostics are in `updates/TICKET/install.log`. Old application copies are retained beside the installation; they can be removed manually after confirming the new version works. Automatic updates download/install only on an explicit user action. The daily automatic operation only checks metadata.
 
-Source/developer launches and read-only installations require manual installation. The first updater-enabled release must be installed manually, since released 1.8.0 clients do not contain an updater. This feature commit does not publish a new version or overwrite the already installed development Mac app.
+Source/developer launches and read-only installations require manual installation. The first updater-enabled release must be installed manually, since released 1.8.0 clients do not contain an updater. Version 1.9.0 is the first updater-enabled release. Building a public release does not replace the separately installed development Mac app.
 
 ## Checks
 
