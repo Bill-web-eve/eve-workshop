@@ -63,8 +63,8 @@ globalThis.EveDesktop=(()=>{
       await fetch('/');const response=await fetch('/api/state');
       if(!response.ok)throw Error('shutdown');
       {const current=await response.json();const stopped=await fetch('/api/shutdown',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':current.csrf},body:'{}'});if(!stopped.ok)throw Error('shutdown');}
-      await send('stopped');
-    }catch(e){if(e instanceof TypeError)await send('stopped');else await send('quitFailed');}
+      await send('stopped');return true;
+    }catch(e){if(e instanceof TypeError){await send('stopped');return true;}await send('quitFailed');return false;}
   }
   if(active){
     document.documentElement.dataset.desktop=windows?'windows':'mac';
@@ -86,6 +86,6 @@ globalThis.EveDesktop=(()=>{
     const query=new URLSearchParams({intel_window:kind});for(const key of ['character_id','region','center'])if(Number.isSafeInteger(options[key])&&options[key]>0)query.set(key,options[key]);if(options.history)query.set('history','1');
     const child=window.open('/?'+query,'eve-intel-'+kind,'popup,width='+(kind==='map'?1200:700)+',height=800');return child?Promise.resolve({opened:true}):Promise.reject(Error('A külön ablakot a böngésző letiltotta. Engedélyezd a felugró ablakokat.'));
   }
-  return {capturePreviewKey:capturing=>send('previewKeyCapture',{capturing}),syncPreviewMining:data=>send('previewMining',{data}),previewStatus:()=>send('previewStatus'),refreshPreview:()=>send('previewRefresh'),configurePreview:options=>send('previewConfigure',{options}),previewPermission:kind=>send('previewPermission',{kind}),activatePreview:key=>send('previewActivate',{key}),cyclePreview:direction=>send('previewCycle',{direction}),active,platform:windows?'windows':macHandler?'mac':'browser',overlayAvailable:active,saveBlob,openIntelWindow,intelOverlayStatus:()=>send('intelOverlayStatus'),configureIntelOverlay:options=>send('configureIntelOverlay',{options}),syncIntelOverlay:data=>send('syncIntelOverlay',{data}),openExternal:url=>send('external',{url}),chooseIntelFolder:()=>send('chooseIntelFolder'),authorize,prepareQuit,shutdown,notificationStatus:()=>send('notificationStatus'),requestNotifications:()=>send('requestNotifications'),notify:content=>send('notify',content),quit:shutdown};
+  return {installUpdate:ticket=>send('installUpdate',{ticket}),capturePreviewKey:capturing=>send('previewKeyCapture',{capturing}),syncPreviewMining:data=>send('previewMining',{data}),previewStatus:()=>send('previewStatus'),refreshPreview:()=>send('previewRefresh'),configurePreview:options=>send('previewConfigure',{options}),previewPermission:kind=>send('previewPermission',{kind}),activatePreview:key=>send('previewActivate',{key}),cyclePreview:direction=>send('previewCycle',{direction}),active,platform:windows?'windows':macHandler?'mac':'browser',overlayAvailable:active,saveBlob,openIntelWindow,intelOverlayStatus:()=>send('intelOverlayStatus'),configureIntelOverlay:options=>send('configureIntelOverlay',{options}),syncIntelOverlay:data=>send('syncIntelOverlay',{data}),openExternal:url=>send('external',{url}),chooseIntelFolder:()=>send('chooseIntelFolder'),authorize,prepareQuit,shutdown,notificationStatus:()=>send('notificationStatus'),requestNotifications:()=>send('requestNotifications'),notify:content=>send('notify',content),quit:shutdown};
 })();
 async function openEveAuthorization(auth){return EveDesktop.authorize(auth);}

@@ -3,6 +3,12 @@ on:
   push:
     branches: [main]
     paths:
+      - muhely/updates.py
+      - muhely/update_install.py
+      - data/update-public-key.json
+      - static/updates.js
+      - desktop.py
+      - windows_update_smoke.py
       - muhely/windows_window.py
       - muhely/windows_overlay.py
       - muhely/windows_preview.py

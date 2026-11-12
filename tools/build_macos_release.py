@@ -34,6 +34,7 @@ def stage_source(target,config):
     for name in ['Hasznalat.md','UserGuide.en.md']:shutil.copy2(SOURCE/name,target/name)
     shutil.copy2(SOURCE/'data/catalog.sqlite3',target/'data/catalog.sqlite3')
     shutil.copy2(SOURCE/'data/intel_universe.json',target/'data/intel_universe.json')
+    shutil.copy2(SOURCE/'data/update-public-key.json',target/'data/update-public-key.json')
     (target/'data/defaults.json').write_text(json.dumps({'client_id':config['client_id']})+'\n',encoding='utf-8')
     licenses=target/'licenses';licenses.mkdir()
     runtime_license=Path(sys.base_prefix)/'lib'/f'python{sys.version_info.major}.{sys.version_info.minor}'/'LICENSE.txt'
@@ -159,6 +160,18 @@ Hivatalos Apple-útmutató: https://support.apple.com/102445
     dmg=output/(name+'.dmg')
     subprocess.run(['/usr/bin/hdiutil','create','-volname',f'EVE Muhely {version}','-srcfolder',str(disk),'-fs','HFS+','-format','UDZO','-ov',str(dmg)],check=True)
     subprocess.run(['/usr/bin/hdiutil','verify',str(dmg)],check=True)
+    # Signed update transport preserves internal framework symlinks and modes.
+    import zipfile,stat
+    update_zip=output/(name+'-update.zip')
+    with zipfile.ZipFile(update_zip,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+        for base,dirs,files in os.walk(app,followlinks=False):
+            for item in sorted(dirs+files):
+                path=Path(base)/item;relative=app.name+'/'+path.relative_to(app).as_posix()
+                if path.is_symlink():
+                    info=zipfile.ZipInfo(relative);info.create_system=3;info.external_attr=(stat.S_IFLNK|0o777)<<16;z.writestr(info,os.readlink(path).encode())
+                elif path.is_file():z.write(path,relative)
+    with zipfile.ZipFile(update_zip) as z:
+        if z.testzip():raise RuntimeError('Invalid Mac update ZIP')
     checksum=hashlib.sha256(dmg.read_bytes()).hexdigest()
     (output/(name+'.sha256')).write_text(checksum+'  '+dmg.name+'\n')
     (output/'EVE_Muhely-Telepites.txt').write_text(instructions,encoding='utf-8')

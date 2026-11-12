@@ -110,7 +110,18 @@ def main():
     parser.add_argument('--data-dir',type=Path)
     parser.add_argument('--self-test',action='store_true',help=argparse.SUPPRESS)
     parser.add_argument('--shutdown',action='store_true',help=argparse.SUPPRESS)
+    parser.add_argument('--install-update',help=argparse.SUPPRESS)
+    parser.add_argument('--apply-update',type=Path,help=argparse.SUPPRESS)
+    parser.add_argument('--parent-pid',type=int,help=argparse.SUPPRESS)
     args=parser.parse_args()
+    if args.apply_update:
+        from muhely.update_install import apply_update
+        raise SystemExit(apply_update(args.apply_update))
+    if args.install_update:
+        from muhely.update_install import launch_helper
+        from muhely.store import default_data_dir
+        launch_helper(args.data_dir or default_data_dir(),args.install_update,f'http://127.0.0.1:{args.port}',args.parent_pid)
+        return
     if not 1024<=args.port<=65535:parser.error('A port 1024 és 65535 közé essen.')
     if args.shutdown:
         if not stop_backend(f'http://127.0.0.1:{args.port}'):raise SystemExit('Could not stop the local EVE service')

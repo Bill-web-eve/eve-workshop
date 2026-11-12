@@ -271,6 +271,15 @@ static BOOL StartService(NSString **logPath) {return RunBackend(logPath,@[@"--no
     if (!message.frameInfo.mainFrame || ![self localURL:message.frameInfo.request.URL] || ![self managedWeb:message.webView] || ![message.body isKindOfClass:NSDictionary.class]) {reply(nil,([self english]?@"Untrusted origin":@"Nem megbízható eredet."));return;}
     NSDictionary *body=message.body;NSString *action=body[@"action"];
     if(message.webView!=self.web && ![@[@"clipboard",@"preferences",@"external",@"activate",@"openIntelWindow"] containsObject:action]){reply(nil,([self english]?@"Main window action required":@"Ez a művelet csak a főablakból érhető el."));return;}
+    if([action isEqual:@"installUpdate"]){
+        NSString *ticket=body[@"ticket"];
+        NSRegularExpression *pattern=[NSRegularExpression regularExpressionWithPattern:@"^[a-f0-9]{32}$" options:0 error:NULL];
+        if(![ticket isKindOfClass:NSString.class]||ticket.length!=32||[pattern numberOfMatchesInString:ticket options:0 range:NSMakeRange(0,ticket.length)]!=1){reply(nil,([self english]?@"Invalid update request.":@"Hibás frissítési kérés."));return;}
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0),^{
+            BOOL ok=RunBackend(NULL,@[@"--install-update",ticket,@"--parent-pid",[@(getpid()) stringValue]]);
+            dispatch_async(dispatch_get_main_queue(),^{reply(ok?@{@"started":@YES}:nil,ok?nil:([self english]?@"Could not prepare the update. Open Settings → Updates for details.":@"A frissítés nem készíthető elő. Nézd meg a Beállítások → Frissítések oldalt."));});
+        });return;
+    }
     if([@[@"previewKeyCapture",@"previewMining",@"previewStatus",@"previewRefresh",@"previewConfigure",@"previewPermission",@"previewActivate",@"previewCycle"] containsObject:action]){
         self.preview.english=[self english];self.preview.light=[self.window.appearance.name isEqual:NSAppearanceNameAqua];
         if([action isEqual:@"previewPermission"]){

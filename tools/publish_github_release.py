@@ -12,6 +12,8 @@ import time
 from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
+import sys
+if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
 MANIFEST = ROOT / 'release-assets/v1.8.0/manifest.json'
 
 
@@ -37,6 +39,16 @@ def checked_bundle(manifest_path):
         files.append((path, asset['sha256']))
     if not files:
         raise RuntimeError('No release assets')
+    # New updater-enabled releases must include authenticated update metadata.
+    match=re.fullmatch(r'v(\d+)\.(\d+)\.(\d+)',data['tag'])
+    if 'update.json' in names or match and tuple(map(int,match.groups())) >= (1,9,0):
+        from muhely.updates import verify_document,strict_json,asset_valid
+        if 'update.json' not in names:raise RuntimeError('Missing signed update descriptor')
+        payload=verify_document(strict_json((manifest_path.parent/'update.json').read_bytes()))
+        if 'v'+payload['version']!=data['tag']:raise RuntimeError('Update version does not match release')
+        for asset in payload['assets'].values():
+            if asset['name'] not in names:raise RuntimeError('Update archive missing from release manifest')
+            asset_valid(manifest_path.parent/asset['name'],asset)
     data['body'] = (manifest_path.parent / 'notes.md').read_text(encoding='utf-8')
     return data, files
 

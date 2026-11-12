@@ -822,3 +822,17 @@ Crystal replacement/loading is not reliably logged. **Click the crystal icon** t
 The module name is its last relevant log mention. Exact hold volume/percentage, unloading and the active state of every laser are not reliably available from Gamelogs and are not displayed. Badges indicate events, not continuous telemetry.
 
 The character name in the eve-preview title bar **flashes red for 10 seconds after incoming damage**. Each new hit restarts the timer. Only positive incoming ship-damage combat log lines trigger it: outgoing damage, misses and historical lines do not. The Gamelogs monitor above must be enabled; no ESI request is required. Flashing is independent of capture frames and stops automatically after the last hit.
+
+## Application updates
+
+Open **Settings → Updates**. The main native Mac or Windows window checks for a newer stable release on startup when the last check was at least 24 hours ago. Turn off **Check for updates automatically every day** to stop scheduled checks; **Check for updates** still works manually. Detached intel windows do not schedule additional checks. No EVE login, GitHub account or personal token is required.
+
+An available version appears in a compact banner. **Download and restart** downloads the correct platform archive, verifies its size, SHA-256 and Ed25519 signature against the public key embedded in the installed app, and proceeds to installation. Download and verification progress are displayed. Save/apply pending changes and finish any current EVE data refresh first. Merely finding an update never installs it.
+
+The native shell starts a separate updater from a private copy of its runtime. It then uses the normal complete shutdown path, including preview, overlay and detached windows. The updater waits for the main window and service to exit, makes a SQLite backup in the profile's `backups` directory, and replaces the application directory. It retains the old app beside the installation under a hidden `.previous-…` name. If the directory swap fails, the original directory is restored. After restart it checks that the local service reports the expected new version. A restart failure retains the new app, the previous copy and the database backup for recovery; it does not automatically roll back a potentially migrated database.
+
+Characters, encrypted credentials, plans, reservations, moons, settings and logs remain in the separate user-data directory. The updater never replaces that directory. Installation needs sufficient free space for the download, the helper, the new app and retained previous copy, and write permission to the app's parent folder. A read-only disk image or source/developer installation cannot update itself; install the complete updater-enabled package first.
+
+The current 1.8.0 release predates the updater. The first release containing this feature must be installed manually once. An older release without signed update metadata is shown as **No signed update has been published yet**, rather than being treated as proof that no newer release exists. Browser use can display update status but cannot replace an installed app.
+
+The free update signature authenticates our update archive; it is separate from an Apple Developer ID or Windows publisher certificate. macOS may still request preview permissions again after an unsigned app update. No Gatekeeper, SmartScreen or privacy setting is changed by the updater.

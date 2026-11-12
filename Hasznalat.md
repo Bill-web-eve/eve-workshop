@@ -822,3 +822,17 @@ A kristály cseréjét/betöltését a napló nem jelzi megbízhatóan. A **kris
 A modul neve csak az utolsó megfelelő naplóemlítésből ismert. A raktér pontos m³-értékét/telítettségi százalékát, az ürítést és minden egyes lézer aktív állapotát nem mutatja az alkalmazás, mert ezek a Gamelogs alapján nem állapíthatók meg biztosan. Az ikonok eseményjelzések, nem folyamatos telemetria.
 
 Az eve-preview névcsíkján a karakter neve **pirosan villog a beérkező sebzés utáni 10 másodpercben**. Az újabb találat meghosszabbítja a jelzést. Kizárólag a saját hajóra érkező, pozitív sebzésű combat naplóüzenet váltja ki: kiosztott sebzés, mellélövés és régi naplóbejegyzés nem. A jelzéshez a fenti Gamelogs-figyelésnek bekapcsolva kell lennie; ESI-lekérés nem szükséges. A villogás a képfelvételtől függetlenül működik, és a találatok megszűnése után automatikusan leáll.
+
+## Alkalmazásfrissítés
+
+A **Beállítások → Frissítések** oldalon kapcsolható a napi automatikus verzióellenőrzés, és kézzel is indítható keresés. Induláskor csak akkor kérdez újra, ha az előző ellenőrzés óta legalább 24 óra eltelt. Az intel külön ablakai nem indítanak plusz ellenőrzéseket. EVE-belépés, GitHub-fiók és személyes token nem kell.
+
+Új stabil verziónál egy kompakt sáv jelzi a frissítést. A **Letöltés és újraindítás** gomb letölti a megfelelő platform csomagját, ellenőrzi a méretet, a SHA-256 összeget és a telepített appba épített nyilvános kulccsal az Ed25519-aláírást, majd elindítja a telepítést. A letöltés és ellenőrzés állapota látható. Előbb mentsd/alkalmazd a módosításokat, és várd meg az aktuális EVE-adatfrissítést. A verzió megtalálása önmagában nem telepít semmit.
+
+A külön frissítő a saját futtatókörnyezetének másolatából dolgozik. Megvárja a főablak és a szolgáltatás teljes leállását, beleértve a preview-t és a külön ablakokat, majd SQLite-mentést készít a profil `backups` könyvtárába. Az alkalmazásmappát egyben cseréli; az előző példány a telepítés mellett, rejtett `.previous-…` nevű mappában megmarad. Sikertelen fájlcserekor visszaállítja az eredetit. Újraindítás után ellenőrzi, hogy a szolgáltatás a várt új verziót jelenti-e. Sikertelen indításnál az új app, a régi példány és az adatbázismentés is megmarad; egy esetleg már átalakított adatbázist nem állít vissza automatikusan.
+
+A karakterek, tokenek, tervek, foglalások, holdak és beállítások külön felhasználói mappája megmarad. A telepítéshez hely kell a letöltésnek, a segédfolyamatnak, az új appnak és a korábbi példánynak, továbbá írható alkalmazáskönyvtár szükséges. Lemezképről vagy fejlesztői forrásból futó példányhoz előbb a teljes telepítőt kell telepíteni.
+
+A jelenlegi 1.8.0 kiadásban még nincs frissítő. Az első, ezt tartalmazó verziót egyszer kézzel kell telepíteni. Ha a legfrissebb kiadáshoz még nincs aláírt frissítési adat, ezt külön jelzi. Böngészőből az app fájljai nem cserélhetők le.
+
+A saját, ingyenes frissítési aláírás különbözik az Apple/Microsoft kiadói tanúsítványától. Macen a rendszer továbbra is újra kérheti a preview engedélyeit. A frissítő nem módosítja a rendszer biztonsági vagy adatvédelmi beállításait.

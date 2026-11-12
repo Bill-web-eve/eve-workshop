@@ -41,6 +41,7 @@ from .asset_locations import AssetLocations
 from .learning_clones import LearningCloneWatch
 from .boosts import BoostCounter,discover as boost_channels
 from .preview_mining import PreviewMining
+from .updates import Updates
 from . import stable_plans
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -76,6 +77,7 @@ class App:
         self.learning_clones=LearningCloneWatch(self.store,self.eve)
         self.boosts=BoostCounter(self.store)
         self.preview_mining=PreviewMining(self.store)
+        self.updates=Updates(self.store)
 
     def desktop_auth_start(self, url):
         """One-use browser handoff; OAuth codes and tokens never enter the UI."""
@@ -812,7 +814,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'app': 'eve-muhely', 'version': __version__})
             if path == '/':
                 return self.send(200, (ROOT/'static/index.html').read_bytes(), 'text/html; charset=utf-8', cookie=True)
-            if path in ['/preview.js', '/research.js', '/readiness.js', '/learning-clones.js', '/locations.js', '/market-history.js', '/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
+            if path in ['/updates.js', '/preview.js', '/research.js', '/readiness.js', '/learning-clones.js', '/locations.js', '/market-history.js', '/invention.js', '/boosts.js', '/reservations.js', '/contracts.js', '/trade.js', '/battle.js', '/fleet.js', '/assets.js', '/jobs.js', '/app.js', '/i18n.js', '/i18n-en.js', '/theme.js', '/tables.js', '/numbers.js', '/corporations.js', '/style.css', '/graph.js', '/graph.css', '/skills.js', '/pi.js', '/mining.js', '/moons.js', '/moon-transfer.js', '/costs.js', '/prices.js', '/economics.js', '/extractions.js', '/settings.js', '/multibuy.js', '/accounts.js', '/schedule.js', '/schedule-graph.js', '/documentation.js', '/desktop.js', '/notifications.js', '/activity.js', '/intel.js', '/intel-map.js', '/app-window-icon.png', '/icon.svg']:
                 # Types are server-owned constants, not derived MIME metadata
                 # from an untrusted request path or an OS MIME registration.
                 content_type={'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
@@ -855,6 +857,7 @@ class Handler(BaseHTTPRequestHandler):
                 radius=integer(int(query.get('radius',['5'])[0]),'Jump',12,1)
                 return self.send(200,self.app.intel.dashboard(center,radius,query.get('history',['0'])[0]=='1',region=integer(int(query.get('region',['0'])[0]),'Régió',2**31-1,0) or None,character_id=integer(int(query.get('character_id',['0'])[0]),'Karakter',2**31-1,0) or None))
             if path == '/api/intel/channels':return self.send(200,{'channels':self.app.intel.channels(query.get('folder',[''])[0])})
+            if path == '/api/updates':return self.send(200,self.app.updates.snapshot())
             if path == '/api/preview/mining':return self.send(200,self.app.preview_mining.snapshot())
             if path == '/api/boosts':return self.send(200,self.app.boosts.snapshot())
             if path == '/api/boosts/channels':return self.send(200,{'channels':boost_channels(query.get('folder',[''])[0])})
@@ -1001,7 +1004,12 @@ class Handler(BaseHTTPRequestHandler):
             path = urllib.parse.urlsplit(self.path).path
             query=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             corporation_id=self.app.scope_id(query.get('corporation_id',[None])[0])
-            if path == '/api/learning-clones/refresh':return self.send(200,self.app.learning_clones.request())
+            if path == '/api/updates/preferences':return self.send(200,self.app.updates.configure(data))
+            elif path in ['/api/updates/check','/api/updates/download']:
+                if set(data)-{'manual'} or 'manual' in data and type(data['manual']) is not bool:raise PlanningError('Invalid update request')
+                if path.endswith('/download') and self.app.task['running']:raise PlanningError('update_task_running')
+                return self.send(200,self.app.updates.request('check' if path.endswith('/check') else 'download',manual=data.get('manual',True)))
+            elif path == '/api/learning-clones/refresh':return self.send(200,self.app.learning_clones.request())
             elif path == '/api/learning-clones/claim':
                 from .learning_clones import alerts
                 return self.send(200,{'items':notifications.claim(self.app.store,alerts(self.app.store))})
@@ -1195,6 +1203,7 @@ class Server(ThreadingHTTPServer):
         self._workers_stopped=True
         self.app.preview_mining.closed=True
         self.app.boosts.close()
+        self.app.updates.close()
         self.app.asset_locations.stop()
         self.app.learning_clones.stop()
         self.app.fleet.stop()

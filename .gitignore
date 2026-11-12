@@ -123,3 +123,6 @@ runtime/
 !release-assets/v1.8.0/EVE_Muhely-1.8.0-macOS-AppleSilicon.sha256
 !release-assets/v1.8.0/EVE_Muhely-1.8.0-Windows11-x64.zip
 !release-assets/v1.8.0/EVE_Muhely-1.8.0-Windows11-x64.sha256
+
+# Signed Mac update transport (verified by the release manifest).
+!release-assets/v*/EVE_Muhely-*-macOS-AppleSilicon-update.zip

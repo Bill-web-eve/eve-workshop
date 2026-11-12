@@ -78,6 +78,15 @@ class WindowsWindowTests(unittest.TestCase):
         self.assertEqual(set(saved),{'language','notifications'})
         self.assertTrue(WindowHost(self.webview,self.host.origin,self.tmp.name).notification_granted)
 
+    def test_updater_is_main_window_only_and_passes_an_opaque_ticket_to_local_installer(self):
+        with patch('muhely.update_install.launch_helper',return_value={'started':True}) as launch:
+            with self.assertRaisesRegex(ValueError,'Main window'):
+                self.host.dispatch(Mock(),self.host.origin,{'action':'installUpdate','ticket':'a'*32})
+            launch.assert_not_called()
+            result=self.host.dispatch(self.window,self.host.origin,{'action':'installUpdate','ticket':'a'*32,'url':'https://evil.invalid','path':'C:/other'})
+            self.assertTrue(result['started']);self.assertEqual(launch.call_args.args[:3],(self.host.folder,'a'*32,self.host.origin))
+            self.assertEqual(len(launch.call_args.args),4)
+
     def test_unknown_native_actions_and_non_dict_messages_are_rejected(self):
         for body in [{},[],{'action':'execute'},{'action':'selfTestResult'}]:
             with self.subTest(body=body),self.assertRaises(ValueError):self.host.dispatch(self.window,self.host.origin,body)

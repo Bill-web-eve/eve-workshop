@@ -218,6 +218,10 @@ class WindowHost:
         if action=='notify':return self._notification(body)
         if action in {'intelOverlayStatus','configureIntelOverlay','syncIntelOverlay'}:return self._overlay_action(action,body)
         if action in {'previewStatus','previewRefresh','previewConfigure','previewKeyCapture','previewMining','previewActivate','previewCycle'}:return self._preview_action(action,body)
+        if action=='installUpdate':
+            from .update_install import launch_helper
+            # Main-window-only dispatch gate above; target is derived natively.
+            return launch_helper(self.folder,body.get('ticket'),self.origin,os.getpid())
         if action=='quitCheck':
             if not self.quitting:raise ValueError('No close request is pending')
             message=('Unsaved changes or EVE requests are still in progress. Close EVE Workshop?' if self.language=='en' else 'Még nem mentett módosítás vagy folyamatban lévő lekérés van. Bezárod az EVE Műhelyt?')

@@ -106,11 +106,12 @@ def trim_other_architectures(packages):
 def stage(root,config):
     app=root/'app';(app/'muhely').mkdir(parents=True);(app/'data').mkdir()
     for file in (SOURCE/'muhely').glob('*.py'):shutil.copy2(file,app/'muhely'/file.name)
-    for name in ['desktop.py','windows_desktop.py','windows_smoke_test.py','windows_window_smoke.py']:shutil.copy2(SOURCE/name,app/name)
+    for name in ['desktop.py','windows_desktop.py','windows_smoke_test.py','windows_window_smoke.py','windows_update_smoke.py']:shutil.copy2(SOURCE/name,app/name)
     shutil.copytree(SOURCE/'static',app/'static',ignore=shutil.ignore_patterns('.DS_Store','__pycache__'))
     for name in ['Hasznalat.md','UserGuide.en.md']:shutil.copy2(SOURCE/name,app/name)
     shutil.copy2(SOURCE/'data/catalog.sqlite3',app/'data/catalog.sqlite3')
     shutil.copy2(SOURCE/'data/intel_universe.json',app/'data/intel_universe.json')
+    shutil.copy2(SOURCE/'data/update-public-key.json',app/'data/update-public-key.json')
     (app/'data/defaults.json').write_text(json.dumps(config)+'\n',encoding='utf-8')
 
 

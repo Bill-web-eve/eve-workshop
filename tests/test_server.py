@@ -13,6 +13,22 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class ServerTests(unittest.TestCase):
+    def test_update_routes_require_local_session_csrf_and_never_accept_urls(self):
+        self.assertEqual(self.request('/api/updates',Cookie='')[0],403)
+        self.assertEqual(self.request('/updates.js')[0],200)
+        self.app.updates.request=Mock(return_value={'phase':'checking'})
+        self.assertEqual(self.request('/api/updates/check',{'manual':True},Origin='https://other.invalid')[0],403)
+        self.assertEqual(self.request('/api/updates/check',{'url':'https://other.invalid'})[0],400)
+        self.app.updates.request.assert_not_called()
+        self.assertEqual(self.request('/api/updates/check',{'manual':True})[0],200)
+        self.app.updates.request.assert_called_once_with('check',manual=True)
+        self.app.task['running']=True
+        self.assertEqual(self.request('/api/updates/download',{})[0],400)
+        self.app.updates.request.assert_called_once()
+        self.app.task['running']=False
+        self.assertEqual(self.request('/api/updates/preferences',{'automatic':False})[0],200)
+        self.assertFalse(self.app.store.settings()['updates']['automatic'])
+
     def test_preview_script_is_served_without_running_production_or_esi(self):
         with patch.object(self.app,'plan',side_effect=AssertionError('Preview must not calculate production')):
             status,body,headers=self.request('/preview.js')

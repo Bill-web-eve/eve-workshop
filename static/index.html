@@ -37,6 +37,7 @@
   <script src="/schedule.js" defer></script>
   <script src="/notifications.js" defer></script>
   <script src="/learning-clones.js" defer></script>
+  <script src="/updates.js" defer></script>
   <script src="/settings.js" defer></script>
   <script src="/costs.js" defer></script>
   <script src="/prices.js" defer></script>
@@ -96,6 +97,7 @@
         <div id="settings-submenu" class="nav-submenu" hidden>
           <button data-settings-nav="notifications">Értesítések</button>
           <button data-settings-nav="intel">Intelbeállítások</button>
+          <button data-settings-nav="updates">Frissítések</button>
           <button data-settings-nav="appearance">Megjelenés és nyelv</button>
           <button data-settings-nav="market">Marketek és értékesítés</button><button data-settings-nav="structures">Struktúrák és bónuszok</button>
           <button data-settings-nav="connection">EVE-kapcsolat <span id="connection-dot" class="dot"></span></button>
@@ -113,6 +115,7 @@
 
   <main>
     <header class="topbar"><span id="breadcrumb">Műhely / Gyártási terv</span><div><span id="source-pill" class="pill">Kézi készlet</span><button id="sync" class="button compact">↻ EVE-frissítés</button></div></header>
+    <div id="update-banner" class="banner" role="status" hidden></div>
     <div id="global-error" class="banner error" role="alert" hidden></div>
     <div id="task-banner" class="banner" role="status" hidden></div>
 

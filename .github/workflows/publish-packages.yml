@@ -36,11 +36,13 @@ jobs:
           persist-credentials: false
       - name: Helyi csomagok es kozzetetel ellenorzese
         run: |
-          python3 -m unittest discover -s tests -p test_github_release.py -v
-          python3 tools/publish_github_release.py --all --check
+          python3 -m venv /tmp/eve-publish
+          /tmp/eve-publish/bin/pip install -r requirements.txt
+          /tmp/eve-publish/bin/python -m unittest discover -s tests -p test_github_release.py -v
+          /tmp/eve-publish/bin/python tools/publish_github_release.py --all --check
       - name: Ellenorzott csomagok feltoltese a Releases oldalra
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TARGET: ${{ github.sha }}
-        run: python3 tools/publish_github_release.py --all
+        run: /tmp/eve-publish/bin/python tools/publish_github_release.py --all

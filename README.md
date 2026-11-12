@@ -8,6 +8,12 @@ A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
+## Fejlesztés alatt: alkalmazáson belüli frissítés
+
+A következő kiadáshoz elkészült a **Beállítások → Frissítések** felület: napi verzióellenőrzés, új verziót jelző sáv és **Letöltés és újraindítás** gomb. A csomagokat saját Ed25519-aláírás hitelesíti; a külön frissítő megvárja az app leállását, adatbázismentést készít, egyben cseréli az alkalmazást, majd ellenőrzi az újraindított verziót. A személyes adatok külön mappája megmarad. A Windowsos teljes frissítési próbát a natív CI-munkafolyamat tartalmazza.
+
+Az **1.8.0 telepítőben még nincs frissítő**: az első ezt tartalmazó kiadást egyszer kézzel kell telepíteni. Ez a forrásváltozás nem jelent új release-t. Csomagolási és aláírási útmutató: [UPDATING.md](UPDATING.md).
+
 ## Mit tud?
 
 - Több karakter személyes készlete, blueprintjei és gyártási munkái EVE ESI kapcsolattal.
