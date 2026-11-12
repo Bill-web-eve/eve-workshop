@@ -2,6 +2,7 @@
 No real signing key, user profile, EVE window or published release is involved.
 """
 import base64
+from contextlib import closing
 import hashlib
 import json
 import os
@@ -80,7 +81,7 @@ launch_helper(profile,'a'*32,sys.argv[2],os.getpid())
         assert Path(status['previous']).exists() and Path(status['backup']).exists()
         assert (profile/'characters.enc').read_bytes()==b'opaque synthetic credential fixture'
         assert Store(profile).settings()['update_fixture']=='preserved'
-        with sqlite3.connect(status['backup']) as db:assert db.execute("select value from settings where key='update_fixture'").fetchone()[0]=='"preserved"'
+        with closing(sqlite3.connect(status['backup'])) as db:assert db.execute("select value from settings where key='update_fixture'").fetchone()[0]=='"preserved"'
         # Detached helper can finish releasing its copied DLLs after marker write.
         for _ in range(60):
             try:shutil.rmtree(folder/'helper');break

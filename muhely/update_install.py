@@ -5,6 +5,7 @@ are derived from our own packaged executable; no executable URL is UI-controlled
 """
 from __future__ import annotations
 import ast
+from contextlib import closing
 import os
 from pathlib import Path, PurePosixPath
 import plistlib
@@ -134,7 +135,8 @@ def backup_database(profile):
     if source.is_symlink(): raise UpdateError('invalid_update')
     directory = profile/'backups';directory.mkdir(mode=0o700, exist_ok=True)
     target = directory/('before-update-'+time.strftime('%Y%m%d-%H%M%S')+'-'+secrets.token_hex(4)+'.sqlite3')
-    with sqlite3.connect(source.as_uri()+'?mode=ro', uri=True) as src, sqlite3.connect(target) as dst: src.backup(dst)
+    with closing(sqlite3.connect(source.as_uri()+'?mode=ro', uri=True)) as src, closing(sqlite3.connect(target)) as dst:
+        src.backup(dst)
     target.chmod(0o600);return target
 
 

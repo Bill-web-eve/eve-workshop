@@ -146,6 +146,18 @@ class UpdateTests(unittest.TestCase):
         backup=backup_database(self.store.folder)
         with sqlite3.connect(backup) as db:self.assertIn('updates',[r[0] for r in db.execute('select key from settings')])
         self.assertEqual(secret.read_bytes(),b'untouched');self.assertEqual(backup.stat().st_mode&0o777,0o600)
+    def test_backup_closes_both_sqlite_connections_before_return(self):
+        connections=[];connect=sqlite3.connect
+        def tracked(*args,**kwargs):
+            db=connect(*args,**kwargs);connections.append(db);return db
+        with patch('muhely.update_install.sqlite3.connect',side_effect=tracked):
+            backup=backup_database(self.store.folder)
+        self.assertEqual(len(connections),2)
+        for db in connections:
+            with self.assertRaisesRegex(sqlite3.ProgrammingError,'closed'):db.execute('select 1')
+        # Also immediately rename/delete the backup, as the Windows test does.
+        renamed=backup.with_suffix('.moved');backup.rename(renamed);renamed.unlink()
+
     def test_payload_version_is_read_without_executing_source(self):
         root=self.windows(self.root/'new','1.9.0');payload_version(root,'windows-x64','1.9.0')
         with self.assertRaises(UpdateError):payload_version(root,'windows-x64','2.0.0')

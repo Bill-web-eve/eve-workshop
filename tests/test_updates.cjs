@@ -49,3 +49,10 @@ test('untrusted error text is never inserted as markup or exposed as a download 
  const f=fixture();t.after(f.close);f.set({error:'<img src=x onerror=alert(1)>',phase:'error'});f.run('paintUpdates()');assert.equal(f.w.document.querySelector('#settings-content img'),null);
  assert.equal(f.w.document.querySelectorAll('#settings-content a').length,0);
 });
+
+test('startup waits for the authenticated app state and starts only once',async t=>{
+ const f=fixture();t.after(f.close);
+ await f.w.startUpdateChecks();assert.equal(f.requests.length,0);
+ f.run("state.csrf='ready-token'");await f.w.startUpdateChecks();await f.w.startUpdateChecks();
+ assert.equal(f.requests.length,1);assert.equal(f.requests[0][0],'/api/updates/check');assert.equal(f.requests[0][1].manual,false);
+});

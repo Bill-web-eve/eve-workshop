@@ -1,6 +1,6 @@
 'use strict';
 // Only the MAIN native window schedules checks; the service deduplicates them.
-let updateData=null,updatePoll=null,updateDaily=null,updateInstallRequested=false;
+let updateData=null,updatePoll=null,updateDaily=null,updateInstallRequested=false,updateChecksStarted=false;
 const updatePhases={idle:'Még nincs ellenőrzés',checking:'Frissítések keresése…',available:'Új verzió érhető el',current:'A legújabb verziót használod',unpublished:'Még nincs közzétett, aláírt frissítés',downloading:'Frissítés letöltése…',verifying:'Aláírás és fájltartalom ellenőrzése…',ready:'A frissítés telepítésre kész',preparing:'Telepítés előkészítése…',installing:'Az alkalmazás újraindul…',error:'A frissítés nem sikerült'};
 const updateErrors={invalid_update:'A frissítési adatok érvénytelenek.',invalid_signature:'A frissítés aláírása nem érvényes. A telepítés letiltva.',invalid_archive:'A letöltött fájl nem egyezik az aláírt csomaggal.',unsafe_archive:'A frissítési csomag nem biztonságos. A telepítés letiltva.',missing_update_key:'Hiányzik a frissítések ellenőrzőkulcsa.',older_update:'Régebbi frissítési adatok érkeztek. A korábban ellenőrzött verzió megmaradt.',manual_install_required:'Ehhez a példányhoz kézi telepítés szükséges. Telepítsd a frissítőt tartalmazó teljes csomagot.',update_network_error:'A frissítési szolgáltatás nem érhető el. Próbáld újra később.',update_close_timeout:'Az alkalmazás nem állt le időben. A fájlok változatlanok.',update_install_failed:'A telepítés nem sikerült. Ellenőrizd az írási jogosultságot és a szabad helyet.',update_restart_failed:'A frissítés telepítve, de az újraindítás nem sikerült. Indítsd el az alkalmazást.',expired_update:'A letöltött frissítés lejárt. Töltsd le újra.',update_already_started:'A frissítés előkészítése már elindult. Ha nem állt le az app, keress újra frissítést.',update_task_running:'Várd meg a folyamatban lévő adatfrissítés végét.'};
 function updateText(s){return EveI18n.t(s);}
@@ -69,11 +69,11 @@ function scheduleNextUpdateCheck(){
  updateDaily=setTimeout(()=>void requestUpdates('check',false),delay);
 }
 async function startUpdateChecks(){
- if(!updateNativeMain())return;
+ if(!updateNativeMain()||updateChecksStarted||typeof state==='undefined'||!state?.csrf)return;
+ updateChecksStarted=true;
  await requestUpdates('check',false);
  scheduleNextUpdateCheck();
 }
-window.addEventListener('DOMContentLoaded',()=>void startUpdateChecks(),{once:true});
 window.addEventListener('eve-language-change',()=>{if(updateData)paintUpdates();});
 window.addEventListener('pagehide',()=>{clearTimeout(updatePoll);clearTimeout(updateDaily);});
 
