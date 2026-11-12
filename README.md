@@ -4,7 +4,7 @@ Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple S
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.7.0**, **Windows 11 x64 1.7.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.8.0**, **Windows 11 x64 1.8.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
 
@@ -21,6 +21,17 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - Választható helyi station/struktúra market buy/sell/split árakkal, külön ESI-olvasóval; a privát piac gyorsítótára elkülönül Jitától és más olvasóktól.
 - Kompakt tervenkénti bekerülés/bevétel/profit, független anyag- és eladási árforrással, Accounting/standing alapú NPC-díjakkal, megadható struktúra broker fee-vel és egyéb költségekkel.
 - Holdankénti termelés, üzemanyag-, bérleti és egyéb költségek, összesített 30 napos profit.
+
+## Az 1.8.0 kiadás újdonságai
+
+- **eve-preview Macen és Windowson:** élő EVE-ablakok kicsinyített képei, kattintásos ablakváltás, menthető méret, pozíció és sorrend. Közvetlenül felvehető következő/előző gyorsbillentyű, akár egyetlen billentyűvel; a módosító nélküli billentyűk csak az EVE előtt működnek.
+- **Naplóalapú preview-jelzések:** a karakter nevének jobb szélén bányászati figyelmeztetések, kristálycsere kézi nyugtázása és új aktivitásnál automatikus törlése. Bejövő hajósebzés után a névcsík tíz másodpercig villog. A jelzések a játék naplóiban ténylegesen elérhető eseményekre épülnek, nem folyamatos cargo- vagy modulleolvasásra.
+- **Research agentek:** a karakterek RP-adatainak közös nézete, adott napra becsült datacore-mennyiség és Jita-érték. Külön ESI-engedély és naponta egyszeri adatfrissítés; a holdadatok automatikus frissítése is napi ütemezésű.
+- **Pontosabb intel:** a regionális killértesítések is követik a beállított jump-határt; javított név- és hajófelismerés, háttérben előtöltött pilotazonosítók és rövid dscan-linkek.
+- **Kompaktabb gyártási táblák**, rövidebb fejlécek, másolható összes run és EVE-be illeszthető anyaghiánylista.
+- **Biztonsági javítások:** HTML-kimenetek, fordítások, strukturált hibák, URL-ek és HTTP-fejlécek kezelése. A CodeQL-vizsgálat után egy, szándékos helyi Boost-naplómappa-választásra vonatkozó felülvizsgálati tétel maradt; részletek: [SECURITY_REVIEW.md](SECURITY_REVIEW.md).
+- A Windows natív ablak-, overlay- és preview-próbája sikeres a GitHub Windows-környezetében, tesztablakokkal. Valódi Windowsos EVE-klienssel helyi használati próba még nem történt. Macen a képernyőolvasást és ablakváltást a felhasználó engedélyezi a rendszerbeállításokban; a tanúsítvány nélküli app frissítésénél ezt a macOS újra kérheti.
+- Üres telepítők a nyilvános Client ID-val; meglévő helyi adatok megőrzése.
 
 ## Az 1.7.0 kiadás újdonságai
 

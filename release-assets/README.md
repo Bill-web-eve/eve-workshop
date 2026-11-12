@@ -1,11 +1,13 @@
 # Kész csomagok közzététele
 
-A jelenlegi kiadás **1.5.0**, saját ablakos Mac Apple Silicon és Windows 11 x64 csomaggal, magyar–angol felülettel. Újdonságok: személyes és corp-szerződések, szerződésértesítések, implantérték-figyelés, fordítási és ablakkezelési javítások. A `v1.5.0/manifest.json` felsorolja a hat ellenőrzött mellékletet és SHA-256 összegüket.
+A legújabb előkészített kiadás **1.8.0**, saját ablakos Mac Apple Silicon és Windows 11 x64 csomaggal. Újdonságok: eve-preview mindkét platformon, beállítható gyorsbillentyűk, bányászati és sebzésjelzések, Research agentek, intel- és biztonsági javítások. A `v1.8.0/manifest.json` a hat ellenőrzött mellékletet és SHA-256 összegüket tartalmazza.
 
-A helyi kiadási commit elkészítése után a GitHub Desktopban a **Push origin** indítja a feltöltést. A main ágra érkezett kiadási változás elindítja a **Mac es Windows csomagok kozzetetele** munkafolyamatot. Siker után a csomagok itt tölthetők le: https://github.com/Bill-web-eve/eve-workshop/releases.
+A helyi kiadási commit feltöltése a GitHub Desktop **Push origin** gombjával elindítja a **Mac es Windows csomagok kozzetetele** munkafolyamatot. Csak a teljes alkalmazásteszt és a valódi Windows WebView2/overlay/preview automatizált próba sikere után publikál. A preview tesztje saját tesztablakokat használ; valódi EVE-klienssel végzett Windows-próba még nem történt.
 
-A folyamat először a teljes alkalmazástesztet futtatja, és valódi Windows WebView2-ablakokkal ellenőrzi a rögzített beépített futtatókörnyezetet. Csak mindkettő sikere után készít piszkozatot, ellenőrzi és feltölti a csomagokat, majd publikál. Megszakadt futás folytatható. Egy már publikált, módosítható kiadásból hiányzó mellékleteket is pótol, de eltérő meglévő fájlt nem ír felül és immutable kiadást nem módosít. Személyes tokenre nincs szükség: a munkafolyamat csak az adott repositoryhoz kap ideiglenes GitHub-tokent.
+Letöltések sikeres publikálás után: https://github.com/Bill-web-eve/eve-workshop/releases.
 
-Helyi ellenőrzés: `python3 tools/publish_github_release.py --all --check`. A helyi commit még nem jelent GitHub-közzétételt; a Push origin és a GitHub Actions sikeres futása szükséges.
+A folyamat a korábbi kiadások mellékleteit is ellenőrzi. Meglévő fájlt nem ír felül; eltérő tartalomnál leáll. Megszakadt feltöltés újraindítható. A GitHub csak az adott repositoryhoz ad ideiglenes közzétételi tokent; személyes token nem kell.
 
-Az ellenőrzött telepítők a repositoryban is tárolódnak, így növelik a klón méretét. A korábbi `v0.8.1` csomagjai megmaradnak. Később a fordításból közvetlenül feltölthető kiadásokkal ez a megoldás kiváltható.
+Helyi csomagellenőrzés: `python3 tools/publish_github_release.py --all --check`. A helyi commit még nem jelent közzétételt: feltöltés és sikeres GitHub Actions-futás szükséges.
+
+A telepítők üres profillal, kizárólag a nyilvános EVE Client ID-val készülnek. A már meglévő helyi felhasználói adatokat a frissítés megőrzi.
