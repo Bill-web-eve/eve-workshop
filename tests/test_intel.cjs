@@ -251,3 +251,12 @@ test('live kills do not dismiss an open region selector and paint after focus le
  intel.nodes[0].kill_groups=[killGroup()];await run('refreshIntel(true)');assert.equal(d.querySelector('#intel-region'),select);assert.equal(d.querySelector('#intel-map svg'),svg);
  select.blur();await run('refreshIntel(true)');assert.notEqual(d.querySelector('#intel-map svg'),svg);assert(d.querySelector('.intel-kill-summary'));
 });
+
+test('report ages and timestamps stay literal text and invalid system IDs cannot become navigation controls',async t=>{
+ const {w,d,run,intel}=await fixture();t.after(()=>w.close());
+ const hostile='"><img src=x onerror=alert(1)>&';w.securityReport={...intel.reports[0],timestamp:hostile,systems:[hostile],system_names:[hostile],reporter:hostile,message:hostile};
+ const original=w.EveI18n.t;w.EveI18n.t=value=>value==='{0} perce'?hostile:original(value);
+ const target=d.createElement('div');target.innerHTML=run('intelReportTable([securityReport],"security-report")');
+ assert.equal(target.querySelector('td[data-sort-value]').getAttribute('data-sort-value'),hostile);
+ assert(target.textContent.includes(hostile));assert.equal(target.querySelector('img[src="x"],[onerror],button[data-intel-locate]'),null);
+});

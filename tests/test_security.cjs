@@ -47,3 +47,11 @@ test('table headers and metadata use the same text-only encoding boundary',async
  const heading=d.querySelector('#view-content th');assert(heading.textContent.includes(payload));assert.equal(heading.getAttribute('data-label'),payload);
  assert.equal(d.querySelector('#view-content img,#view-content svg,#view-content [onerror]'),null);
 });
+
+test('inventory-wait timestamps from an exception cannot inject sorting attributes',async t=>{
+ const {w,d,run}=await fixture();t.after(()=>w.close());w.securityPayload=payload;
+ run(`deliveryWait={plan_name:securityPayload,retry_at:Date.now()/1000+100,items:[{name:securityPayload,character_name:securityPayload,assets_as_of:securityPayload,completed_at:securityPayload}]};renderDeliveryWait($('#view-content'));`);
+ const cells=[...d.querySelectorAll('#view-content td[data-sort-value]')];assert.equal(cells.length,2);
+ assert(cells.every(cell=>cell.getAttribute('data-sort-value')===payload));
+ assert.equal(d.querySelector('#view-content img,#view-content svg,#view-content [onerror],#view-content [onload]'),null);
+});
