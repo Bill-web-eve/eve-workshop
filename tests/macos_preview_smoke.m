@@ -52,6 +52,10 @@ int main(int argc,const char *argv[]){@autoreleasepool{
  NSMutableArray *ordered=[NSMutableArray new];for(NSDictionary *slot in @[p.slots[1],p.slots[0],p.slots[2]])[ordered addObject:@{@"key":slot[@"key"],@"label":slot[@"label"],@"enabled":slot[@"enabled"],@"width":slot[@"width"]}];
  require([p configure:@{@"slots":ordered}],@"reorder rejected");[p cycle:1];require([p.selected isEqual:@"b"],@"cycle ignored configured order");
  NSMutableDictionary *bad=[ordered[0] mutableCopy];bad[@"width"]=@999;require(![p configure:@{@"slots":@[bad,ordered[1],ordered[2]]}],@"invalid width accepted");
+ NSMutableDictionary *minimum=[ordered[0] mutableCopy];minimum[@"width"]=@100;
+ require([p configure:@{@"slots":@[minimum,ordered[1],ordered[2]]}]&&NSWidth(p.panels[@"b"].frame)==100,@"100px preview width rejected or clamped");
+ minimum[@"width"]=@99;require(![p configure:@{@"slots":@[minimum,ordered[1],ordered[2]]}],@"below-minimum preview width accepted");
+ require([p configure:@{@"slots":ordered}],@"restore width after minimum-size check");
  p.slots[0][@"screen"]=@"disconnected";p.slots[0][@"x"]=@1e8;p.slots[0][@"y"]=@1e8;[p renderPanels];require(NSContainsRect(NSScreen.mainScreen.visibleFrame,p.panels[@"b"].frame),@"disconnected monitor fallback outside screen");
  NSArray *alerts=@[@{@"kind":@"cargo_full",@"at":@1,@"id":@"123456789012345678901234",@"module":@"Strip Miner"},@{@"kind":@"crystal_broken",@"at":@2,@"id":@"223456789012345678901234",@"crystal":@"Common Crystal"},@{@"kind":@"rock_depleted",@"at":@3,@"id":@"323456789012345678901234"}];
  require([p syncMining:@{@"enabled":@YES,@"characters":@[@{@"name":@"PILOT A",@"alerts":alerts}]}],@"mining sync rejected");
@@ -61,7 +65,7 @@ int main(int argc,const char *argv[]){@autoreleasepool{
  require(![p syncMining:@{@"enabled":@YES,@"characters":@[@{@"name":@"Pilot A",@"alerts":@[@{@"kind":@"injected",@"at":@1}]}]}],@"unknown mining icon accepted");require(warning.miningAlerts.count==3,@"bad sync damaged existing badges");
  require([p setKeyCaptureValue:@YES]&&p.keyCapture,@"key capture rejected");require(![p setKeyCaptureValue:@1],@"numeric capture flag accepted");require([p setKeyCaptureValue:@NO]&&!p.keyCapture,@"key capture did not end");
  for(NSUInteger i=0;i<warning.miningAlerts.count;i++){NSRect badge=[warning miningBadgeRect:i];require(NSMinY(badge)>=0&&NSMaxY(badge)<=24,@"badge outside character name bar");require(NSMaxX([warning captionRect])<NSMinX([warning miningBadgeRect:0]),@"name overlaps mining badges");if(i)require(!NSIntersectsRect(badge,[warning miningBadgeRect:i-1]),@"badges overlap");}
- NSSize original=warning.frame.size;[warning setFrameSize:NSMakeSize(160,original.height)];require(NSWidth([warning captionRect])>0&&NSMaxX([warning captionRect])<NSMinX([warning miningBadgeRect:0]),@"narrow name bar layout");[warning setFrameSize:original];warning.caption=@"EVE - Alpha Joey";
+ NSSize original=warning.frame.size;[warning setFrameSize:NSMakeSize(100,original.height)];require(NSWidth([warning captionRect])>0&&NSMaxX([warning captionRect])<NSMinX([warning miningBadgeRect:0]),@"narrow name bar layout");[warning setFrameSize:original];warning.caption=@"EVE - Alpha Joey";
  if(argc>1){EvePreviewTile *tile=(id)panel.contentView;[tile display];NSRect sample=NSMakeRect(0,0,tile.bounds.size.width,24);NSBitmapImageRep *image=[tile bitmapImageRepForCachingDisplayInRect:sample];[tile cacheDisplayInRect:sample toBitmapImageRep:image];[[image representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:@(argv[1]) atomically:YES];}
  NSTimeInterval hit=NSDate.date.timeIntervalSince1970;
  require([p syncMining:@{@"enabled":@YES,@"characters":@[@{@"name":@"PILOT A",@"alerts":@[],@"last_damage":@(hit)},@{@"name":@"Pilot B",@"alerts":@[],@"last_damage":NSNull.null}]}],@"damage sync rejected");

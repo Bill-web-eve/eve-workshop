@@ -134,7 +134,7 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
                 if([slot[@"label"] isKindOfClass:NSString.class])safe[@"label"]=[slot[@"label"] substringToIndex:MIN(80,[slot[@"label"] length])];
                 if(EvePreviewBoolean(slot[@"enabled"]))safe[@"enabled"]=slot[@"enabled"];
                 for(NSString *field in @[@"width",@"x",@"y"])if([slot[field] isKindOfClass:NSNumber.class]&&isfinite([slot[field] doubleValue]))safe[field]=slot[field];
-                safe[@"width"]=@(MAX(160,MIN(900,[safe[@"width"] doubleValue])));
+                safe[@"width"]=@(MAX(100,MIN(900,[safe[@"width"] doubleValue])));
                 if([slot[@"screen"] isKindOfClass:NSString.class])safe[@"screen"]=slot[@"screen"];
                 [self.slots addObject:safe];if(self.slots.count==64)break;}
         }
@@ -217,7 +217,7 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
         if(![options[@"slots"] isKindOfClass:NSArray.class]||[options[@"slots"] count]!=self.slots.count)return NO;
         NSMutableSet *seen=[NSMutableSet new];
         for(id value in options[@"slots"]){
-            if(![value isKindOfClass:NSDictionary.class]||![value[@"key"] isKindOfClass:NSString.class]||[seen containsObject:value[@"key"]]||!EvePreviewBoolean(value[@"enabled"])||![value[@"label"] isKindOfClass:NSString.class]||[value[@"label"] length]>80||![value[@"width"] isKindOfClass:NSNumber.class]||!isfinite([value[@"width"] doubleValue])||[value[@"width"] doubleValue]<160||[value[@"width"] doubleValue]>900)return NO;
+            if(![value isKindOfClass:NSDictionary.class]||![value[@"key"] isKindOfClass:NSString.class]||[seen containsObject:value[@"key"]]||!EvePreviewBoolean(value[@"enabled"])||![value[@"label"] isKindOfClass:NSString.class]||[value[@"label"] length]>80||![value[@"width"] isKindOfClass:NSNumber.class]||!isfinite([value[@"width"] doubleValue])||[value[@"width"] doubleValue]<100||[value[@"width"] doubleValue]>900)return NO;
             NSDictionary *old=nil;for(NSDictionary *slot in self.slots)if([slot[@"key"] isEqual:value[@"key"]])old=slot;if(!old)return NO;
             NSMutableDictionary *slot=[old mutableCopy];for(NSString *key in @[@"label",@"enabled",@"width"])slot[key]=value[key];[slots addObject:slot];[seen addObject:value[@"key"]];
         }
@@ -423,7 +423,7 @@ static pid_t EvePreviewLegacyFrontPID(void){ProcessSerialNumber psn;pid_t pid=-1
     self.dragStart=NSEvent.mouseLocation;self.initialFrame=self.window.frame;
 }
 - (void)mouseDragged:(NSEvent *)event {
-    if(!self.editing||!self.resizing)return;CGFloat width=MAX(160,MIN(900,self.initialFrame.size.width+NSEvent.mouseLocation.x-self.dragStart.x));CGFloat ratio=(self.initialFrame.size.height-24)/self.initialFrame.size.width;CGFloat height=width*ratio+24;
+    if(!self.editing||!self.resizing)return;CGFloat width=MAX(100,MIN(900,self.initialFrame.size.width+NSEvent.mouseLocation.x-self.dragStart.x));CGFloat ratio=(self.initialFrame.size.height-24)/self.initialFrame.size.width;CGFloat height=width*ratio+24;
     [self.window setFrame:NSMakeRect(self.initialFrame.origin.x,NSMaxY(self.initialFrame)-height,width,height) display:YES];
 }
 - (void)mouseUp:(NSEvent *)event {if(self.editing)[self.owner savePanel:(id)self.window];self.resizing=NO;self.dragging=NO;}

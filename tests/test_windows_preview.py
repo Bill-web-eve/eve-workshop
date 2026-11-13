@@ -36,6 +36,39 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(self.state.slots[0]['label'],'My pilot');self.assertEqual([r['key'] for r in self.state.candidates()],['a'])
         with self.assertRaises(ValueError):self.state.configure({'slots':rows[:1]})
 
+    def test_drag_after_saving_a_narrow_width_survives_refresh_done_and_restart(self):
+        # The native MouseDown closure still holds the row from tile creation.
+        bound_slot=self.state.slots[0]
+        self.state.configure({'enabled':True})
+        rows=[{k:r[k] for k in ['key','label','enabled','width']} for r in self.state.slots]
+        rows[0]['width']=160
+        self.state.configure({'slots':rows,'editing':True})
+        self.state.place(bound_slot,180,230,160,self.screens)
+        self.state.configure({'editing':False})
+        self.state.reconcile(self.sources)
+        current=next(r for r in self.state.slots if r['key']==bound_slot['key'])
+        self.assertEqual(self.state.bounds(current,self.screens,2),(180,230,160,104))
+        restored=PreviewState(self.temp.name)
+        self.assertEqual(restored.bounds(restored.slots[0],self.screens,2),(180,230,160,104))
+
+    def test_minimum_width_repeated_moves_and_saved_reorder_keep_callback_current(self):
+        bound=self.state.slots[0]
+        for width in [100,160,400,100]:
+            rows=[{k:r[k] for k in ['key','label','enabled','width']} for r in reversed(self.state.slots)]
+            next(row for row in rows if row['key']==bound['key']).update(width=width,label='Updated pilot')
+            self.state.configure({'enabled':True,'slots':rows,'editing':True})
+            self.state.place(bound,-1700,180,width,self.screens)
+            self.state.configure({'editing':False})
+            live=next(row for row in self.state.slots if row['key']==bound['key'])
+            self.assertEqual(self.state.bounds(live,self.screens,2),(-1700,180,width,round(width/2)+24))
+            self.assertEqual(bound['label'],'Updated pilot')
+        self.assertEqual(PreviewState(self.temp.name).slots,[dict(row) for row in self.state.slots])
+        saved=self.state.path.read_bytes()
+        rows=[dict(row) for row in self.state.slots];rows[0]['width']=99
+        with self.assertRaises(ValueError):self.state.configure({'slots':rows})
+        self.assertEqual(self.state.path.read_bytes(),saved)
+        self.assertEqual(next(row for row in self.state.slots if row['key']==bound['key'])['width'],100)
+
     def test_cycling_skips_offline_and_disabled_sources_and_wraps_both_ways(self):
         self.assertEqual(self.state.next_slot('a',1)['key'],'b');self.assertEqual(self.state.next_slot('a',-1)['key'],'b')
         self.assertEqual(self.state.next_slot(None,1)['key'],'a');self.assertEqual(self.state.next_slot(None,-1)['key'],'b')

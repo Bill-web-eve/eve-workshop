@@ -56,7 +56,7 @@ class PreviewState:
         for key,limit in [('key',200),('title',250),('label',80),('screen',200)]:
             if not isinstance(row.get(key,''),str) or len(row.get(key,''))>limit or any(ord(c)<32 for c in row.get(key,'')):raise ValueError('Invalid preview label')
         if not row.get('key') or type(row.get('enabled')) is not bool:raise ValueError('Invalid preview window')
-        return {'key':row['key'],'title':row.get('title',''),'label':row.get('label',''),'enabled':row['enabled'],'width':integer(row.get('width'),160,900),
+        return {'key':row['key'],'title':row.get('title',''),'label':row.get('label',''),'enabled':row['enabled'],'width':integer(row.get('width'),100,900),
                 'screen':row.get('screen',''),'x':integer(row.get('x',20),0,20000),'y':integer(row.get('y',20),0,20000)}
 
     def configure(self,options,persist=True):
@@ -77,6 +77,17 @@ class PreviewState:
             if len({s['key'] for s in values['slots']})!=len(values['slots']):raise ValueError('Duplicate preview window')
             if persist and set(old)!=set(s['key'] for s in values['slots']):raise ValueError('Window list changed; refresh and try again')
         if not values['enabled']:values['editing']=False
+        # Native tile callbacks retain these row objects. Validate everything
+        # first, then update existing rows in place so dragging after a width,
+        # label or order save writes into the live persisted configuration.
+        if 'slots' in options:
+            previous={row['key']:row for row in self.slots}
+            rows=[]
+            for row in values['slots']:
+                current=previous.get(row['key'])
+                if current is not None:current.update(row);rows.append(current)
+                else:rows.append(row)
+            values['slots']=rows
         for key,value in values.items():setattr(self,key,value)
         if persist:self.persist()
 
@@ -137,7 +148,7 @@ class PreviewState:
 
     def place(self,slot,left,top,width,screens):
         screen=next((s for s in screens if s['left']<=left+width/2<s['left']+s['width'] and s['top']<=top+12<s['top']+s['height']),screens[0])
-        slot.update(screen=screen['id'],x=max(0,min(20000,int(left-screen['left']))),y=max(0,min(20000,int(top-screen['top']))),width=max(160,min(900,int(width))))
+        slot.update(screen=screen['id'],x=max(0,min(20000,int(left-screen['left']))),y=max(0,min(20000,int(top-screen['top']))),width=max(100,min(900,int(width))))
         self.persist()
 
     def bounds(self,slot,screens,ratio):
@@ -377,9 +388,9 @@ class NativePreview:
 
     def _create(self,slot):
         from System.Windows.Forms import Form,FormBorderStyle,ToolTip,FormStartPosition,AutoScaleMode
-        from System.Drawing import Color,Font,FontStyle
+        from System.Drawing import Color,Font,FontStyle,Size
         form=Form();form.FormBorderStyle=getattr(FormBorderStyle,'None');form.ShowInTaskbar=False;form.TopMost=True
-        form.StartPosition=FormStartPosition.Manual;form.AutoScaleMode=getattr(AutoScaleMode,'None')
+        form.StartPosition=FormStartPosition.Manual;form.AutoScaleMode=getattr(AutoScaleMode,'None');form.MinimumSize=Size(100,40)
         form.BackColor=Color.FromArgb(12,24,33);form.Text='eve-preview'
         font=Font('Segoe UI',9,FontStyle.Bold);tooltip=ToolTip()
         tile={'form':form,'source':self.state.sources[slot['key']]['hwnd'],'thumbnail':None,'font':font,'tooltip':tooltip,'dragging':False}

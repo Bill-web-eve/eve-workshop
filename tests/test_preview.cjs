@@ -92,3 +92,15 @@ test('Windows preview uses Windows key codes, labels and native controls without
  data.error='activate_failed';await run('loadPreview()');assert(d.querySelector('#preview-status').textContent.includes('same privilege level'));
  assert(!/[áéíóöőúüű]/i.test(d.querySelector('#view-content').textContent.replaceAll('EVE Műhely','')),d.querySelector('#view-content').textContent);
 });
+
+test('100 px is accepted by the preview width field on both native platforms',async t=>{
+ for(const platform of ['mac','windows']){
+  const {w,d,native}=await fixture(platform);t.after(()=>w.close());
+  const form=d.querySelector('#preview-settings'),width=form.querySelector('[data-width]');
+  assert.equal(width.min,'100');width.value='99';assert.equal(width.checkValidity(),false);
+  width.value='100';assert.equal(width.checkValidity(),true);
+  form.dispatchEvent(new w.Event('input',{bubbles:true}));
+  form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
+  assert.equal(native.findLast(r=>r.action==='previewConfigure').options.slots[0].width,100);
+ }
+});

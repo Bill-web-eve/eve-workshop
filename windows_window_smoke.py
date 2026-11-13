@@ -114,7 +114,34 @@ def check_preview(host,window):
             reloaded=PreviewState(host.folder)
             assert reloaded.slots[0]['width']==330 and reloaded.slots[0]['screen']==screen['id']
             assert not reloaded.editing,'Layout edit mode must not be restored at startup'
-            preview.configure({'editing':False})
+            # Reproduce the user's sequence: a live tile already exists, the
+            # settings form saves a narrower size, then its bound MouseDown
+            # callback moves it. A later refresh/Done must not restore old XY.
+            original_callback_slot=slot
+            for saved_width in [100,160]:
+                rows=[{k:r[k] for k in ('key','label','enabled','width')} for r in reversed(preview.state.slots)]
+                next(r for r in rows if r['key']==slot['key'])['width']=saved_width
+                preview.configure({'slots':rows,'editing':True})
+                assert first['form'].Width==saved_width,'Minimum/narrow width not applied'
+                work=screen['work'];left,top=work[0]+90,work[1]+120
+                def native_drag(hwnd,message,hit,lparam):
+                    assert message==0xA1 and hit==2
+                    first['form'].Left=left;first['form'].Top=top
+                    preview._tick() # Timer must not change bounds during a drag.
+                    return 0
+                with patch.object(preview.api.user,'SendMessageW',side_effect=native_drag):
+                    preview._mouse(original_callback_slot,first,MouseEventArgs(MouseButtons.Left,1,8,8,0))
+                expected=(first['form'].Left,first['form'].Top,first['form'].Width,first['form'].Height)
+                assert expected[:3]==(left,top,saved_width),'Drag position was not applied'
+                preview.refresh();preview.configure({'editing':False});preview.refresh()
+                assert (first['form'].Left,first['form'].Top,first['form'].Width,first['form'].Height)==expected,'Preview jumped back after refresh/Done'
+                restored=PreviewState(host.folder)
+                saved=next(r for r in restored.slots if r['key']==slot['key'])
+                assert restored.bounds(saved,screens,size.cx/size.cy)==expected,'Dragged position was not persisted'
+            # Keep the remaining paint/badge checks at their original width.
+            rows=[{k:r[k] for k in ('key','label','enabled','width')} for r in preview.state.slots]
+            next(r for r in rows if r['key']==slot['key'])['width']=330
+            preview.configure({'slots':rows,'editing':False})
             real_callback=preview.callback
             preview.callback=lambda kind,data=None:actions.append((kind,data))
             try:
@@ -159,7 +186,7 @@ def check_preview(host,window):
                 if host.preview is not None:host.preview.configure({'enabled':False})
                 for form in forms:form.Dispose()
             host._ui(window,cleanup)
-    return {'native_preview':True,'preview_dwm':True,'preview_activation':True,'preview_shortcuts':True,'preview_badges':True,'preview_damage':True,'preview_saved_layout':True}
+    return {'native_preview':True,'preview_dwm':True,'preview_activation':True,'preview_shortcuts':True,'preview_badges':True,'preview_damage':True,'preview_saved_layout':True,'preview_drag_after_settings':True,'preview_minimum_width':100}
 
 
 def check(report_path=None):
