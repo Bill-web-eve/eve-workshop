@@ -1,0 +1,38 @@
+{
+  "tag": "v1.9.1",
+  "title": "EVE Workshop 1.9.1 \u2013 Preview layout fix and 100px minimum",
+  "assets": [
+    {
+      "name": "EVE_Muhely-1.9.1-Windows11-x64.sha256",
+      "sha256": "be9cfd85c2a9ec5fdcaa266b3b615dc2dd23ab3a8d64b481ad750c952717f512"
+    },
+    {
+      "name": "EVE_Muhely-1.9.1-Windows11-x64.zip",
+      "sha256": "001ac437ca1f1aeffd5e529de50cec3c16c4fafa5c284dacb85caf14a5812bff"
+    },
+    {
+      "name": "EVE_Muhely-1.9.1-macOS-AppleSilicon.dmg",
+      "sha256": "6aff4badc551c6f36b557204360298d0af761fa25bfa879e462219e1abb5624d"
+    },
+    {
+      "name": "EVE_Muhely-1.9.1-macOS-AppleSilicon.sha256",
+      "sha256": "305c1a896aca05eec7b8af1c611acc351c2d62a2669fc1b796d6f23058b6fad3"
+    },
+    {
+      "name": "EVE_Muhely-Telepites.txt",
+      "sha256": "6cae23a1e19941a380fac24703ae060e3b567c28ab7b6042e34ea939c0f12a69"
+    },
+    {
+      "name": "EVE_Muhely-Windows-Telepites.txt",
+      "sha256": "a572889f631f1f249480f8fee631768995caeac5a2d4723a84ff1de8fc7de8cb"
+    },
+    {
+      "name": "EVE_Muhely-1.9.1-macOS-AppleSilicon-update.zip",
+      "sha256": "f216edccae8ecd3126f7a2334544c6bbc07e6895ecb655f3c5ae421014bd1587"
+    },
+    {
+      "name": "update.json",
+      "sha256": "c8f20d7526357e925916ebc5e31803d731a353ccbdc4711c3f75b4324ed952ff"
+    }
+  ]
+}

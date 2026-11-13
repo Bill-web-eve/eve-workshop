@@ -132,3 +132,9 @@ runtime/
 !release-assets/v1.9.0/EVE_Muhely-1.9.0-macOS-AppleSilicon.sha256
 !release-assets/v1.9.0/EVE_Muhely-1.9.0-Windows11-x64.zip
 !release-assets/v1.9.0/EVE_Muhely-1.9.0-Windows11-x64.sha256
+
+# Reviewed 1.9.1 preview layout and 100px minimum release.
+!release-assets/v1.9.1/EVE_Muhely-1.9.1-macOS-AppleSilicon.dmg
+!release-assets/v1.9.1/EVE_Muhely-1.9.1-macOS-AppleSilicon.sha256
+!release-assets/v1.9.1/EVE_Muhely-1.9.1-Windows11-x64.zip
+!release-assets/v1.9.1/EVE_Muhely-1.9.1-Windows11-x64.sha256

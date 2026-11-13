@@ -4,9 +4,16 @@ Helyben futó, magyar–angol nyelvű EVE Online gyártástervező macOS Apple S
 
 ## Letöltés
 
-A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.9.0**, **Windows 11 x64 1.9.0**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
+A telepíthető csomagok a [GitHub Kiadások / Releases](https://github.com/Bill-web-eve/eve-workshop/releases) oldalon érhetők el a közzétételi munkafolyamat sikeres futása után. A jelenlegi csomagok: **Mac Apple Silicon 1.9.1**, **Windows 11 x64 1.9.1**, magyar és angol felülettel, élő kill/intel jelzésekkel, flottajelentésekkel és gyártástervezéssel.
 
 A helyi repositoryból történő automatikus közzététel lépései: [release-assets/README.md](release-assets/README.md).
+
+## Az 1.9.1 kiadás újdonságai
+
+- **Windows eve-preview pozíciójavítás:** szélesség, címke vagy sorrend mentése után a mozgatás az aktuális ablakbeállítást frissíti. A következő frissítés és az elrendezés lezárása nem állítja vissza a korábbi helyet.
+- **100 pixeles minimumszélesség** Macen és Windowson, a beviteli mezőben és a natív előnézeteknél is. A korábbi elrendezések megmaradnak.
+- Az 1.9.0-ból már a **Beállítások → Frissítések** oldalon telepíthető. Az 1.8.0 vagy régebbi változatokról kézi telepítés szükséges; a helyi profil megmarad.
+- Natív Windows-próba a 100/160 pixeles mozgatásra, frissítésre, az elrendezés befejezésére és újratöltésére; Mac méretpróba és frissített kézikönyv.
 
 ## Az 1.9.0 kiadás újdonságai
 
