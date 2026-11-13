@@ -800,6 +800,8 @@ A holdnaptár, holdértesítések és corporation-kitermelési időzítők telje
 
 ## eve-preview – EVE-kliensek előnézete (Mac és Windows)
 
+Az oldalsávban, az Intel alatt a **Preview → On / Off** kapcsoló azonnal be- vagy kikapcsolja az előnézeteket. A helyek, méretek és gyorsbillentyűk megmaradnak; a kapcsoló az eve-preview oldal főkapcsolójával közös, mentett állapotot használ.
+
 Az **eve-preview** menüpont kis élő képeket jelenít meg a futó EVE-kliensekről. A Mac asztali appban macOS 12.3 vagy újabb rendszeren, illetve a Windows 11 x64 asztali appban használható. Böngészőben nem érhető el.
 
 1. Indítsd el az EVE-klienseket. **Macen** az eve-preview oldalon a két engedélygombbal kérd a macOS **Screen & System Audio Recording** és **Accessibility** hozzáférését. A **System Settings → Privacy & Security** alatt az EVE Muhely alkalmazást engedélyezd. A képernyőengedély változtatása után a Mac kérhet alkalmazás-újraindítást. **Windowson** nincs szükség Mac-engedélyekre: az EVE és az EVE Workshop azonos Windows-felhasználó alatt, azonos jogosultsággal fusson.

@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {JSDOM}=require('jsdom'),root=path.join(__dirname,'../static'),tick=()=>new Promise(r=>setImmediate(r));
-async function fixture(platform='mac'){
+async function fixture(platform='mac',open=true){
  const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://127.0.0.1:8765',runScripts:'outside-only'}),w=dom.window,d=w.document,run=s=>vm.runInContext(s,dom.getInternalVMContext()),calls=[],native=[];
  const state={csrf:'test',version:'1.7.0',characters:[],corporations:[],production_characters:[],plans:[],jobs:[],settings:{source:'manual'},task:{running:false},sde:{buildNumber:1},recipe_count:1};
  const mining={enabled:true,folder:'/test/Gamelogs',characters:[],error:null,file_errors:0};
@@ -11,7 +11,7 @@ async function fixture(platform='mac'){
  w.fetch=async (url,options={})=>{calls.push(url);if(url==='/api/preview/mining/replace-crystal'){const body=JSON.parse(options.body);assert.equal(body.name,mining.characters[0].name);assert.equal(body.id,mining.characters[0].alerts[0].id);mining.characters[0].alerts=[{id:'a'.repeat(24),kind:'module_stopped',at:2}];}if(url==='/api/preview/mining/acknowledge'){const body=JSON.parse(options.body);mining.characters[0].alerts=mining.characters[0].alerts.filter(a=>!body.ids.includes(a.id));}const value=url==='/api/state'?state:url.startsWith('/api/preview/mining')?mining:url==='/api/notifications'?{items:[],counts:{},task:{running:false},corporations:[],preferences:{os_enabled:false,categories:{intel:false}}}:url==='/api/intel/alerts'?{enabled:false,items:[]}:null;if(value===null)throw Error('Unexpected '+url);return {ok:true,json:async()=>value};};
  for(const tag of d.querySelectorAll('script[src]'))run(fs.readFileSync(path.join(root,tag.getAttribute('src')),'utf8'));
  await tick();await tick();if(platform==='windows'){w.EveDesktop.active=true;w.EveDesktop.platform='windows';}
- run('navigate("preview")');await tick();await tick();return {w,d,run,native,calls,data,mining};
+ if(open)run('navigate("preview")');await tick();await tick();return {w,d,run,native,calls,data,mining};
 }
 for(const platform of ['browser'])test('eve-preview explains unavailable '+platform+' support without native or ESI calls',async t=>{
  const f=await fixture(platform);t.after(()=>f.w.close());assert(f.d.querySelector('#view-content').textContent.includes('Mac or Windows desktop app'));assert.equal(f.d.querySelector('#preview-settings'),null);assert.equal(f.native.length,0);assert(!f.calls.some(url=>url.includes('preview')));
@@ -103,4 +103,48 @@ test('100 px is accepted by the preview width field on both native platforms',as
   form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
   assert.equal(native.findLast(r=>r.action==='previewConfigure').options.slots[0].width,100);
  }
+});
+
+for(const platform of ['mac','windows'])test(platform+' sidebar Preview switch uses Intel styling and native saved master state',async t=>{
+ const {w,d,data,native,run,calls}=await fixture(platform,false);t.after(()=>w.close());
+ const control=d.querySelector('#sidebar-preview-toggle'),on=control.querySelector('[data-sidebar-preview=on]'),off=control.querySelector('[data-sidebar-preview=off]');
+ assert.equal(d.querySelector('#sidebar-intel-toggle').nextElementSibling,control);assert.equal(control.querySelector('h3').textContent,'Preview');
+ assert(control.querySelector('.language-control.intel-notification-control'));assert.equal(control.hidden,false);
+ assert.equal(off.getAttribute('aria-pressed'),'true');assert.equal(on.getAttribute('aria-pressed'),'false');
+ const before=structuredClone(data),fetches=calls.length;
+ on.click();await tick();await tick();assert.deepEqual(JSON.parse(JSON.stringify(native.findLast(r=>r.action==='previewConfigure').options)),{enabled:true});
+ assert.equal(on.getAttribute('aria-pressed'),'true');assert.equal(off.getAttribute('aria-pressed'),'false');assert.equal(data.enabled,true);
+ assert.equal(calls.length,fetches);assert.deepEqual({...data,enabled:before.enabled},before); // No ESI or notification preference change.
+ const count=native.filter(r=>r.action==='previewConfigure').length;on.click();await tick();assert.equal(native.filter(r=>r.action==='previewConfigure').length,count);
+ await run('loadPreview()');assert.equal(on.getAttribute('aria-pressed'),'true');
+ off.click();await tick();await tick();assert.equal(data.enabled,false);assert.equal(off.getAttribute('aria-pressed'),'true');assert.deepEqual(data.windows,before.windows);
+ w.EveI18n.setLanguage('hu');await tick();assert.equal(control.querySelector('h3').textContent,'Preview');assert.equal(on.textContent,'On');assert.equal(off.textContent,'Off');assert(control.title.includes('kikapcsolva'));
+});
+test('sidebar switching preserves the preview form draft and follows saves from the full page',async t=>{
+ const {w,d,data,native}=await fixture();t.after(()=>w.close());
+ const form=d.querySelector('#preview-settings'),on=d.querySelector('[data-sidebar-preview=on]'),off=d.querySelector('[data-sidebar-preview=off]');
+ form.querySelector('[data-label]').value='Unfinished pilot label';form.querySelector('[data-width]').value='160';form.dispatchEvent(new w.Event('input',{bubbles:true}));
+ on.click();await tick();await tick();assert.equal(d.querySelector('#preview-settings'),form);assert.equal(form.elements.enabled.checked,true);assert.equal(form.querySelector('[data-label]').value,'Unfinished pilot label');assert.equal(form.querySelector('[data-width]').value,'160');
+ assert.deepEqual(JSON.parse(JSON.stringify(native.findLast(r=>r.action==='previewConfigure').options)),{enabled:true});assert.equal(data.windows[0].label,'');assert.equal(data.windows[0].width,260);
+ off.click();await tick();await tick();assert.equal(form.elements.enabled.checked,false);assert.equal(form.querySelector('[data-width]').value,'160');
+ form.elements.enabled.checked=true;form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();
+ assert.equal(on.getAttribute('aria-pressed'),'true');assert.equal(data.windows[0].label,'Unfinished pilot label');assert.equal(data.windows[0].width,160);
+});
+test('failed native switch retains confirmed state, reports error and prevents duplicate pending requests',async t=>{
+ const {w,d,data}=await fixture();t.after(()=>w.close());
+ const on=d.querySelector('[data-sidebar-preview=on]'),off=d.querySelector('[data-sidebar-preview=off]');
+ let reject,calls=0;w.EveDesktop.configurePreview=()=>{calls++;return new Promise((_,r)=>reject=r);};
+ on.click();on.click();assert.equal(calls,1);assert.equal(on.disabled,true);assert.equal(off.disabled,true);assert.equal(d.querySelector('#sidebar-preview-toggle').getAttribute('aria-busy'),'true');
+ reject(Error('Native preview switch failed'));await tick();await tick();
+ assert.equal(data.enabled,false);assert.equal(off.getAttribute('aria-pressed'),'true');assert.equal(on.disabled,false);assert.equal(off.disabled,false);assert(d.querySelector('#global-error').textContent.includes('Native preview switch failed'));
+});
+test('late native status cannot undo a newer explicit Preview switch',async t=>{
+ const {w,d,run}=await fixture();t.after(()=>w.close());
+ let resolve,first=true;const old=w.EveDesktop.previewStatus;w.EveDesktop.previewStatus=()=>{if(!first)return old();first=false;return new Promise(r=>resolve=r);};
+ const pending=run('loadPreview()');const on=d.querySelector('[data-sidebar-preview=on]');on.click();await tick();await tick();
+ assert.equal(on.getAttribute('aria-pressed'),'true');resolve({supported:true,enabled:false});await pending;
+ assert.equal(on.getAttribute('aria-pressed'),'true');w.EveDesktop.previewStatus=old;
+});
+test('browser UI hides the native-only sidebar Preview switch',async t=>{
+ const {w,d,native}=await fixture('browser',false);t.after(()=>w.close());assert.equal(d.querySelector('#sidebar-preview-toggle').hidden,true);assert.equal(native.length,0);
 });

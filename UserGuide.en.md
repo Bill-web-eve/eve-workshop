@@ -800,6 +800,8 @@ Automatic moon calendar, notification and corporation extraction timer refreshes
 
 ## eve-preview – EVE client previews (Mac and Windows)
 
+The **Preview → On / Off** switch below Intel in the sidebar immediately enables or disables previews. Window positions, sizes and shortcuts are preserved. It shares the saved master setting with the eve-preview page.
+
 **eve-preview** in the sidebar displays small live thumbnails of running EVE clients. It supports the Mac desktop app on macOS 12.3 or later and the Windows 11 x64 desktop app. It is not available in a normal browser.
 
 1. Start the EVE clients. **On Mac**, use the two permission buttons on the eve-preview page to request macOS **Screen & System Audio Recording** and **Accessibility** access. Enable EVE Muhely under **System Settings → Privacy & Security**. Changing screen permission may require restarting the app. **On Windows**, there are no Mac permission prompts: run EVE and EVE Workshop under the same Windows user and at the same privilege level.

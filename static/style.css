@@ -337,3 +337,5 @@ html[data-theme=dark] .badge.input-stock{background:#203f35;color:#9bddb9}html[d
 .plan-options{grid-column:1/-1;display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12px}
 .plan-options label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin:0}
 .plan-options small{color:var(--muted)}
+
+#sidebar-intel-toggle:has(+ #sidebar-preview-toggle:not([hidden])){margin-bottom:12px}

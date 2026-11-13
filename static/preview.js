@@ -6,12 +6,36 @@ let previewData=null,previewBusy=false,previewAction=false,previewTimer=null,pre
 const previewKeys=[[0,'A'],[11,'B'],[8,'C'],[2,'D'],[14,'E'],[3,'F'],[5,'G'],[4,'H'],[34,'I'],[38,'J'],[40,'K'],[37,'L'],[46,'M'],[45,'N'],[31,'O'],[35,'P'],[12,'Q'],[15,'R'],[1,'S'],[17,'T'],[32,'U'],[9,'V'],[13,'W'],[7,'X'],[16,'Y'],[6,'Z'],[29,'0'],[18,'1'],[19,'2'],[20,'3'],[21,'4'],[23,'5'],[22,'6'],[26,'7'],[28,'8'],[25,'9'],[123,'←'],[124,'→'],[125,'↓'],[126,'↑'],[116,'Page Up'],[121,'Page Down'],[115,'Home'],[119,'End'],[122,'F1'],[120,'F2'],[99,'F3'],[118,'F4'],[96,'F5'],[97,'F6'],[98,'F7'],[100,'F8'],[101,'F9'],[109,'F10'],[103,'F11'],[111,'F12']];
 const previewModifiers=[[4096,'Control'],[2048,'Option'],[256,'Command'],[512,'Shift']];
 function previewSupported(){return EveDesktop.active&&['mac','windows'].includes(EveDesktop.platform);}
+function syncPreviewSwitch(){
+ const control=$('#sidebar-preview-toggle');if(!control)return;
+ control.hidden=!previewSupported()||previewData?.supported===false;
+ const loaded=!!previewData,busy=previewAction||!loaded&&previewBusy;
+ control.setAttribute('aria-busy',String(busy));
+ control.title=EveI18n.t(!loaded?'EVE-ablakok betöltése…':previewData.enabled?'Előnézet bekapcsolva.':'Előnézet kikapcsolva.');
+ control.querySelectorAll('[data-sidebar-preview]').forEach(button=>{
+  const enabled=button.dataset.sidebarPreview==='on';
+  button.disabled=!loaded||busy;
+  button.setAttribute('aria-pressed',String(loaded&&previewData.enabled===enabled));
+  button.onclick=async()=>{
+   if(previewAction||!previewData||previewData.enabled===enabled)return;
+   await previewCommand(async()=>{
+    const data=await EveDesktop.configurePreview({enabled});
+    // Change only the master switch; keep unfinished labels, sizes and keys.
+    if(previewDraft)previewDraft.enabled=data.enabled;
+    const form=$('#preview-settings');if(form)form.elements.enabled.checked=data.enabled;
+    return data;
+   });
+  };
+ });
+}
+window.addEventListener('eve-language-change',syncPreviewSwitch);
+window.addEventListener('focus',()=>{if(previewSupported()&&!document.hidden)void loadPreview();});
 function previewSchedule(){clearTimeout(previewTimer);if(view==='preview')previewTimer=setTimeout(()=>void loadPreview(),2000);}
 async function loadPreview(refresh=false){
- if(previewBusy||previewAction||!previewSupported())return;previewBusy=true;const revision=previewRevision;
+ if(previewBusy||previewAction||!previewSupported())return;previewBusy=true;syncPreviewSwitch();const revision=previewRevision;
  try{const data=await (refresh?EveDesktop.refreshPreview():EveDesktop.previewStatus());if(revision!==previewRevision)return;previewData=data;if(view==='preview')renderPreview($('#view-content'));}
  catch(e){if(view==='preview')error(e.message);}
- finally{previewBusy=false;previewSchedule();}
+ finally{previewBusy=false;syncPreviewSwitch();previewSchedule();}
 }
 function previewReadDraft(){
  const form=$('#preview-settings');if(!form)return;
@@ -73,7 +97,9 @@ function renderPreview(content){
  updatePreview();renderPreviewMining();void pollPreviewMining();previewSchedule();
 }
 function updatePreview(){
+ syncPreviewSwitch();
  if(!$('#preview-settings')||!previewData)return;const data=previewData;
+ if(!dirty.preview)$('#preview-settings').elements.enabled.checked=data.enabled;
  if(previewDraft){for(const row of data.windows)if(!previewDraft.slots.some(r=>r.key===row.key))previewDraft.slots.push({key:row.key,label:row.label,enabled:row.enabled,width:row.width});}
  const rows=previewDraft?.slots||data.windows;
  if($('#preview-screen'))$('#preview-screen').textContent=data.screen_permission?'Engedélyezve':'Engedély szükséges';if($('#preview-accessibility'))$('#preview-accessibility').textContent=data.accessibility_permission?'Engedélyezve':'Engedély szükséges';
@@ -92,10 +118,10 @@ function updatePreview(){
  $('#preview-no-windows').hidden=data.windows.some(w=>w.online);EveI18n.translate($('#view-content'));
 }
 async function previewCommand(command,saved=false){
- if(previewAction)return;previewAction=true;previewRevision++;
+ if(previewAction)return;previewAction=true;previewRevision++;syncPreviewSwitch();
  const save=$('#preview-settings [type=submit]');if(save)save.disabled=true;
  try{previewData=await command();if(saved){void EveDesktop.capturePreviewKey(false).catch(()=>{});delete dirty.preview;previewDraft=null;$('#preview-settings')?.remove();toast('Előnézet-beállítások mentve.');}error('');if(view==='preview')renderPreview($('#view-content'));}
- catch(e){error(e.message);}finally{previewAction=false;if(save?.isConnected)save.disabled=false;previewSchedule();}
+ catch(e){error(e.message);}finally{previewAction=false;syncPreviewSwitch();if(save?.isConnected)save.disabled=false;previewSchedule();}
 }
 
 const previewMiningNames={cargo_full:'Megtelt raktér',crystal_broken:'Elkopott kristály',rock_depleted:'Elfogyott kő',module_stopped:'Modul nem fut'};
