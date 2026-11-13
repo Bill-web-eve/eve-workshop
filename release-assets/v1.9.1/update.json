@@ -7,16 +7,16 @@
       "macos-arm64": {
         "name": "EVE_Muhely-1.9.1-macOS-AppleSilicon-update.zip",
         "url": "https://github.com/Bill-web-eve/eve-workshop/releases/download/v1.9.1/EVE_Muhely-1.9.1-macOS-AppleSilicon-update.zip",
-        "size": 29316358,
-        "sha256": "f216edccae8ecd3126f7a2334544c6bbc07e6895ecb655f3c5ae421014bd1587"
+        "size": 29317314,
+        "sha256": "4a424a89bb621dc860a4d9591d071bdc973705641cb86b425d45b277e7e6a47a"
       },
       "windows-x64": {
         "name": "EVE_Muhely-1.9.1-Windows11-x64.zip",
         "url": "https://github.com/Bill-web-eve/eve-workshop/releases/download/v1.9.1/EVE_Muhely-1.9.1-Windows11-x64.zip",
-        "size": 29119068,
-        "sha256": "001ac437ca1f1aeffd5e529de50cec3c16c4fafa5c284dacb85caf14a5812bff"
+        "size": 29119448,
+        "sha256": "155f7b2fb267f1c84718e5a2eb005c2fbda98bdb2cbbea2baea24a87f0855c6d"
       }
     }
   },
-  "signature": "8lYfGuUNCGujgo9FdB3nvSIE6KeGMsgvX4nMglELtoswx0CD3x6bcj/dlcQFoPqFmrw1HYRvhgrrMgOazIBQDw=="
+  "signature": "D8Ssut/7eiGTMWq8vtLFZAofL4N3CZrqZwogUZMkmoFUrUNDhRbgIPuMkCGabkZQaR4xmzaaX9KFjwUaC33zDw=="
 }

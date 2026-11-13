@@ -4,19 +4,19 @@
   "assets": [
     {
       "name": "EVE_Muhely-1.9.1-Windows11-x64.sha256",
-      "sha256": "be9cfd85c2a9ec5fdcaa266b3b615dc2dd23ab3a8d64b481ad750c952717f512"
+      "sha256": "7bed2ba8137898b67164899bf485b684a3f52c7d2e951f3a288975cf53f4b67e"
     },
     {
       "name": "EVE_Muhely-1.9.1-Windows11-x64.zip",
-      "sha256": "001ac437ca1f1aeffd5e529de50cec3c16c4fafa5c284dacb85caf14a5812bff"
+      "sha256": "155f7b2fb267f1c84718e5a2eb005c2fbda98bdb2cbbea2baea24a87f0855c6d"
     },
     {
       "name": "EVE_Muhely-1.9.1-macOS-AppleSilicon.dmg",
-      "sha256": "6aff4badc551c6f36b557204360298d0af761fa25bfa879e462219e1abb5624d"
+      "sha256": "23b5a7421909b20bbf59018ef5162a7422c6213b99272d2ee8e93c93e796ec72"
     },
     {
       "name": "EVE_Muhely-1.9.1-macOS-AppleSilicon.sha256",
-      "sha256": "305c1a896aca05eec7b8af1c611acc351c2d62a2669fc1b796d6f23058b6fad3"
+      "sha256": "d8e58218fa1750d95de68b4ea57f15b47bc0a7e15707dc3b772c87c97a974be4"
     },
     {
       "name": "EVE_Muhely-Telepites.txt",
@@ -28,11 +28,11 @@
     },
     {
       "name": "EVE_Muhely-1.9.1-macOS-AppleSilicon-update.zip",
-      "sha256": "f216edccae8ecd3126f7a2334544c6bbc07e6895ecb655f3c5ae421014bd1587"
+      "sha256": "4a424a89bb621dc860a4d9591d071bdc973705641cb86b425d45b277e7e6a47a"
     },
     {
       "name": "update.json",
-      "sha256": "c8f20d7526357e925916ebc5e31803d731a353ccbdc4711c3f75b4324ed952ff"
+      "sha256": "f4c9b6b2583bede0771ff87216f472c7546e8bf3b426121a52043a01106e743a"
     }
   ]
 }

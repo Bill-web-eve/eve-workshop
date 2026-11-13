@@ -20,6 +20,7 @@ on:
       - static/desktop.js
       - static/intel.js
       - tools/windows-runtime-lock.json
+      - tools/windows_atomic_status_smoke.py
       - tools/windows_ci_smoke.py
       - tools/build_windows_release.py
       - .github/workflows/windows-window.yml

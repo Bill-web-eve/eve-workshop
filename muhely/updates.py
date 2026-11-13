@@ -100,7 +100,16 @@ def atomic_json(path, value):
     fd = os.open(temp, os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600)
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as f: json.dump(value, f, ensure_ascii=True, allow_nan=False)
-        os.replace(temp, path)
+        # A Windows reader/antivirus can briefly deny replacing a JSON file.
+        # Keep the old complete file until the replacement succeeds, and let
+        # persistent permission/disk errors propagate after a bounded retry.
+        delays=(0,.02,.05,.1,.2,.4)
+        for attempt,delay in enumerate(delays):
+            if delay:time.sleep(delay)
+            try:
+                os.replace(temp,path);break
+            except PermissionError:
+                if attempt==len(delays)-1:raise
     finally: temp.unlink(missing_ok=True)
 
 def installation(executable=None, platform=None, frozen=None):

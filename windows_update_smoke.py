@@ -21,6 +21,12 @@ from muhely import __version__
 from muhely.updates import REPO,canonical,atomic_json
 from muhely.store import Store
 
+def read_update_result(path):
+    # Existence + a second open races MoveFileEx on Windows. Read once per poll;
+    # retry only missing/sharing-denied files. Invalid JSON remains a failure.
+    try:return json.loads(path.read_text())
+    except (FileNotFoundError,PermissionError):return None
+
 def check():
     if sys.platform!='win32':raise RuntimeError('Windows required')
     package=Path(sys.executable).resolve().parent.parent
@@ -70,13 +76,16 @@ launch_helper(profile,'a'*32,sys.argv[2],os.getpid())
         atomic_json(folder/'receipt.json',{'document':document,'platform':'windows-x64','target':str(old.resolve()),'backend_pid':1,'created':time.time(),'current_version':__version__})
         subprocess.run([str(old/'runtime/python.exe'),'-I',str(coordinator),str(profile),'http://127.0.0.1:'+str(port)],check=True,timeout=45,capture_output=True,cwd=str(old))
         result=profile/'updates/last-result.json'
+        status=None
         for _ in range(200):
-            if result.exists() and json.loads(result.read_text()).get('phase')=='installed' and (old/'restarted.txt').exists():break
-            if result.exists() and not json.loads(result.read_text()).get('ok'):
-                raise AssertionError(result.read_text()+'\n'+(folder/'install.log').read_text(errors='replace')[-4000:])
+            status=read_update_result(result)
+            if status is not None:
+                if not status.get('ok'):
+                    raise AssertionError(json.dumps(status)+'\n'+(folder/'install.log').read_text(errors='replace')[-4000:])
+                if status.get('phase')=='installed' and (old/'restarted.txt').exists():break
             time.sleep(.1)
         else:raise AssertionError('Update did not finish: '+((folder/'install.log').read_text(errors='replace')[-4000:] if (folder/'install.log').exists() else 'no helper log'))
-        status=json.loads(result.read_text());assert status['ok'] and status['version']==new_version
+        assert status['ok'] and status['version']==new_version
         assert (old/'app/muhely/__init__.py').read_text().find(new_version)>0
         assert Path(status['previous']).exists() and Path(status['backup']).exists()
         assert (profile/'characters.enc').read_bytes()==b'opaque synthetic credential fixture'

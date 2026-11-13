@@ -160,6 +160,33 @@ class UpdateTests(unittest.TestCase):
         # Also immediately rename/delete the backup, as the Windows test does.
         renamed=backup.with_suffix('.moved');backup.rename(renamed);renamed.unlink()
 
+    def test_atomic_status_write_retries_sharing_denial_without_truncating_old_file(self):
+        path=self.root/'status.json';atomic_json(path,{'phase':'restarting'})
+        real_replace=os.replace;attempts=[]
+        def busy_then_replace(src,dst):
+            attempts.append(1)
+            if len(attempts)<3:
+                self.assertEqual(json.loads(path.read_text()),{'phase':'restarting'})
+                raise PermissionError('temporarily shared')
+            return real_replace(src,dst)
+        with patch('muhely.updates.os.replace',side_effect=busy_then_replace),patch('muhely.updates.time.sleep'):
+            atomic_json(path,{'phase':'installed'})
+        self.assertGreater(len(attempts),1);self.assertEqual(json.loads(path.read_text()),{'phase':'installed'})
+        self.assertEqual(list(self.root.glob('status.json.*.tmp')),[])
+
+    def test_persistent_status_permission_error_preserves_original_and_cleans_temp(self):
+        path=self.root/'status.json';atomic_json(path,{'ok':'original'})
+        with patch('muhely.updates.os.replace',side_effect=PermissionError('denied')),patch('muhely.updates.time.sleep'),self.assertRaises(PermissionError):
+            atomic_json(path,{'ok':'new'})
+        self.assertEqual(json.loads(path.read_text()),{'ok':'original'});self.assertEqual(list(self.root.glob('status.json.*.tmp')),[])
+
+    def test_windows_status_poll_retries_lock_but_does_not_hide_corrupt_json(self):
+        from windows_update_smoke import read_update_result
+        path=self.root/'status.json'
+        with patch.object(Path,'read_text',side_effect=[PermissionError('shared'),'{"ok":true,"phase":"installed"}']):
+            self.assertIsNone(read_update_result(path));self.assertEqual(read_update_result(path),{'ok':True,'phase':'installed'})
+        with patch.object(Path,'read_text',return_value='{bad'),self.assertRaises(json.JSONDecodeError):read_update_result(path)
+
     def test_payload_version_is_read_without_executing_source(self):
         root=self.windows(self.root/'new','1.9.0');payload_version(root,'windows-x64','1.9.0')
         with self.assertRaises(UpdateError):payload_version(root,'windows-x64','2.0.0')

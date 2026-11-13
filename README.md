@@ -13,6 +13,7 @@ A helyi repositoryból történő automatikus közzététel lépései: [release-
 - **Windows eve-preview pozíciójavítás:** szélesség, címke vagy sorrend mentése után a mozgatás az aktuális ablakbeállítást frissíti. A következő frissítés és az elrendezés lezárása nem állítja vissza a korábbi helyet.
 - **100 pixeles minimumszélesség** Macen és Windowson, a beviteli mezőben és a natív előnézeteknél is. A korábbi elrendezések megmaradnak.
 - Az 1.9.0-ból már a **Beállítások → Frissítések** oldalon telepíthető. Az 1.8.0 vagy régebbi változatokról kézi telepítés szükséges; a helyi profil megmarad.
+- A frissítő rövid Windowsos állapotfájl-zárolásoknál korlátozott újrapróbálást használ; a tartós hibákat továbbra is jelzi.
 - Natív Windows-próba a 100/160 pixeles mozgatásra, frissítésre, az elrendezés befejezésére és újratöltésére; Mac méretpróba és frissített kézikönyv.
 
 ## Az 1.9.0 kiadás újdonságai

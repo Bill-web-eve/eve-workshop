@@ -44,6 +44,7 @@ def main():
         (runtime/'python313._pth').write_text('python313.zip\n.\nLib\\site-packages\n..\\app\n',encoding='ascii')
         run_check([str(runtime/'python.exe'),'-I','-X','utf8',str(package/'app/windows_smoke_test.py')],90)
         run_check([str(runtime/'python.exe'),'-I','-X','utf8',str(package/'app/windows_window_smoke.py')],120)
+        run_check([str(runtime/'python.exe'),'-I','-X','utf8',str(source/'tools/windows_atomic_status_smoke.py')],15)
         run_check([str(runtime/'python.exe'),'-I','-X','utf8',str(package/'app/windows_update_smoke.py')],100)
 
 if __name__=='__main__':main()
