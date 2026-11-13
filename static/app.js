@@ -36,7 +36,7 @@ async function setProductionScope(id){
     await reloadState();if(generation!==planGeneration)return;
     if(productId&&!['saved','reservations','jobs'].includes(view))await calculate(false);
     else{
-      localStorage.setItem('eve-muhely-last-plan',JSON.stringify({id:productId,name:productName,quantity:targetQuantity(),saved_plan_id:null,corporation_id:corporationId,manufacturer_id:manufacturerId,activity:productActivity}));
+      localStorage.setItem('eve-muhely-last-plan',JSON.stringify({id:productId,name:productName,quantity:targetQuantity(),saved_plan_id:null,corporation_id:corporationId,manufacturer_id:manufacturerId,activity:productActivity,skip_reactions:$('#skip-reactions')?.checked===true}));
       render();
     }
   }catch(e){if(generation===planGeneration)error(e.message);}
@@ -189,6 +189,7 @@ async function openSavedPlan(id){
   planGeneration++;corporationId=saved.corporation_id??null;plan=null;restorePlanSelector();$('#view-content').innerHTML=empty('A mentett terv saját készletének betöltése…');
   activePlanId=saved.id;productId=saved.product_id;productName=saved.product_name;
   $('#product-search').value=productName;EveNumbers.set($('#target-quantity'),saved.quantity);manufacturerId=saved.manufacturer_id??0;productActivity=saved.activity||null;
+  $('#skip-reactions').checked=saved.skip_reactions===true;
   $('#search-results').hidden=true;updatePlanControls();await calculate();
 }
 function updatePlanControls() {
@@ -240,7 +241,7 @@ function scheduleTaskPoll() {
   },1200);
 }
 function currentPlanKey(id=productId,quantity=targetQuantity()){
-  return JSON.stringify([id,quantity,corporationId,activePlanId,manufacturerValue(),state?.settings,state?.inventory,state?.parameters,state?.reservation_revision]);
+  return JSON.stringify([id,quantity,corporationId,activePlanId,manufacturerValue(),$('#skip-reactions')?.checked===true,state?.settings,state?.inventory,state?.parameters,state?.reservation_revision]);
 }
 function planRefreshFailureMarkup(current){
   return '<div class="banner warn" data-plan-refresh-failed><strong>Az újraszámítás nem sikerült; a legutóbbi sikeres terv látható.</strong><div>A mentés és az ütemezés friss számításig szünetel. A meglévő foglalások megmaradnak.</div><div>'+esc(current.refresh_error)+'</div><div><span>Az utolsó sikeres számítás:</span> '+date(current.calculated_at)+'</div></div>';
@@ -261,12 +262,12 @@ async function calculate(refreshState=true,announce=false) {
     if(activePlanId && !state.plans.some(p=>p.id===activePlanId&&p.product_id===targetId))activePlanId=null;
     const owner=activePlanId;
     requestKey=currentPlanKey(targetId,quantity);
-    const next=await api(scoped(`/api/plan?product_id=${encodeURIComponent(targetId)}&quantity=${encodeURIComponent(quantity)}${owner?'&saved_plan_id='+encodeURIComponent(owner):''}&manufacturer_id=${encodeURIComponent(manufacturerValue())}&preview=1`));
+    const next=await api(scoped(`/api/plan?product_id=${encodeURIComponent(targetId)}&quantity=${encodeURIComponent(quantity)}${owner?'&saved_plan_id='+encodeURIComponent(owner):''}&manufacturer_id=${encodeURIComponent(manufacturerValue())}&skip_reactions=${$('#skip-reactions')?.checked===true?1:0}&preview=1`));
     if(generation!==planGeneration) return;
     plan=next;planLoadedKey=requestKey;productActivity=next.activity; dirty={};
     deliveryWait=next.inventory_wait||null;scheduleDeliveryCheck();
     updatePlanControls();
-    localStorage.setItem('eve-muhely-last-plan',JSON.stringify({id:targetId,name:targetName,quantity,saved_plan_id:owner,corporation_id:corporationId,manufacturer_id:manufacturerId,activity:productActivity}));
+    localStorage.setItem('eve-muhely-last-plan',JSON.stringify({id:targetId,name:targetName,quantity,saved_plan_id:owner,corporation_id:corporationId,manufacturer_id:manufacturerId,activity:productActivity,skip_reactions:$('#skip-reactions')?.checked===true}));
     $('#calculated-at').textContent='Számítás: '+date(plan.calculated_at);
     $('#queue-count').textContent=plan.summary.items;
     const status=$('#plan-status');
@@ -749,6 +750,7 @@ document.addEventListener('click',event=>{const link=event.target.closest('[data
 
 $('#sync').onclick=()=>startTask('/api/sync');
 $('#production-scope').onchange=event=>setProductionScope(Number(event.target.value)||null);
+$('#skip-reactions').onchange=async()=>{if(productId)await calculate();};
 $('#manufacturer').onchange=async event=>{manufacturerId=event.target.value==='manual'?0:Number(event.target.value);if(productId)await calculate();};
 $('#save-plan').onclick=async()=>{
   const button=$('#save-plan');button.disabled=true;
@@ -757,10 +759,10 @@ $('#save-plan').onclick=async()=>{
     if(!productId)throw new Error('Előbb válassz terméket a találatok közül.');
     const next=await calculate();if(!next)return;
     if(next.preview_only&&next.saved_plan?.reserve_active!==false)throw new Error('A foglalás véglegesítése friss készletadatra vár.');
-    const saved=await api('/api/plans/save',{id:next.saved_plan?.id||null,product_id:next.product_id,quantity:next.quantity,name:next.saved_plan?.name||next.name,corporation_id:next.corporation_id,manufacturer_id:next.manufacturer_id});
+    const saved=await api('/api/plans/save',{id:next.saved_plan?.id||null,product_id:next.product_id,quantity:next.quantity,name:next.saved_plan?.name||next.name,corporation_id:next.corporation_id,manufacturer_id:next.manufacturer_id,skip_reactions:next.skip_reactions===true});
     if(typeof financeContext!=='undefined'&&financeContext&&!financeContext.plan_id&&financeContext.plan.product_id===next.product_id&&financePrefs)await api('/api/trade/plan',{...financePrefs,plan_id:saved.id});
     if(!next.saved_plan&&view==='invention'&&inventionOptions?.config.product_id===next.product_id)await api('/api/trade/plan',{plan_id:saved.id,invention:inventionOptions.config,materials:inventionOptions.manufacturing_prices});
-    if(productId===next.product_id&&corporationId===next.corporation_id&&manufacturerId===next.manufacturer_id&&targetQuantity()===next.quantity)activePlanId=saved.id;
+    if(productId===next.product_id&&corporationId===next.corporation_id&&manufacturerId===next.manufacturer_id&&targetQuantity()===next.quantity&&($('#skip-reactions')?.checked===true)===(next.skip_reactions===true))activePlanId=saved.id;
     await calculate();toast(next.saved_plan?.reserve_active===false?'A terv mentve, a foglalása kikapcsolva maradt.':'A terv mentve, a készletfoglalás aktív.');
   }catch(e){error(e.message);}
   finally{button.disabled=!!plan?.refresh_error||!!plan?.preview_only&&plan.saved_plan?.reserve_active!==false;}
@@ -789,6 +791,7 @@ document.addEventListener('click',event=>{if(!event.target.closest('.search-wrap
   try {
     const saved=JSON.parse(localStorage.getItem('eve-muhely-last-plan')||'null');
     corporationId=Number(saved?.corporation_id)||null;manufacturerId=saved?.manufacturer_id??0;productActivity=saved?.activity||null;
+    $('#skip-reactions').checked=saved?.skip_reactions===true;
     if(saved?.id && saved?.quantity){productId=saved.id;productName=saved.name;activePlanId=saved.saved_plan_id||null;EveNumbers.set($('#target-quantity'),saved.quantity);}
   }catch{}
   $('#product-search').value=productName;

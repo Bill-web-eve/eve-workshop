@@ -1,6 +1,11 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Reakciók kihagyása": "Skip reactions",
+"A reakciótermékek beszerzendő alapanyagok.": "Reaction products are treated as purchased materials.",
+"A reakciótermékeket készletből, folyamatban lévő jobokból vagy beszerzésből fedezi; a reakciók bemeneteit nem bontja tovább.": "Reaction products are covered by inventory, active jobs or purchases; their reaction inputs are not expanded.",
+"A reakciók kihagyása igaz vagy hamis lehet.": "Skip reactions must be true or false.",
+
 "A frissítés előkészítése már elindult. Ha nem állt le az app, keress újra frissítést.": "Update preparation has already started. If the app did not close, check for updates again.",
 "Frissítések": "Updates",
 "Még nincs ellenőrzés": "Not checked yet",

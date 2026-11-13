@@ -73,7 +73,7 @@ def ordered_active(plans):
 
 
 def revision(plans,corporation_id=None):
-    fields=('id','product_id','quantity','created','reserve_active','reserved_at','corporation_id','manufacturer_id')
+    fields=('id','product_id','quantity','created','reserve_active','reserved_at','corporation_id','manufacturer_id','skip_reactions')
     rows=[{k:p.get(k) for k in fields} for p in plans if p.get('corporation_id')==corporation_id]
     rows.sort(key=lambda p:p['id'])
     return hashlib.sha256(json.dumps(rows,sort_keys=True,separators=(',',':')).encode()).hexdigest()

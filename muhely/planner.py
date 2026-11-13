@@ -136,7 +136,9 @@ class Planner:
 
     def calculate(self, product_id, quantity, settings, inventory=None, parameters=None,
                   stock=None, wip=None, blueprints=(), jobs=(), reservations=None, own_reservations=None,
-                  skill_profiles=(), manufacturer_id=None,material_locations=None):
+                  skill_profiles=(), manufacturer_id=None,material_locations=None,skip_reactions=False):
+        if type(skip_reactions) is not bool:
+            raise PlanningError('A reakciók kihagyása igaz vagy hamis lehet.')
         c = self.catalog
         product_id = integer(product_id, 'Termékazonosító', 10**9, 1)
         if product_id not in c.recipes:
@@ -159,6 +161,7 @@ class Planner:
             # spreadsheets. When selected as the target they are manufactured.
             default_mode = 'buy' if tid != product_id and c.types.get(tid, {}).get('group_id') == 1136 else 'build'
             building = recipe is not None and overrides.get(tid, {}).get('mode', default_mode) != 'buy'
+            if skip_reactions and recipe and recipe['activity']=='reaction':building=False
             graph[tid] = recipe if building else None
             if building:
                 for material in recipe['materials']:
@@ -285,7 +288,7 @@ class Planner:
         for row in [*rows.values(),*blueprint_shortages]:row['is_blueprint']=row['id'] in blueprint_ids
         shopping = sorted([r for r in rows.values() if r['buy']]+blueprint_shortages, key=lambda r: (r['category'], normalize_name(r['name'])))
         result={'product_id': product_id, 'name': c.name(product_id), 'quantity': quantity,
-                'activity':c.recipes[product_id]['activity'],'manufacturer_id':manufacturer_id,
+                'activity':c.recipes[product_id]['activity'],'manufacturer_id':manufacturer_id,'skip_reactions':skip_reactions,
                 'blueprint_shortages':blueprint_shortages,'blueprint_usage':blueprint_usage,
                 'queue': queue, 'shopping': shopping, 'rows': [rows[i] for i in reversed(order)],
                 'summary': {'items': len(queue), 'runs': sum(r['runs'] for r in queue),

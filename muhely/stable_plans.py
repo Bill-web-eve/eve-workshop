@@ -9,11 +9,11 @@ def schema(store):
         db.execute('CREATE TABLE IF NOT EXISTS stable_plan_views(key TEXT PRIMARY KEY, snapshot TEXT NOT NULL, data TEXT NOT NULL, updated REAL NOT NULL)')
 
 
-def key(context,plans,product,quantity,saved_id,manufacturer,catalog,characters):
-    pool=[{k:p.get(k) for k in ['id','product_id','quantity','reserve_active','reserved_at','created','manufacturer_id']}
+def key(context,plans,product,quantity,saved_id,manufacturer,catalog,characters,skip_reactions=False):
+    pool=[{k:p.get(k) for k in ['id','product_id','quantity','reserve_active','reserved_at','created','manufacturer_id','skip_reactions']}
           for p in plans if p.get('corporation_id')==context.get('corporation_id')]
     pool.sort(key=lambda p:p['id'])
-    value=[1,context.get('corporation_id'),product,quantity,saved_id,manufacturer,context['settings'],
+    value=[2,skip_reactions,context.get('corporation_id'),product,quantity,saved_id,manufacturer,context['settings'],
            context['inventory'],context['parameters'],pool,catalog,sorted(c['id'] for c in characters)]
     return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 

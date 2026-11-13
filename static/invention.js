@@ -3,14 +3,14 @@ let inventionKey='',inventionOptions=null,inventionResult=null,inventionBusy=fal
 let financeInvention=null,financeInventionRequest=null,financeInventionKey='';
 const inventionNumber=v=>Number(v).toLocaleString(EveI18n.locale,{maximumFractionDigits:6});
 const inventionMoney=v=>v==null?'–':EveCosts.format(BigInt(v));
-function inventionTargetKey(){return JSON.stringify([productId,activePlanId,corporationId,targetQuantity()]);}
+function inventionTargetKey(){return JSON.stringify([productId,activePlanId,corporationId,targetQuantity(),$('#skip-reactions')?.checked===true]);}
 function inventionProfileActive(c,f){return !!(f?.invention?.enabled&&f.invention.product_id===c.plan.product_id&&c.plan.queue.find(r=>r.id===c.plan.product_id)?.parameters?.kind!=='BPO');}
 async function loadFinanceInvention(){
  if(!financeContext||!financePrefs||!inventionProfileActive(financeContext,financePrefs)){financeInvention=null;financeInventionKey='';return;}
  const c=financeContext,f=financePrefs,key=JSON.stringify([financeKey,f.invention,f.materials,c.quantity]);
  if(financeInventionRequest)return;
  financeInventionKey=key;financeInventionRequest=key;
- try{const data=c.quantity?await api('/api/invention/estimate',{config:f.invention,quantity:c.quantity,corporation_id:corporationId,manufacturing_prices:f.materials}):{selected:{bpc_total_cents:'0'},price_ids:[]};
+ try{const data=c.quantity?await api('/api/invention/estimate',{config:f.invention,quantity:c.quantity,corporation_id:corporationId,manufacturing_prices:f.materials,skip_reactions:c.plan.skip_reactions===true}):{selected:{bpc_total_cents:'0'},price_ids:[]};
   if(key===JSON.stringify([financeKey,financePrefs?.invention,financePrefs?.materials,financeContext?.quantity])){financeInvention={...data,key};applyProductionFinance();}
  }catch(e){if(key===financeInventionKey){financeInvention={key,error:e.message};applyProductionFinance();}}
  finally{financeInventionRequest=null;}
@@ -48,7 +48,7 @@ async function calculateInvention(manual=false,read=true){
  if(inventionBusy)return;const key=inventionKey,generation=inventionGeneration,config=read?readInventionForm():inventionOptions.config;
  delete dirty.invention;inventionBusy=true;inventionError='';render();
  try{
-  const body={config,quantity:targetQuantity(),corporation_id:corporationId,manufacturing_prices:inventionOptions.manufacturing_prices,check_data:read||manual,refresh_all:manual};
+  const body={config,quantity:targetQuantity(),corporation_id:corporationId,manufacturing_prices:inventionOptions.manufacturing_prices,skip_reactions:$('#skip-reactions')?.checked===true,check_data:read||manual,refresh_all:manual};
   const data=await api('/api/invention/estimate',body);
   if(key!==inventionKey||generation!==inventionGeneration)return;inventionResult=data;
   if(data.refresh_pending||data.price_running||data.industry.running||data.skill_refresh?.running){clearTimeout(inventionTimer);inventionTimer=setTimeout(()=>{if(view==='invention'&&!dirty.invention)void calculateInvention(false,false);},1600);}

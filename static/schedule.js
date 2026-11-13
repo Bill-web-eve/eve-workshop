@@ -9,7 +9,7 @@ let scheduleTimelineDays=EveScheduleGraph.DEFAULT_DAYS,scheduleWindow=0;
 try{const saved=JSON.parse(localStorage.getItem('eve-muhely-schedule-timeline')||'{}');if(EveScheduleGraph.validDays(saved.days))scheduleTimelineDays=saved.days;}catch{}
 const scheduleViewport=()=>({days:scheduleTimelineDays,window:scheduleWindow});
 function saveScheduleTimeline(){try{localStorage.setItem('eve-muhely-schedule-timeline',JSON.stringify({days:scheduleTimelineDays}));}catch{}}
-const scheduleKey=()=>JSON.stringify([productId,targetQuantity(),corporationId,activePlanId,scheduleRevision]);
+const scheduleKey=()=>JSON.stringify([productId,targetQuantity(),corporationId,activePlanId,$('#skip-reactions')?.checked===true,scheduleRevision]);
 const scheduleTime=n=>n?EveI18n.date(n*1000,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'–';
 function readScheduleOptions(){
   const form=$('#schedule-form');
@@ -30,7 +30,7 @@ function renderSchedule(content){
   $('#schedule-form').oninput=readScheduleOptions;
   $('#schedule-form').onsubmit=async event=>{
     event.preventDefault();if(!productId||scheduleRequest||(typeof plan!=='undefined'&&(plan?.preview_only||plan?.refresh_error)))return;
-    const opts=readScheduleOptions(),key=scheduleKey(),body={product_id:productId,quantity:targetQuantity(),corporation_id:corporationId,saved_plan_id:activePlanId,
+    const opts=readScheduleOptions(),key=scheduleKey(),body={product_id:productId,quantity:targetQuantity(),corporation_id:corporationId,saved_plan_id:activePlanId,skip_reactions:$('#skip-reactions')?.checked===true,
       characters:opts.characters,owned_only:opts.owned_only,transfer_blueprints:opts.transfer_blueprints,min_job_hours:opts.min_job_hours};
     for(const field of ['start','supply_at'])if(opts[field])body[field]=new Date(opts[field]).getTime()/1000;
     scheduleRequest=api('/api/schedule',body);render();

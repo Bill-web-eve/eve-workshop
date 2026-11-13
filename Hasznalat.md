@@ -199,6 +199,12 @@ A bónuszok szorzódnak, és az adott tevékenység minden lépésére vonatkozn
 
 A célmennyiségből a már meglévő késztermékeket is levonja. Ha például van 3 Redeemered, és **további 3-at** szeretnél gyártani, a Készlet oldalon a Redeemer sorának **Másra foglalva (kézi)** mezőjébe írj 3-at. A meglévő hajókat így minden terv félreteszi, az újonnan elkészülő példányok viszont csökkentik a hátralévő mennyiséget. Ez valódi készlet mellett működik; ne állítsd a kézi készletet 0-ra, mert az frissítés után is elrejtené az új hajókat. A gyártási oldalon külön összesítés mutatja a késztermékből és jobkimenetből fedezett mennyiséget.
 
+## Reakciók kihagyása
+
+A gyártási cél alatt a **Reakciók kihagyása** kapcsolóval a reakciótermékek beszerzendő alapanyaggá válnak. A rendszer ezek meglévő készletét és folyamatban lévő mennyiségét levonja; csak a fennmaradó hiányt kell beszerezni. A reakciók bemeneteit, formuláit és munkaköltségét nem számolja a tervhez. A gyártási lépések megmaradnak.
+
+A kapcsoló tervenként mentődik; módosítás után a **Terv és foglalás frissítése** gombbal véglegesítsd a változást. Az előnézet önmagában nem módosítja a mentett foglalásokat. Az anyaghiány, a költségszámítás, a gráf és az ütemező ugyanazt a módot használja. Az ütemező a hiányzó reakciótermékeket a beállított anyagérkezési időre várja. Ha reakciótermék a cél, bekapcsolt állapotban azt is beszerzésként kezeli. A korábbi tervekben a kapcsoló alapból kikapcsolt.
+
 ## Gyártási gráf
 
 A kiválasztott vagy megnyitott mentett tervhez a bal oldali **Gyártási gráf** menü mutatja az összefüggéseket. A nyilak balról jobbra, a bemenettől a belőle készülő termék felé haladnak. Alapból csak a még gyártandó reakciók és komponensek látszanak, ugyanazokkal a mennyiségekkel és runokkal, mint a táblázatos listában. A csomópontok a kerekített gyártandó darabszámot, a hiányt, valamint a szabad készletet és jobkimenetet is jelzik. A foglalásokat már levontuk.

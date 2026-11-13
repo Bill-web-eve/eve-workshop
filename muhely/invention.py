@@ -99,7 +99,7 @@ def fee(industry,catalog,product_ids,activity,facility,runs=1):
             'complete':complete,'stale':any(r and r['data']['expires']<=industry.clock() for r in data.values())}
 
 
-def compare(store,catalog,industry,config,quantity,quote_provider,manufacturing_prices,parameters=None,blueprints=None):
+def compare(store,catalog,industry,config,quantity,quote_provider,manufacturing_prices,parameters=None,blueprints=None,skip_reactions=False):
     config=validate(config,store,catalog);quantity=integer(quantity,'Mennyiség',10**6,1);tid=config['product_id'];recipe=catalog.inventions[tid]
     character=next((c for c in profiles(store,store.settings()) if c['id']==config['inventor_id']),None)
     skills=[{'id':s['typeID'],'name':catalog.name(s['typeID']),'required':s['level'],'active':(character or {}).get('levels',{}).get(s['typeID'],0)} for s in recipe['skills']]
@@ -112,7 +112,7 @@ def compare(store,catalog,industry,config,quantity,quote_provider,manufacturing_
     settings=store.settings()
     for variant in variants:
         params=copy.deepcopy(parameters or {});params[tid]={'source':'manual','me':2+variant['me'],'te':4+variant['te'],'job_runs':recipe['runs']+variant['runs']}
-        plan=Planner(catalog).calculate(tid,quantity,settings,parameters=params,blueprints=blueprints or [])
+        plan=Planner(catalog).calculate(tid,quantity,settings,parameters=params,blueprints=blueprints or [],skip_reactions=skip_reactions)
         mats=[{'id':r['id'],'quantity':(r['used_stock']+r['used_wip']) if r['runs'] else r['required']} for r in plan['rows'] if r['id']!=tid]
         mats=[m for m in mats if m['quantity']>0];all_ids.update(m['id'] for m in mats)
         formula=[] # Reusable BPOs/formulas are capital assets, not per-ship consumption.

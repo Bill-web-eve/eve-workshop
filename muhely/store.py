@@ -91,6 +91,8 @@ class Store:
                 db.execute('ALTER TABLE plans ADD COLUMN reserved_at REAL')
             if 'corporation_id' not in columns:
                 db.execute('ALTER TABLE plans ADD COLUMN corporation_id INTEGER')
+            if 'skip_reactions' not in columns:
+                db.execute('ALTER TABLE plans ADD COLUMN skip_reactions INTEGER NOT NULL DEFAULT 0')
             if 'manufacturer_id' not in columns:
                 db.execute('ALTER TABLE plans ADD COLUMN manufacturer_id INTEGER')
             if 'monitoring_enabled' not in {r['name'] for r in db.execute('PRAGMA table_info(corporations)')}:
@@ -148,24 +150,24 @@ class Store:
 
     def plans(self):
         with self.db() as db:
-            return [{**dict(row), 'reserve_active': bool(row['reserve_active'])} for row in db.execute(
-                'SELECT id,name,product_id,quantity,created,reserve_active,reserved_at,corporation_id,manufacturer_id FROM plans ORDER BY created DESC,id')]
+            return [{**dict(row), 'reserve_active': bool(row['reserve_active']), 'skip_reactions': bool(row['skip_reactions'])} for row in db.execute(
+                'SELECT id,name,product_id,quantity,created,reserve_active,reserved_at,corporation_id,manufacturer_id,skip_reactions FROM plans ORDER BY created DESC,id')]
 
     def save_plan(self, plan):
         with self.db() as db:
-            db.execute('''INSERT INTO plans(id,name,product_id,quantity,created,reserve_active,reserved_at,corporation_id,manufacturer_id)
-                       VALUES (:id,:name,:product_id,:quantity,:created,:reserve_active,:reserved_at,:corporation_id,:manufacturer_id)
+            db.execute('''INSERT INTO plans(id,name,product_id,quantity,created,reserve_active,reserved_at,corporation_id,manufacturer_id,skip_reactions)
+                       VALUES (:id,:name,:product_id,:quantity,:created,:reserve_active,:reserved_at,:corporation_id,:manufacturer_id,:skip_reactions)
                        ON CONFLICT(id) DO UPDATE SET name=excluded.name,product_id=excluded.product_id,
                        quantity=excluded.quantity,reserve_active=excluded.reserve_active,reserved_at=excluded.reserved_at,
-                       manufacturer_id=excluded.manufacturer_id''', {'corporation_id':None,'manufacturer_id':None,**plan})
+                       manufacturer_id=excluded.manufacturer_id,skip_reactions=excluded.skip_reactions''', {'corporation_id':None,'manufacturer_id':None,'skip_reactions':False,**plan})
 
     def save_reservation_order(self,corporation_id,expected,changes):
         from .reservations import revision
         from .planner import PlanningError
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
-            current=[{**dict(row),'reserve_active':bool(row['reserve_active'])} for row in db.execute(
-                'SELECT id,name,product_id,quantity,created,reserve_active,reserved_at,corporation_id,manufacturer_id FROM plans')]
+            current=[{**dict(row),'reserve_active':bool(row['reserve_active']),'skip_reactions':bool(row['skip_reactions'])} for row in db.execute(
+                'SELECT id,name,product_id,quantity,created,reserve_active,reserved_at,corporation_id,manufacturer_id,skip_reactions FROM plans')]
             if revision(current,corporation_id)!=expected:raise PlanningError('A foglalások megváltoztak. Frissítsd a listát, majd próbáld újra.')
             db.executemany('UPDATE plans SET reserved_at=? WHERE id=?',[(p['reserved_at'],p['id']) for p in changes if p.get('corporation_id')==corporation_id and p['reserve_active']])
 

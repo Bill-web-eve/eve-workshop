@@ -250,6 +250,12 @@ Use **Details** to inspect a planet. Factory supply checks cover the next cycle 
 
 Missing permissions, failed requests or stale API snapshots are marked for review. Old factory colony states remain dated estimates; refreshing the HTTP response does not make the original colony state current. Open the planet in EVE and refresh the app after the ESI cache expires to obtain updated data. The visible PI page checks every minute while the app is running. Closed apps do not monitor planets.
 
+## Skip reactions
+
+Use **Skip reactions** below the production target to treat reaction products as purchased materials. Existing inventory and active job output are deducted; only the remaining shortfall must be purchased. Reaction inputs, formulas and job costs are excluded, while manufacturing steps remain.
+
+This option is saved per plan. Use **Update plan and reservation** to commit changes; previews alone do not change saved reservations. Material shortfall, costs, the dependency graph and the scheduler use the same mode. The scheduler waits for missing reaction products until the configured supply arrival time. If the target itself is a reaction product, it is also purchased while this option is enabled. Existing plans keep the option off by default.
+
 ## Production dependency graph
 
 Open **Production graph** for the current target or saved plan. Arrows run from inputs to products. By default only remaining manufacturing and reactions appear, with the same quantities and runs as the table. Nodes show rounded output, deficit, free stock and active output after reservations.

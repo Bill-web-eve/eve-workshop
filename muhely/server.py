@@ -280,7 +280,7 @@ class App:
             settings=self.scope_settings(cid)
             live=self.live_data(settings) if cid is None else self.corporation_data(cid,settings)
             result=invention.compare(self.store,self.catalog,self.industry,config,data.get('quantity'),quotes,source,
-                self.store.mapping('parameters',cid),live[2])
+                self.store.mapping('parameters',cid),live[2],skip_reactions=self.reaction_mode(data.get('skip_reactions')))
         if data.get('check_data') or data.get('refresh_all'):
             # Explicit Compare checks every dependency. Each provider still honors ESI expiry.
             for market,ids in result['price_ids_by_source'].items():
@@ -424,12 +424,12 @@ class App:
                     corporation_id=corporation_id,inventory=self.store.mapping('inventory',corporation_id),
                     parameters=self.store.mapping('parameters',corporation_id))
 
-    def _calculate(self, product_id, quantity, context, reservations=None, own=None, manufacturer_id=None,allow_pending=False):
+    def _calculate(self, product_id, quantity, context, reservations=None, own=None, manufacturer_id=None,allow_pending=False,skip_reactions=False):
         settings = context['settings']
         plan = self.planner.calculate(product_id, quantity, settings, context['inventory'], context['parameters'],
                                       context['stock'], context['wip'], context['blueprints'], context['jobs'],
                                       reservations=reservations, own_reservations=own,
-                                      skill_profiles=context['skill_profiles'],manufacturer_id=manufacturer_id,material_locations=context.get('material_locations'))
+                                      skill_profiles=context['skill_profiles'],manufacturer_id=manufacturer_id,material_locations=context.get('material_locations'),skip_reactions=skip_reactions)
         # Asset and job caches can disagree just after delivery. Do not allocate
         # those materials or create duplicate production until the assets catch up.
         planned = {r['id']: r for r in plan['rows']}
@@ -463,19 +463,19 @@ class App:
         same_pool=[p for p in plans if p.get('corporation_id')==context.get('corporation_id')]
         return allocate_plans(same_pool, lambda product, quantity, held: self._calculate(product, quantity, context, held,allow_pending=allow_pending),
             calculate_saved=lambda saved,held:self._calculate(saved['product_id'],saved['quantity'],context,held,
-                                                            manufacturer_id=saved.get('manufacturer_id'),allow_pending=allow_pending))
+                                                            manufacturer_id=saved.get('manufacturer_id'),allow_pending=allow_pending,skip_reactions=saved.get('skip_reactions',False)))
 
-    def _stable_key(self,context,plans,product,quantity,saved_id,manufacturer):
-        return stable_plans.key(context,plans,product,quantity,saved_id,manufacturer,self.catalog.meta,self.store.characters())
+    def _stable_key(self,context,plans,product,quantity,saved_id,manufacturer,skip_reactions=False):
+        return stable_plans.key(context,plans,product,quantity,saved_id,manufacturer,self.catalog.meta,self.store.characters(),skip_reactions)
 
     def _remember_allocations(self,plans,context,allocation):
         snapshot=stable_plans.marker(context)
         for saved in plans:
             if not saved['reserve_active'] or saved.get('corporation_id')!=context.get('corporation_id'):continue
-            key=self._stable_key(context,plans,saved['product_id'],saved['quantity'],saved['id'],saved.get('manufacturer_id'))
+            key=self._stable_key(context,plans,saved['product_id'],saved['quantity'],saved['id'],saved.get('manufacturer_id'),saved.get('skip_reactions',False))
             if not stable_plans.needs_update(self.store,key,snapshot):continue
             other,own=except_owner(allocation,saved['id'])
-            plan=self._calculate(saved['product_id'],saved['quantity'],context,other,own,saved.get('manufacturer_id'))
+            plan=self._calculate(saved['product_id'],saved['quantity'],context,other,own,saved.get('manufacturer_id'),skip_reactions=saved.get('skip_reactions',False))
             plan['saved_plan']={**saved,'preview_changed':False}
             plan['reservation_summary']={'active_count':allocation['active_count'],'other_plan_count':allocation['active_count']-1,
                                          'own':allocation['by_plan'].get(saved['id']),'provisional':False}
@@ -500,11 +500,18 @@ class App:
             raise PlanningError('Ez a mentett terv már nem található. Nyiss meg másik tervet vagy kezdj újat.')
         return found
 
-    def plan(self, product_id, quantity, saved_plan_id=None, corporation_id=None, manufacturer_id='saved',allow_preview=False):
+    @staticmethod
+    def reaction_mode(value,saved=None):
+        if value is None:return bool((saved or {}).get('skip_reactions',False))
+        if type(value) is not bool:raise PlanningError('A reakciók kihagyása igaz vagy hamis lehet.')
+        return value
+
+    def plan(self, product_id, quantity, saved_plan_id=None, corporation_id=None, manufacturer_id='saved',allow_preview=False,skip_reactions=None):
         with self.planning_lock, self.catalog.lock:
             context = self._context(corporation_id)
             plans = self.store.plans()
             saved = self._saved(plans, saved_plan_id) if saved_plan_id else None
+            skip_reactions=self.reaction_mode(skip_reactions,saved)
             manufacturer_id=saved.get('manufacturer_id') if manufacturer_id=='saved' and saved else None if manufacturer_id=='saved' else self.manufacturer(manufacturer_id,context['corporation_id'],saved.get('manufacturer_id') if saved else None)
             if saved and saved.get('corporation_id')!=context.get('corporation_id'):
                 raise PlanningError('A mentett terv másik készlethez tartozik. Nyisd meg a saját gyártási körében.')
@@ -512,33 +519,33 @@ class App:
                 raise PlanningError('Másik termékhez kezdj új tervet; a mentett terv saját foglalása csak a saját céljához használható.')
             # Editing a saved quantity previews the same priority allocation that
             # saving it will commit. No persistent reservation changes on GET.
-            preview = [{**p, 'quantity': quantity} if p['id'] == saved_plan_id else p for p in plans]
+            preview = [{**p, 'quantity': quantity,'manufacturer_id':manufacturer_id,'skip_reactions':skip_reactions} if p['id'] == saved_plan_id else p for p in plans]
             try:
                 allocation = self._allocate(preview, context)
                 other, own = except_owner(allocation, saved_plan_id)
-                plan = self._calculate(product_id, quantity, context, other, own,manufacturer_id)
+                plan = self._calculate(product_id, quantity, context, other, own,manufacturer_id,skip_reactions=skip_reactions)
             except AssetSnapshotPending as error:
                 if not allow_preview:raise
-                cached=stable_plans.load(self.store,self._stable_key(context,plans,product_id,quantity,saved_plan_id,manufacturer_id))
+                cached=stable_plans.load(self.store,self._stable_key(context,plans,product_id,quantity,saved_plan_id,manufacturer_id,skip_reactions))
                 if cached:
                     cached.update(preview_only=True,frozen_snapshot=True,inventory_wait={**error.info,'frozen_snapshot_at':cached['calculated_at']})
                     cached['reservation_summary']['provisional']=True
-                    cached['saved_plan']=({**saved,'preview_changed':quantity!=saved['quantity'] or (manufacturer_id or 0)!=(saved.get('manufacturer_id') or 0)} if saved else None)
+                    cached['saved_plan']=({**saved,'preview_changed':quantity!=saved['quantity'] or (manufacturer_id or 0)!=(saved.get('manufacturer_id') or 0) or skip_reactions!=saved.get('skip_reactions',False)} if saved else None)
                     return cached
                 # Read-only preview: keep the exact same cached assets/WIP and
                 # reservation priority. Never invent delivered output or write
                 # provisional holds. All saving/scheduling paths remain strict.
                 allocation = self._allocate(preview, context,allow_pending=True)
                 other, own = except_owner(allocation, saved_plan_id)
-                plan = self._calculate(product_id, quantity, context, other, own,manufacturer_id,allow_pending=True)
+                plan = self._calculate(product_id, quantity, context, other, own,manufacturer_id,allow_pending=True,skip_reactions=skip_reactions)
                 waits=allocation['pending']+([plan['inventory_wait']] if plan.get('inventory_wait') else [])
                 plan.update(preview_only=True,inventory_wait=pending_info(waits))
-            plan['saved_plan'] = ({**saved, 'preview_changed': quantity != saved['quantity'] or (manufacturer_id or 0)!=(saved.get('manufacturer_id') or 0)} if saved else None)
+            plan['saved_plan'] = ({**saved, 'preview_changed': quantity != saved['quantity'] or (manufacturer_id or 0)!=(saved.get('manufacturer_id') or 0) or skip_reactions!=saved.get('skip_reactions',False)} if saved else None)
             plan['reservation_summary'] = {'active_count': allocation['active_count'],
                 'other_plan_count': allocation['active_count']-int(bool(saved and saved['reserve_active'])),
                 'own': allocation['by_plan'].get(saved_plan_id),'provisional':bool(plan.get('preview_only'))}
             if not plan.get('preview_only'):
-                stable_plans.remember(self.store,self._stable_key(context,plans,product_id,quantity,saved_plan_id,manufacturer_id),stable_plans.marker(context),plan)
+                stable_plans.remember(self.store,self._stable_key(context,plans,product_id,quantity,saved_plan_id,manufacturer_id,skip_reactions),stable_plans.marker(context),plan)
             return plan
 
     def schedule(self,data):
@@ -550,10 +557,11 @@ class App:
             plans=self.store.plans();saved=self._saved(plans,sid) if sid else None
             if saved and (saved.get('corporation_id')!=cid or saved['product_id']!=product):
                 raise PlanningError('A mentett terv más termékhez vagy gyártási körhöz tartozik.')
-            preview=[{**p,'quantity':quantity} if p['id']==sid else p for p in plans]
+            skip_reactions=self.reaction_mode(data.get('skip_reactions'),saved)
+            preview=[{**p,'quantity':quantity,'skip_reactions':skip_reactions} if p['id']==sid else p for p in plans]
             allocation=self._allocate(preview,context);other,own=except_owner(allocation,sid)
             context['reservations']=other
-            def calculate(current):return self._calculate(product,quantity,current,other,own,None)
+            def calculate(current):return self._calculate(product,quantity,current,other,own,None,skip_reactions=skip_reactions)
             return scheduler.build(context,self.store,self.catalog,calculate,data)
 
     def shopping_summary(self,allow_preview=False):
@@ -612,6 +620,7 @@ class App:
             plans = self.store.plans()
             old = self._saved(plans, data['id']) if data.get('id') else None
             corporation_id=self.scope_id(data.get('corporation_id'))
+            skip_reactions=self.reaction_mode(data.get('skip_reactions'),old)
             manufacturer_id=self.manufacturer(data.get('manufacturer_id',old.get('manufacturer_id') if old else None),corporation_id,old.get('manufacturer_id') if old else None)
             if old and old.get('corporation_id')!=corporation_id:
                 raise PlanningError('A terv készlettulajdonosa nem módosítható. Másik corporationhöz kezdj új tervet.')
@@ -620,7 +629,7 @@ class App:
             now = time.time()
             saved = {'id': old['id'] if old else str(uuid.uuid4()),
                      'name': str(data.get('name') or self.catalog.name(product))[:120].strip(),
-                     'product_id': product, 'quantity': quantity,'manufacturer_id':manufacturer_id,
+                     'product_id': product, 'quantity': quantity,'manufacturer_id':manufacturer_id,'skip_reactions':skip_reactions,
                      'created': old['created'] if old else now, 'reserve_active': old['reserve_active'] if old else True,'corporation_id':corporation_id,
                      'reserved_at': (old['reserved_at'] if old and old['reserve_active'] else now) if not old or old['reserve_active'] else None}
             proposed = [p for p in plans if p['id'] != saved['id']]+[saved]
@@ -681,7 +690,7 @@ class App:
                 if isinstance(error,AssetSnapshotPending):
                     for saved in plans:
                         if saved.get('corporation_id')!=cid or not saved['reserve_active']:continue
-                        cached=stable_plans.load(self.store,self._stable_key(context,plans,saved['product_id'],saved['quantity'],saved['id'],saved.get('manufacturer_id')))
+                        cached=stable_plans.load(self.store,self._stable_key(context,plans,saved['product_id'],saved['quantity'],saved['id'],saved.get('manufacturer_id'),saved.get('skip_reactions',False)))
                         if cached and cached['reservation_summary'].get('own'):
                             allocation['by_plan'][saved['id']]=cached['reservation_summary']['own']
                             saved['allocation_frozen_at']=cached['calculated_at']
@@ -971,8 +980,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/plans/shopping':
                 return self.send(200,self.app.shopping_summary(allow_preview=query.get('preview',['0'])[0]=='1'))
             if path == '/api/plan':
+                reaction=query.get('skip_reactions',[None])[0]
+                if reaction not in [None,'0','1']:raise PlanningError('A reakciók kihagyása igaz vagy hamis lehet.')
                 return self.send(200, self.app.plan(int(query.get('product_id', ['0'])[0]), int(query.get('quantity', ['1'])[0]),
-                                                   query.get('saved_plan_id', [None])[0],query.get('corporation_id',[None])[0],query.get('manufacturer_id',['saved'])[0],allow_preview=query.get('preview',['0'])[0]=='1'))
+                                                   query.get('saved_plan_id', [None])[0],query.get('corporation_id',[None])[0],query.get('manufacturer_id',['saved'])[0],allow_preview=query.get('preview',['0'])[0]=='1',skip_reactions=None if reaction is None else reaction=='1'))
             return self.send(404, {'error': 'Nincs ilyen oldal.'})
         except (PlanningError, EsiError, ValueError) as error:
             message = str(error) if isinstance(error, (PlanningError, EsiError)) else 'Hibás kérés.'
