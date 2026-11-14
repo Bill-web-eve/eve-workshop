@@ -27,7 +27,7 @@ test('polling preserves unsaved labels, size, order and newly discovered windows
 test('permission, layout and activation require explicit clicks; invalid hotkeys do not save',async t=>{
  const {w,d,run,data,native}=await fixture();t.after(()=>w.close());d.querySelector('[data-preview-permission=screen]').click();await tick();assert.equal(native.findLast(r=>r.action==='previewPermission').kind,'screen');
  let form=d.querySelector('#preview-settings');form.elements.next_code.value='123';form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();assert(!native.some(r=>r.action==='previewConfigure'));assert(d.querySelector('#global-error').textContent.includes('must be different'));
- form.elements.next_code.value='124';form.elements.enabled.checked=true;form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();d.querySelector('#preview-layout').click();await tick();assert(native.findLast(r=>r.action==='previewConfigure').options.editing);assert(d.querySelector('#preview-status').textContent.includes('Editing layout'));
+ data.screen_permission=true;form.elements.next_code.value='124';form.elements.enabled.checked=true;form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await tick();await tick();d.querySelector('#preview-layout').click();await tick();assert(native.findLast(r=>r.action==='previewConfigure').options.editing);assert(d.querySelector('#preview-status').textContent.includes('Editing layout'));
  data.accessibility_permission=true;data.screen_permission=true;await run('loadPreview()');d.querySelector('[data-activate]').click();await tick();assert.equal(native.findLast(r=>r.action==='previewActivate').key,'a');
  data.windows[0].width=345;await run('loadPreview()');assert.equal(d.querySelector('[data-width]').value,'345');
 });
@@ -36,11 +36,11 @@ test('Mac bridge exposes only the intended preview messages',async t=>{
 });
 
 test('capture status waits for the first actual frame before calling a preview live',async t=>{
- const {w,d,run,data}=await fixture();t.after(()=>w.close());data.windows[0].capturing=true;await run('loadPreview()');assert.equal(d.querySelector('[data-preview-state]').textContent,'Starting preview…');data.windows[0].has_frame=true;await run('loadPreview()');assert.equal(d.querySelector('[data-preview-state]').textContent,'Live preview');
+ const {w,d,run,data}=await fixture();t.after(()=>w.close());data.screen_permission=true;data.windows[0].capturing=true;await run('loadPreview()');assert.equal(d.querySelector('[data-preview-state]').textContent,'Starting preview…');data.windows[0].has_frame=true;await run('loadPreview()');assert.equal(d.querySelector('[data-preview-state]').textContent,'Live preview');
 });
 
 test('shortcut delivery count updates without replacing edited fields',async t=>{
- const {w,d,run,data}=await fixture();t.after(()=>w.close());const form=d.querySelector('#preview-settings');form.querySelector('[data-label]').value='Keep label';form.dispatchEvent(new w.Event('input',{bubbles:true}));data.shortcut_count=4;await run('loadPreview()');assert.equal(d.querySelector('#preview-key-count').textContent,'4');assert.equal(d.querySelector('#preview-settings'),form);assert.equal(form.querySelector('[data-label]').value,'Keep label');data.error='hotkey_unavailable';await run('loadPreview()');assert(d.querySelector('#preview-status').textContent.includes('Shortcut listening could not start'));
+ const {w,d,run,data}=await fixture();t.after(()=>w.close());const form=d.querySelector('#preview-settings');form.querySelector('[data-label]').value='Keep label';form.dispatchEvent(new w.Event('input',{bubbles:true}));data.screen_permission=true;data.shortcut_count=4;await run('loadPreview()');assert.equal(d.querySelector('#preview-key-count').textContent,'4');assert.equal(d.querySelector('#preview-settings'),form);assert.equal(form.querySelector('[data-label]').value,'Keep label');data.error='hotkey_unavailable';await run('loadPreview()');assert(d.querySelector('#preview-status').textContent.includes('Shortcut listening could not start'));
 });
 
 
@@ -147,4 +147,21 @@ test('late native status cannot undo a newer explicit Preview switch',async t=>{
 });
 test('browser UI hides the native-only sidebar Preview switch',async t=>{
  const {w,d,native}=await fixture('browser',false);t.after(()=>w.close());assert.equal(d.querySelector('#sidebar-preview-toggle').hidden,true);assert.equal(native.length,0);
+});
+
+test('missing Mac screen permission is unknown client state, not an Offline report',async t=>{
+ const {w,d,data,run}=await fixture();t.after(()=>w.close());
+ data.windows.forEach(row=>row.online=false);await run('loadPreview()');
+ assert([...d.querySelectorAll('[data-preview-state]')].every(el=>el.textContent==='Screen access required'));
+ assert(d.querySelector('#preview-status').textContent.includes('Authorize the current EVE Workshop app'));
+ assert.equal(d.querySelector('#preview-no-windows').hidden,false);assert(d.querySelector('#preview-no-windows').textContent.includes('Saved windows and layouts are preserved'));
+ w.EveI18n.setLanguage('hu');await tick();assert(d.querySelector('[data-preview-state]').textContent.includes('Képernyőengedély szükséges'));
+ data.screen_permission=true;data.accessibility_permission=true;data.windows[0].online=true;await run('loadPreview()');
+ assert.equal(d.querySelector('[data-preview-state]').textContent,'Elérhető');assert.equal(d.querySelectorAll('[data-preview-state]')[1].textContent,'Offline');
+ assert.equal(d.querySelector('[data-activate]').disabled,false);assert.equal(d.querySelector('#preview-no-windows').hidden,true);
+});
+test('Windows client availability does not depend on Mac screen permissions',async t=>{
+ const {w,d,data,run}=await fixture('windows');t.after(()=>w.close());data.windows[1].online=false;await run('loadPreview()');
+ assert.equal(d.querySelector('[data-preview-state]').textContent,'Available');assert.equal(d.querySelectorAll('[data-preview-state]')[1].textContent,'Offline');
+ assert(!d.querySelector('#preview-status').textContent.includes('Authorize the current EVE Workshop app'));
 });

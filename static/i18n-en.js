@@ -1,6 +1,9 @@
 'use strict';
 // Source messages are Hungarian; placeholders preserve names, IDs and quantities.
 globalThis.EveEnglish={
+"Képernyőengedély szükséges": "Screen access required",
+"A kliensek felismeréséhez képernyőengedély szükséges. Engedélyezd az aktuális EVE Műhely appot a macOS beállításaiban, majd indítsd újra.": "Screen access is required to detect clients. Authorize the current EVE Workshop app in macOS settings, then restart it.",
+"A kliensek állapota engedély nélkül nem ellenőrizhető. A mentett ablakok és elrendezés megmaradnak.": "Client status cannot be checked without permission. Saved windows and layouts are preserved.",
 "Reakciók kihagyása": "Skip reactions",
 "A reakciótermékek beszerzendő alapanyagok.": "Reaction products are treated as purchased materials.",
 "A reakciótermékeket készletből, folyamatban lévő jobokból vagy beszerzésből fedezi; a reakciók bemeneteit nem bontja tovább.": "Reaction products are covered by inventory, active jobs or purchases; their reaction inputs are not expanded.",
